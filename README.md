@@ -140,7 +140,7 @@ Every step is bounded, deterministic, and statically analyzable.
 ## Repository structure
 
 ```
-TENOR.md          — full formal specification (v0.3)
+docs/TENOR.md     — full formal specification (v0.3)
 STABILITY.md      — pre-release stability notice
 CONTRIBUTING.md   — contribution guidelines
 conformance/      — elaborator conformance suite (47/47 tests passing)

@@ -9,7 +9,7 @@ fact, entity, rule, operation, flow, type
 ```
 
 Uppercase construct names (`Rule`, `Fact`, `Entity`, `Operation`, `Flow`) appear in:
-- `TENOR.md` when referring to formal construct definitions as concepts
+- `docs/TENOR.md` when referring to formal construct definitions as concepts
 - Comments and prose that discuss the language rather than writing it
 - The interchange JSON `"kind"` field values
 
@@ -32,7 +32,7 @@ cd elaborator && cargo run -- elaborate path/to/file.tenor
 ## Repository layout
 
 ```
-TENOR.md          — full formal specification (v0.3)
+docs/TENOR.md     — full formal specification (v0.3)
 conformance/      — elaborator conformance suite
   positive/       — valid DSL → expected interchange JSON
   negative/       — invalid DSL → expected error JSON
