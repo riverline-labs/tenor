@@ -24,18 +24,19 @@
 5. Fact
 6. Entity
 7. Rule
-8. Operation
-9. PredicateExpression
-10. Flow
-11. NumericModel
-12. ElaboratorSpec
-13. Complete Evaluation Model
-14. Static Analysis Obligations
-15. Executor Obligations
-16. Pending Work
-17. Appendix A — Acknowledged Limitations
-18. Appendix B — Model Convergence Record
-19. Appendix C — Worked Example: Escrow Release Contract
+8. Persona
+9. Operation
+10. PredicateExpression
+11. Flow
+12. NumericModel
+13. ElaboratorSpec
+14. Complete Evaluation Model
+15. Static Analysis Obligations
+16. Executor Obligations
+17. Pending Work
+18. Appendix A — Acknowledged Limitations
+19. Appendix B — Model Convergence Record
+20. Appendix C — Worked Example: Escrow Release Contract
 
 ---
 
@@ -77,7 +78,7 @@ These constraints are non-negotiable. They are not guidelines. Any proposed feat
 
 ## 3. Core Constructs Overview
 
-The language defines eleven constructs across three layers.
+The language defines twelve constructs across three layers.
 
 **Semantic layer** (dependency order — each depends only on those above):
 
@@ -86,6 +87,7 @@ BaseType            — closed value type set (includes Duration)
 Fact                — ground typed assertions; the evaluation root
 Entity              — finite state machines in a static DAG
 Rule                — stratified verdict-producing evaluation (includes variable×variable)
+Persona             — declared identity tokens for authority gating
 Operation           — persona-gated, precondition-guarded state transitions
 PredicateExpression — quantifier-free FOL with arithmetic and bounded quantification
 Flow                — finite DAG orchestration with sequential and parallel steps
@@ -526,9 +528,83 @@ Rate staleness is an executor obligation (E1). Multi-hop conversions require cha
 
 ---
 
-## 8. Operation
+## 8. Persona
 
 ### 8.1 Definition
+
+A Persona is a declared identity construct. It establishes a named participant identity that may be referenced in Operation `allowed_personas` sets, Flow step `persona` fields, `HandoffStep` `from_persona`/`to_persona` fields, `CompensationStep` `persona` fields, and `Escalate` `to_persona` fields. Personas are the authority namespace of the contract — they define *who* can act.
+
+```
+Persona = (
+  id: PersonaId
+)
+```
+
+PersonaId is a non-empty UTF-8 string, unique within the contract. The set of all declared Personas P = {p1, ..., pn} is finite, fixed at contract definition time, and statically enumerable.
+
+A Persona carries no metadata, no description, no delegation, and no semantic content beyond its identity. It is an opaque token whose sole purpose is to make the authority namespace explicit and statically checkable. Documentation-level information about personas (display names, role descriptions) is provided via DSL comments or external documentation, not via construct fields.
+
+**DSL syntax:**
+
+```
+persona buyer
+persona seller
+persona compliance_officer
+persona escrow_agent
+```
+
+### 8.2 Semantics
+
+Persona declarations are consumed during elaboration and carried into the interchange format. They have no runtime evaluation rule. The existing Operation evaluation rule (Section 9.2) is unchanged: `execute(op, persona, verdict_set, entity_state)` checks `persona in op.allowed_personas` as a simple set membership test.
+
+Persona declaration ensures that the strings in `allowed_personas` sets and step `persona` fields are drawn from a declared, finite, statically known set. No new evaluation step is introduced. No existing evaluation step is modified.
+
+### 8.3 Constraints
+
+- Persona identifiers are unique within a contract. Two Persona declarations may not share the same id.
+- Persona ids occupy a distinct namespace from other construct kinds. A Persona named `Foo` does not conflict with an Entity named `Foo`.
+- Every persona reference in an Operation `allowed_personas` set must resolve to a declared Persona. Unresolved persona references are elaboration errors (Pass 5).
+- Every persona reference in a Flow step `persona` field (OperationStep, BranchStep, SubFlowStep), HandoffStep `from_persona`/`to_persona`, CompensationStep `persona`, and Escalate `to_persona` must resolve to a declared Persona. Unresolved persona references are elaboration errors (Pass 5).
+- The complete set of Persona identifiers is statically enumerable from the contract (Pass 2).
+- Unreferenced Persona declarations (declared but never used) are not elaboration errors. Static analysis tooling may optionally warn about them.
+
+### 8.4 Provenance
+
+```
+PersonaProvenance = (
+  id:   PersonaId,
+  file: string,
+  line: nat
+)
+```
+
+Persona provenance records the declaration site. Personas do not carry runtime provenance — they are declaration-time constructs whose identity is fixed at contract definition.
+
+### 8.5 Interchange Representation
+
+Persona constructs appear as items in the interchange `constructs` array with `"kind": "Persona"`.
+
+```json
+{
+  "id": "escrow_agent",
+  "kind": "Persona",
+  "provenance": {
+    "file": "escrow.tenor",
+    "line": 4
+  },
+  "tenor": "0.3"
+}
+```
+
+All JSON keys are sorted lexicographically. The `id` field is the PersonaId string. No additional fields are present — Persona carries no metadata in the interchange format.
+
+Existing persona string references in Operation `allowed_personas` arrays and Flow step `persona` fields remain as string values in the interchange format. They are not replaced with structured references. The validation that these strings resolve to declared Personas is an elaboration-time check (Pass 5), not an interchange-level structural constraint. This parallels how `fact_ref` strings in PredicateExpressions are validated against declared Facts without being replaced by structured references.
+
+---
+
+## 9. Operation
+
+### 9.1 Definition
 
 An Operation is a declared, persona-gated, precondition-guarded unit of work that produces entity state transitions as its sole side effect. Operations are the only construct in the evaluation model that produces side effects.
 
@@ -542,7 +618,7 @@ Operation = (
 )
 ```
 
-### 8.2 Evaluation
+### 9.2 Evaluation
 
 ```
 execute : Operation × PersonaId × ResolvedVerdictSet × EntityState → EntityState' | Error
@@ -559,23 +635,24 @@ execute(op, persona, verdict_set, entity_state) =
   return entity_state'
 ```
 
-### 8.3 Execution Sequence
+### 9.3 Execution Sequence
 
 The execution sequence is fixed and invariant: (1) persona check, (2) precondition evaluation, (3) atomic effect application, (4) provenance emission. No step may be reordered. No step may be skipped if the preceding step succeeds.
 
-### 8.4 Constraints
+### 9.4 Constraints
 
 - An Operation with an empty `allowed_personas` set is a contract error detectable at load time.
+- Every PersonaId in `allowed_personas` must resolve to a declared Persona construct (Section 8). Unresolved persona references are elaboration errors (Pass 5).
 - Each declared effect `(entity_id, from_state, to_state)` must reference an entity declared in the contract, and the transition `(from_state, to_state)` must exist in that entity's declared transition relation. Checked at contract load time. An Operation may declare effects across multiple entities — each is validated independently.
 - Operations do not produce verdict instances. Verdict production belongs exclusively to Rules.
 - Atomicity is an executor obligation. Either all declared state transitions occur, or none do.
 - The executor must validate that the current entity state matches the transition source for each declared effect. This is an executor obligation not encoded in the Operation formalism.
 
-### 8.4.1 No Wildcard Transitions
+### 9.4.1 No Wildcard Transitions
 
 Every effect must name an explicit source state and an explicit target state. Wildcard notation (e.g., `* -> approved`) is not permitted.
 
-**Why:** The executor has an explicit obligation (§15, E2) to validate that the current entity state matches the transition source for each declared effect before applying it. A wildcard would make this validation impossible — the executor would not know which source state to expect. If an operation should be invocable from multiple source states, the contract must either declare multiple operations each with a single explicit source state, or declare multiple effects in the same operation each with a different explicit source state. Multiple effects in one operation are applied atomically; the executor validates the current state against each declared source and applies the matching transition.
+**Why:** The executor has an explicit obligation (§16, E2) to validate that the current entity state matches the transition source for each declared effect before applying it. A wildcard would make this validation impossible — the executor would not know which source state to expect. If an operation should be invocable from multiple source states, the contract must either declare multiple operations each with a single explicit source state, or declare multiple effects in the same operation each with a different explicit source state. Multiple effects in one operation are applied atomically; the executor validates the current state against each declared source and applies the matching transition.
 
 Incorrect:
 
@@ -603,7 +680,7 @@ operation reject_requisition {
 }
 ```
 
-### 8.5 Provenance
+### 9.5 Provenance
 
 ```
 OperationProvenance = (
@@ -618,13 +695,13 @@ OperationProvenance = (
 
 ---
 
-## 9. PredicateExpression
+## 10. PredicateExpression
 
-### 9.1 Definition
+### 10.1 Definition
 
 A PredicateExpression is a quantifier-free first-order logic formula over ground terms drawn from the resolved FactSet, the resolved VerdictSet, and literal constants declared in the contract. All terms are ground at evaluation time. No free variables. No recursion. No side effects.
 
-### 9.2 Grammar
+### 10.2 Grammar
 
 ```
 Pred ::=
@@ -655,7 +732,7 @@ list_ref ::=
   | fact_id.field_name             // List-typed field of a Record Fact
 ```
 
-### 9.3 Evaluation
+### 10.3 Evaluation
 
 ```
 eval_pred : PredicateExpression × FactSet × VerdictSet → Bool
@@ -686,7 +763,7 @@ resolve_list_ref(fact_id, F)       = F[fact_id]
 resolve_list_ref(fact_id.field, F) = F[fact_id].field
 ```
 
-### 9.4 Constraints
+### 10.4 Constraints
 
 - No implicit type coercions. A comparison between incompatible types is a load-time contract error.
 - Quantification domains must be List-typed Facts or List-typed fields of Record Facts with declared max bounds.
@@ -694,15 +771,15 @@ resolve_list_ref(fact_id.field, F) = F[fact_id].field
 - Variable × variable multiplication is not permitted.
 - All arithmetic follows the NumericModel.
 
-### 9.5 Complexity
+### 10.5 Complexity
 
 Scalar predicate evaluation is O(|expression tree|). Quantified predicate evaluation is O(max × |body|) per quantifier level. Nested quantifiers multiply bounds. All bounds are statically derivable from declared maxes and expression tree size.
 
-### 9.6 Entity State Is Not a Predicate Term
+### 10.6 Entity State Is Not a Predicate Term
 
 A common incorrect assumption is that the current state of an Entity can be tested in a precondition using expressions like `Requisition.state = "draft"`. This is not permitted.
 
-**Why:** The term grammar in §9.2 defines the only legal atoms in PredicateExpressions: fact references, literals, verdict presence tests, and arithmetic expressions. Entity state is not in this grammar. Facts and verdicts are the only inputs to predicate evaluation. State is an output of Operations, not an input to Rules. If an operation should only be available in certain states, that constraint is enforced through the operation's effect declarations — the executor validates that the current state matches the source state of each declared transition before applying any effect.
+**Why:** The term grammar in §10.2 defines the only legal atoms in PredicateExpressions: fact references, literals, verdict presence tests, and arithmetic expressions. Entity state is not in this grammar. Facts and verdicts are the only inputs to predicate evaluation. State is an output of Operations, not an input to Rules. If an operation should only be available in certain states, that constraint is enforced through the operation's effect declarations — the executor validates that the current state matches the source state of each declared transition before applying any effect.
 
 Incorrect:
 
@@ -728,9 +805,9 @@ operation submit_requisition {
 
 ---
 
-## 10. Flow
+## 11. Flow
 
-### 10.1 Definition
+### 11.1 Definition
 
 A Flow is a finite, directed acyclic graph of steps that orchestrates the execution of declared Operations under explicit persona control. Flows do not compute — they sequence. All business logic remains in Rules and Operations.
 
@@ -743,7 +820,7 @@ Flow = (
 )
 ```
 
-### 10.2 Step Types
+### 11.2 Step Types
 
 ```
 Step =
@@ -792,7 +869,7 @@ JoinPolicy = (
 // first_success is not permitted — all branches run to completion
 ```
 
-### 10.3 Failure Handling
+### 11.3 Failure Handling
 
 ```
 FailureHandler =
@@ -809,7 +886,7 @@ CompensationStep = (
 
 Every OperationStep and SubFlowStep must declare a FailureHandler. A missing FailureHandler is a contract error detectable at load time.
 
-### 10.4 Evaluation
+### 11.4 Evaluation
 
 **Frozen verdict semantics:** Within a Flow, the ResolvedVerdictSet is computed once at Flow initiation and is not recomputed after intermediate Operation execution. Operations within a Flow do not see entity state changes produced by preceding steps in the same Flow. This is a fundamental semantic commitment: Flows are pure decision graphs over a stable logical universe. The consequence is that a Rule whose inputs include entity state will not reflect mid-Flow transitions — such patterns must be expressed across Flow boundaries, not within them.
 
@@ -842,11 +919,12 @@ execute_flow(flow, initiating_persona, snapshot) =
         return step.outcome
 ```
 
-### 10.5 Constraints
+### 11.5 Constraints
 
 - Step graph must be acyclic. Verified at load time via topological sort.
 - All StepIds referenced in a Flow must exist in the steps map.
 - All OperationIds referenced must exist in the contract.
+- All PersonaIds in step `persona` fields (OperationStep, BranchStep, SubFlowStep), HandoffStep `from_persona`/`to_persona`, CompensationStep `persona`, and Escalate `to_persona` must resolve to declared Persona constructs (Section 8). Unresolved persona references are elaboration errors (Pass 5).
 - Flow reference graph (SubFlowStep references) must be acyclic. Verified via DFS across all contract files.
 - Sub-flows inherit the invoking Flow's snapshot. Sub-flows do not take independent snapshots.
 - Typed outcome routing is Flow-side classification only. The Operation canonical form is unchanged.
@@ -856,7 +934,7 @@ execute_flow(flow, initiating_persona, snapshot) =
 - All branches run to completion before the join evaluates. Branch execution order is implementation-defined. The join outcome is a function of the set of branch terminal outcomes, not their order.
 - `first_success` merge policy is not supported.
 
-### 10.6 Provenance
+### 11.6 Provenance
 
 ```
 FlowProvenance = [StepRecord]
@@ -872,13 +950,13 @@ Flow provenance is the ordered composition of step-level records. No Flow-level 
 
 ---
 
-## 11. NumericModel
+## 12. NumericModel
 
-### 11.1 Definition
+### 12.1 Definition
 
 All numeric computation uses fixed-point decimal arithmetic. No floating-point arithmetic is permitted in conforming implementations. Integer arithmetic is exact within declared range. Decimal arithmetic uses declared precision and scale.
 
-### 11.2 Promotion Rules
+### 12.2 Promotion Rules
 
 The promotion function is total over all numeric type combinations:
 
@@ -895,29 +973,29 @@ any op integer_literal           → literal typed as Int(n,n), then Int rules
 any op decimal_literal           → literal typed as Decimal(digits, frac_digits), then rules
 ```
 
-### 11.3 Overflow
+### 12.3 Overflow
 
 Arithmetic that produces a result outside the declared range aborts evaluation with a typed overflow error. Silent wraparound and saturation are not permitted.
 
-### 11.4 Rounding
+### 12.4 Rounding
 
 Where a Decimal result has more fractional digits than the declared scale, rounding is applied. The rounding mode is **round half to even** (IEEE 754 roundTiesToEven). This mode is mandatory for all conforming implementations.
 
-### 11.5 Literal Types
+### 12.5 Literal Types
 
 Integer literals are typed as Int(n, n). Decimal literals are typed as Decimal(total_digits, fractional_digits) derived from the literal's written form.
 
 ---
 
-## 12. ElaboratorSpec
+## 13. ElaboratorSpec
 
-### 12.1 Overview
+### 13.1 Overview
 
 The elaborator is the trust boundary between human authoring and formal guarantees. It transforms Tenor source into a valid TenorInterchange bundle through six deterministic, ordered passes. A bug in the elaborator is more dangerous than a bug in the executor — it silently produces malformed interchange that the executor then operates on correctly, producing wrong results from correct execution.
 
 A conforming elaborator must be deterministic: identical DSL input produces byte-for-byte identical interchange output on every invocation. No environmental dependency (timestamp, process id, random seed) may affect the output.
 
-### 12.2 Elaboration Passes
+### 13.2 Elaboration Passes
 
 **Pass 0 — Lexing and parsing**
 Input: DSL source text (UTF-8). Output: Parse tree.
@@ -965,16 +1043,16 @@ Input: Unified parse tree, type environment, construct index. Output: Typed expr
 Input: Typed ASTs, construct index, type environment. Output: Validation report.
 
 - Entity: initial ∈ states; transition endpoints ∈ states; hierarchy acyclic.
-- Operation: allowed_personas non-empty; effect entity_ids resolve; effect transitions exist in entity; effects ⊆ entity.transitions.
+- Operation: allowed_personas non-empty; all allowed_personas entries resolve to declared Persona constructs; effect entity_ids resolve; effect transitions exist in entity; effects ⊆ entity.transitions.
 - Rule: stratum ≥ 0; all refs resolve; verdict_refs reference strata < this rule's stratum; produce clauses reference declared VerdictType ids (unresolved VerdictType references are Pass 5 errors).
-- Flow: entry exists; all step refs resolve; step graph acyclic; flow reference graph acyclic; all OperationSteps and SubFlowSteps declare FailureHandlers.
+- Flow: entry exists; all step refs resolve; all step persona fields resolve to declared Persona constructs; step graph acyclic; flow reference graph acyclic; all OperationSteps and SubFlowSteps declare FailureHandlers.
 - Parallel: branch sub-DAGs acyclic; no overlapping entity effect sets across branches (transitively resolved).
 - **Error attribution:** errors are reported at the source line of the specific field or sub-expression responsible for the violation (e.g., the `initial:` field line, not the `Entity` keyword line; the `verdict_present(...)` call line, not the enclosing `Rule` keyword line). This requires AST nodes at all levels — RawExpr variants, RawStep variants, construct sub-field lines — to carry their own source line, set by the parser at token consumption time and treated as immutable by all elaboration passes.
 
 **Pass 6 — Interchange serialization**
 Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON bundle.
 
-- Canonical construct order: VerdictTypes, Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical).
+- Canonical construct order: Personas (alphabetical), VerdictTypes, Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical).
 - Serialize Flow steps as an array. Entry step is first; remaining steps follow in topological order of the step DAG.
 - Sort all JSON object keys lexicographically within each construct document.
 - Represent all Decimal, Money, and Duration values as structured typed objects. No JSON native floats for Decimal or Money values.
@@ -983,11 +1061,11 @@ Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON 
 - Preserve DSL declaration order for all array values. Array values are never sorted.
 - Emit `"tenor"` version and `"kind"` on every top-level document.
 
-### 12.3 Error Reporting Obligation
+### 13.3 Error Reporting Obligation
 
 Every elaboration error must identify: construct kind, construct id (if determinable), field name, source file, source line, and a human-readable description of the violation. Errors referencing internal elaborator state or elaborator-internal terminology are not conforming.
 
-### 12.4 Conformance Test Categories
+### 13.4 Conformance Test Categories
 
 A conforming elaborator must pass all tests in the Tenor Elaborator Conformance Suite:
 
@@ -1001,9 +1079,9 @@ A conforming elaborator must pass all tests in the Tenor Elaborator Conformance 
 
 _Note: The Tenor Elaborator Conformance Suite is at `conformance/`. It is a prerequisite for any implementation to be declared conforming._
 
-## 13. Complete Evaluation Model
+## 14. Complete Evaluation Model
 
-### 13.1 Contract Load Time
+### 14.1 Contract Load Time
 
 The following checks are performed when a contract is loaded. A contract that fails any check is inadmissible.
 
@@ -1029,6 +1107,9 @@ The following checks are performed when a contract is loaded. A contract that fa
 
 6.  persona_check(op.allowed_personas ≠ ∅)
     — no Operation has an empty allowed_personas set
+    — all persona references (Operation allowed_personas, Flow step persona fields,
+      HandoffStep from/to_persona, CompensationStep persona, Escalate to_persona)
+      resolve to declared Persona constructs
 
 7.  failure_handler_check
     — every OperationStep and SubFlowStep declares a FailureHandler
@@ -1037,14 +1118,14 @@ The following checks are performed when a contract is loaded. A contract that fa
     — for all rules r, r': if r references output of r' then stratum(r') < stratum(r)
 ```
 
-### 13.2 Flow Initiation
+### 14.2 Flow Initiation
 
 ```
 snapshot = take_snapshot(contract, current_rules, current_entity_states)
 // Point-in-time. Rule evolution after this point does not affect the Flow.
 ```
 
-### 13.3 Per-Evaluation Sequence
+### 14.3 Per-Evaluation Sequence
 
 ```
 // Read path
@@ -1058,7 +1139,7 @@ state'      = execute(op, persona, verdicts, state)        // → EntityState' |
 outcome     = execute_flow(flow, persona, snapshot)        // → FlowOutcome
 ```
 
-### 13.4 Provenance Chain
+### 14.4 Provenance Chain
 
 Every terminal outcome has a complete provenance chain:
 
@@ -1077,7 +1158,7 @@ FlowOutcome
 
 Every chain terminates at Facts. Facts are the provenance roots. No derivation precedes them.
 
-### 13.5 No Built-in Functions
+### 14.5 No Built-in Functions
 
 Tenor provides no built-in functions. There is no `now()`, no `length()`, no `abs()`, no `sqrt()`, no string functions, no date arithmetic functions. All values that vary at runtime must enter the evaluation model through Facts.
 
@@ -1114,7 +1195,7 @@ rule active_delegation {
 
 ---
 
-## 14. Static Analysis Obligations
+## 15. Static Analysis Obligations
 
 A conforming static analyzer must derive the following from a contract alone, without execution:
 
@@ -1128,7 +1209,7 @@ For each Entity state and each persona, the set of Operations whose precondition
 **S3b — Domain satisfiability per state** _(qualified — not always computationally feasible)_  
 A stronger version of S3a: for each Entity state and each persona, determine whether there exists a concrete FactSet and VerdictSet assignment under which the precondition evaluates to true. This requires model enumeration over the product of Fact domain sizes. For facts with small declared domains (small Enum sets, narrow Int ranges, short List max bounds) this is feasible. For facts with large declared domains (wide Int ranges, large Decimal precision, long Text max lengths), the enumeration space is O(product of domain sizes), which may be astronomically large for realistic contracts. S3b is decidable in principle for all valid Tenor contracts, but is not computationally feasible in general. Static analysis tools implementing S3b should document their domain size thresholds and fall back to S3a when enumeration is infeasible. S3b should not be treated as an unconditional static analysis obligation.
 
-**S4 — Authority topology.** For any persona P and Entity state S, the set of Operations P can invoke in S is derivable. Whether a persona can cause a transition from S to S′ is answerable.
+**S4 — Authority topology.** For any declared Persona P (Section 8) and Entity state S, the set of Operations P can invoke in S is derivable. Whether a persona can cause a transition from S to S' is answerable. The complete set of declared Personas is statically known, enabling exhaustive enumeration of the authority relation.
 
 **S5 — Verdict space.** The complete set of possible verdict types producible by a contract's rules is enumerable.
 
@@ -1138,9 +1219,9 @@ A stronger version of S3a: for each Entity state and each persona, determine whe
 
 ---
 
-## 15. Executor Obligations
+## 16. Executor Obligations
 
-### 15.1 The Conformance Gap
+### 16.1 The Conformance Gap
 
 Tenor provides formal guarantees **conditional on executor conformance**. This conditionality is not a minor caveat — it is a structural property of the language that must be understood before building on it.
 
@@ -1152,7 +1233,7 @@ This is not a temporary limitation to be resolved in a future version. It is the
 
 Implementers building on Tenor should treat E1, E3, and E4 in particular as **trust boundaries**, not implementation details.
 
-### 15.2 Obligation Definitions
+### 16.2 Obligation Definitions
 
 **E1 — External source integrity** _(trust boundary)_  
 Facts are populated from genuinely external sources as declared. An executor must not populate Facts from internal computations or cross-Fact dependencies. Violation of E1 corrupts the provenance root — every chain built on a non-externally-sourced Fact is semantically invalid, but the language cannot detect this.
@@ -1183,19 +1264,23 @@ The join step evaluates after all branches have reached a terminal state. The jo
 
 ---
 
-## 16. Pending Work
+## 17. Pending Work
 
 **Resolved in v0.3:**
 
 **P1 — Syntax definition.** Tenor v1.0 defined. See construct sections for DSL syntax; Appendix C for a complete worked example.
 
-**P2 — Parallel execution semantics.** Resolved via ParallelStep (§10.2).
+**P2 — Parallel execution semantics.** Resolved via ParallelStep (§11.2).
 
 **P3 — Duration type.** Resolved via Duration BaseType (§4).
 
 **P4 — Cross-currency Money operations.** Resolved via Rule-layer conversion pattern (§7.6).
 
 **P6 — Variable × variable multiplication.** Resolved; restricted to Rule produce clauses with range containment check (§7).
+
+**Resolved in v1.0:**
+
+**P8 — Persona declaration.** Persona is now a first-class declared construct (§8). Previously, persona identifiers were bare strings in Operation `allowed_personas` and Flow step `persona` fields with no declaration requirement. In v1.0, all persona references must resolve to declared Persona constructs. Formalized via CFFP (see `docs/cffp/persona.json`).
 
 **Deferred to v2:**
 
@@ -1277,6 +1362,15 @@ Frozen verdict semantics apply within parallel blocks. If parallel branch result
 
 **AL23 — Elaborator Conformance Suite** _(ElaboratorSpec)_
 The Tenor Elaborator Conformance Suite is at `conformance/`. 47/47 tests passing as of v0.3.
+
+**AL24 — Persona declaration is mandatory in v1.0** _(Persona, CFFP CE4)_
+Contracts written against v0.3 that use bare persona strings in Operation `allowed_personas` and Flow step `persona` fields must add explicit `persona` declarations when migrating to v1.0. This is a breaking change covered by the v0.3 to v1.0 major version bump.
+
+**AL25 — Persona carries no metadata** _(Persona, CFFP Phase 4)_
+Persona is a pure identity token with no description, display name, role, or other metadata fields. Documentation-level information about personas must be provided via DSL comments or external documentation. Metadata with no formal semantics does not belong in the construct definition.
+
+**AL26 — Unreferenced Persona declarations are not errors** _(Persona)_
+A Persona declared but never referenced in any Operation or Flow is valid. Static analysis tooling may optionally warn about unreferenced Personas, but this is not an elaboration obligation.
 
 ---
 
