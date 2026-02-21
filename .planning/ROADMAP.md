@@ -34,14 +34,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Shared type library has import semantics for cross-contract Record and TaggedUnion reuse
   4. Interchange JSON includes `tenor_version` field and validates against a published JSON Schema
   5. Each of SPEC-01, SPEC-02, SPEC-03 has a completed CFFP artifact (invariants declared, candidates tested, canonical form chosen)
-**Plans**: TBD
+**Plans:** 5 plans
 
 Plans:
-- [ ] 01-01: CFFP run for Persona construct
-- [ ] 01-02: CFFP run for Operation outcome typing (P7)
-- [ ] 01-03: CFFP run for Shared type library (P5)
-- [ ] 01-04: Interchange format versioning and JSON Schema
-- [ ] 01-05: Spec freeze and v1.0 spec review
+- [ ] 01-01-PLAN.md — CFFP run for Persona construct + spec section
+- [ ] 01-02-PLAN.md — CFFP run for P7 Operation outcome typing + spec updates
+- [ ] 01-03-PLAN.md — CFFP run for P5 Shared type library + spec section
+- [ ] 01-04-PLAN.md — Interchange versioning semantics + JSON Schema
+- [ ] 01-05-PLAN.md — Spec consistency review and v1.0 freeze
 
 ### Phase 2: Foundation
 **Goal**: The monolithic elaborator is refactored into a Cargo workspace with `tenor-core` exposing typed pass outputs as public API, all existing tests pass, and conformance suite covers new v1.0 constructs
