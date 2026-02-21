@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 1 of 9 (Spec Completion)
-Plan: 2 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: Executing
-Last activity: 2026-02-21 -- Plan 01-02 complete (P7 Operation outcome typing CFFP + spec updates)
+Last activity: 2026-02-21 -- Plan 01-03 complete (P5 Shared type library CFFP + spec updates)
 
-Progress: [##........] 4%
+Progress: [##........] 7%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 10.5min
-- Total execution time: 0.35 hours
+- Total plans completed: 3
+- Average duration: 9.7min
+- Total execution time: 0.48 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Spec Completion | 2 | 21min | 10.5min |
+| 1. Spec Completion | 3 | 29min | 9.7min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (11min), 01-02 (10min)
-- Trend: stable
+- Last 5 plans: 01-01 (11min), 01-02 (10min), 01-03 (8min)
+- Trend: improving
 
 *Updated after each plan completion*
 
@@ -54,6 +54,11 @@ Recent decisions affecting current work:
 - Effect-to-outcome association explicit in contract for multi-outcome Operations
 - Outcomes and error_contract are disjoint channels
 - AL13 (Flow-side-only outcomes) superseded by P7
+- P5 shared type library: structural typing preserved (no nominal identity change) -- CFFP Candidate C selected
+- Type library files are self-contained leaves (no imports within type libraries) -- prevents transitive type propagation
+- Nominal typing (Candidate B) eliminated: incompatible with interchange self-containedness
+- Shared types placed as Section 4.6 under BaseType -- extends TypeDecl, not a new construct
+- Scoped-down P5 canonical form: module federation, generics, import depth, flat namespace, type extension, selective import all deferred to v2
 
 ### Pending Todos
 
@@ -66,5 +71,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 01-02-PLAN.md (P7 Operation outcome typing CFFP + spec updates)
-Resume file: .planning/phases/01-spec-completion/01-02-SUMMARY.md
+Stopped at: Completed 01-03-PLAN.md (P5 Shared type library CFFP + spec updates)
+Resume file: .planning/phases/01-spec-completion/01-03-SUMMARY.md
