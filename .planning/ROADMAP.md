@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — CFFP run for Persona construct + spec section
-- [ ] 01-02-PLAN.md — CFFP run for P7 Operation outcome typing + spec updates
+- [x] 01-02-PLAN.md — CFFP run for P7 Operation outcome typing + spec updates
 - [ ] 01-03-PLAN.md — CFFP run for P5 Shared type library + spec section
 - [ ] 01-04-PLAN.md — Interchange versioning semantics + JSON Schema
 - [ ] 01-05-PLAN.md — Spec consistency review and v1.0 freeze
@@ -205,7 +205,7 @@ Note: Phase 8 (VS Code) depends on Phase 4 (not Phase 7) and could execute in pa
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Spec Completion | 1/5 | In progress | - |
+| 1. Spec Completion | 2/5 | In progress | - |
 | 2. Foundation | 0/6 | Not started | - |
 | 3. CLI + Evaluator | 0/6 | Not started | - |
 | 4. Static Analysis | 0/6 | Not started | - |

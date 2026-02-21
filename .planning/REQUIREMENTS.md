@@ -10,7 +10,7 @@ Requirements for 1.0 release. Each maps to roadmap phases.
 ### Spec Completion
 
 - [x] **SPEC-01**: Persona declared as first-class construct with id and optional metadata in spec and elaborator
-- [ ] **SPEC-02**: Operation outcome typing — named outcome types on Operations, statically enumerable, specified via CFFP
+- [x] **SPEC-02**: Operation outcome typing — named outcome types on Operations, statically enumerable, specified via CFFP
 - [ ] **SPEC-03**: Shared type library — cross-contract type reuse for Record and TaggedUnion with import semantics, specified via CFFP
 - [ ] **SPEC-04**: Interchange format versioned with `tenor_version` field and formal JSON Schema
 - [ ] **SPEC-05**: Each spec change (SPEC-01, SPEC-02, SPEC-03) run through CFFP with invariant declaration, candidate formalisms, pressure testing, and canonicalization before implementation
@@ -148,7 +148,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SPEC-01 | Phase 1 | Complete |
-| SPEC-02 | Phase 1 | Pending |
+| SPEC-02 | Phase 1 | Complete |
 | SPEC-03 | Phase 1 | Pending |
 | SPEC-04 | Phase 1 | Pending |
 | SPEC-05 | Phase 1 | Pending |
