@@ -77,6 +77,18 @@ Requirements for 1.0 release. Each maps to roadmap phases.
 - [ ] **CGEN-06**: Rust code generator as second target
 - [ ] **CGEN-07**: Generated code passes evaluation conformance suite (same verdicts as reference evaluator)
 
+### Testing
+
+- [ ] **TEST-01**: CI pipeline runs all conformance suites (elaborator, evaluator, codegen) on every commit
+- [ ] **TEST-02**: Elaborator conformance suite extended to cover persona, P7 outcome typing, and P5 shared types
+- [ ] **TEST-03**: Static analyzer test suite covering each S1-S7 analysis with known-good and known-bad contracts
+- [ ] **TEST-04**: Code generation integration tests — generated TypeScript compiles and produces correct verdicts against reference evaluator
+- [ ] **TEST-05**: Code generation integration tests — generated Rust compiles and produces correct verdicts against reference evaluator
+- [ ] **TEST-06**: Domain validation contracts serve as end-to-end integration tests (elaborate → check → eval → generate → run)
+- [ ] **TEST-07**: CLI integration tests for each subcommand (exit codes, output format, error handling)
+- [ ] **TEST-08**: Interchange JSON Schema validation test — every elaborator output validates against the formal schema
+- [ ] **TEST-09**: Numeric precision regression suite shared across elaborator, evaluator, and codegen targets
+
 ### Developer Experience
 
 - [ ] **DEVX-01**: VS Code extension with TextMate grammar for syntax highlighting
@@ -187,12 +199,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEVX-05 | — | Pending |
 | DEVX-06 | — | Pending |
 | DEVX-07 | — | Pending |
+| TEST-01 | — | Pending |
+| TEST-02 | — | Pending |
+| TEST-03 | — | Pending |
+| TEST-04 | — | Pending |
+| TEST-05 | — | Pending |
+| TEST-06 | — | Pending |
+| TEST-07 | — | Pending |
+| TEST-08 | — | Pending |
+| TEST-09 | — | Pending |
 | DEVX-08 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 53 total
+- v1 requirements: 62 total
 - Mapped to phases: 0
-- Unmapped: 53 (pending roadmap creation)
+- Unmapped: 62 (pending roadmap creation)
 
 ---
 *Requirements defined: 2026-02-21*
