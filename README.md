@@ -121,6 +121,7 @@ Eleven constructs across two layers.
 | **PredicateExpression** | Quantifier-free FOL with arithmetic and bounded quantification over List-typed facts                              |
 | **Flow**                | Finite DAG orchestration of Operations with sequential, branching, handoff, sub-flow, and parallel steps          |
 | **NumericModel**        | Fixed-point decimal arithmetic with total promotion rules (cross-cutting)                                         |
+| **TypeDecl**            | Named type aliases for Record and TaggedUnion — DSL-layer only, inlined by elaborator, absent from interchange    |
 
 **Tooling layer:**
 
