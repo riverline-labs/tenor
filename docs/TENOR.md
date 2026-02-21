@@ -1222,6 +1222,50 @@ Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON 
 - Preserve DSL source order for commutative binary expression operands.
 - Preserve DSL declaration order for all array values. Array values are never sorted.
 - Emit `"tenor"` version and `"kind"` on every top-level document.
+- Emit `"tenor_version"` at the bundle top level (see §13.2.1).
+
+### 13.2.1 Interchange Format Versioning
+
+The TenorInterchange format is versioned independently of the Tenor language specification version. The canonical structure of TenorInterchange output is defined by the JSON Schema at `docs/interchange-schema.json`.
+
+**Bundle-level `tenor_version` field:**
+
+Every TenorInterchange bundle includes a `tenor_version` field at the top level. This field is a string in semantic versioning format (e.g., `"1.0.0"`).
+
+```json
+{
+  "constructs": [ ... ],
+  "id": "my_contract",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}
+```
+
+**Version field semantics:**
+
+- `tenor_version` (bundle-level, string, semver, required): The canonical interchange format version. Three-component semver: `MAJOR.MINOR.PATCH`.
+  - **Major version** — breaking structural changes to the interchange format (new required fields, removed fields, changed field types, changed construct structure).
+  - **Minor version** — additive fields or constructs (new optional fields, new construct kinds that do not affect existing construct schemas).
+  - **Patch version** — fixes to serialization behavior (corrected key ordering, fixed decimal representation edge cases) that do not change the logical content.
+- `tenor` (per-construct, string): Short version identifier emitted on every top-level construct document. Updated to `"1.0"` for v1.0 interchange. The per-construct `tenor` field provides a quick version check; the bundle-level `tenor_version` is the canonical semver.
+
+**Versioning contract:**
+
+1. **Producers (conforming elaborators):** A conforming elaborator MUST include `tenor_version` in bundle output. The value MUST be a valid semver string corresponding to the interchange format version the elaborator targets.
+2. **Consumers (executors, validators, tooling):** A conforming consumer MUST check `tenor_version` for compatibility before processing a bundle.
+3. **Major version incompatibility:** A consumer receiving a bundle with a higher major version than it supports MUST reject the bundle with a clear error indicating the version mismatch.
+4. **Minor version forward-compatibility:** A consumer supporting major version N can process bundles with any minor version of major version N (older consumers can read newer minor versions). Unknown optional fields are ignored.
+5. **Patch version transparency:** Patch version differences are transparent to consumers. A consumer need not distinguish between patch versions.
+
+**v0.3 to v1.0 transition:**
+
+The v0.3 to v1.0 transition is a major version bump. v1.0 interchange is not backward compatible with v0.3. Key breaking changes:
+- Persona constructs added to the `constructs` array (new construct kind).
+- Operation `outcomes` field added (required).
+- Multi-outcome effect-to-outcome association added (new field on effect objects).
+- Per-construct `tenor` field updated from `"0.3"` to `"1.0"`.
+- Bundle-level `tenor_version` field added (required, not present in v0.3).
 
 ### 13.3 Error Reporting Obligation
 
