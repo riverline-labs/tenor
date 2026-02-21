@@ -1,0 +1,14 @@
+// Negative test — Pass 5
+// Rule declares a negative stratum value.
+// §12.2 Pass 5 Rule: "stratum ≥ 0"
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule bad_stratum {
+  stratum: -1
+  when:    flag = true
+  produce: verdict bad { payload: Bool = true }
+}

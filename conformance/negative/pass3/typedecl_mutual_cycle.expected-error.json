@@ -1,0 +1,9 @@
+{
+  "pass": 3,
+  "construct_kind": "TypeDecl",
+  "construct_id": "TypeB",
+  "field": "type.fields.ref",
+  "file": "typedecl_mutual_cycle.tenor",
+  "line": 14,
+  "message": "TypeDecl cycle detected: TypeA → TypeB → TypeA"
+}

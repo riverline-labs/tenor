@@ -1,0 +1,172 @@
+{
+  "constructs": [
+    {
+      "id": "is_active",
+      "kind": "Fact",
+      "provenance": { "file": "flow_basic.tenor", "line": 17 },
+      "source": { "field": "active", "system": "account_service" },
+      "tenor": "0.3",
+      "type": { "base": "Bool" }
+    },
+    {
+      "id": "requires_review",
+      "kind": "Fact",
+      "provenance": { "file": "flow_basic.tenor", "line": 22 },
+      "source": { "field": "requires_review", "system": "policy_service" },
+      "tenor": "0.3",
+      "type": { "base": "Bool" }
+    },
+    {
+      "id": "Order",
+      "initial": "draft",
+      "kind": "Entity",
+      "provenance": { "file": "flow_basic.tenor", "line": 6 },
+      "states": ["draft", "submitted", "approved", "rejected"],
+      "tenor": "0.3",
+      "transitions": [
+        { "from": "draft", "to": "submitted" },
+        { "from": "submitted", "to": "approved" },
+        { "from": "submitted", "to": "rejected" },
+        { "from": "approved", "to": "draft" }
+      ]
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": { "type": { "base": "Bool" }, "value": true },
+          "verdict_type": "account_active"
+        },
+        "when": {
+          "left": { "fact_ref": "is_active" },
+          "op": "=",
+          "right": { "literal": true, "type": { "base": "Bool" } }
+        }
+      },
+      "id": "account_active",
+      "kind": "Rule",
+      "provenance": { "file": "flow_basic.tenor", "line": 27 },
+      "stratum": 0,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": { "type": { "base": "Bool" }, "value": true },
+          "verdict_type": "review_required"
+        },
+        "when": {
+          "left": { "fact_ref": "requires_review" },
+          "op": "=",
+          "right": { "literal": true, "type": { "base": "Bool" } }
+        }
+      },
+      "id": "review_required",
+      "kind": "Rule",
+      "provenance": { "file": "flow_basic.tenor", "line": 33 },
+      "stratum": 0,
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": ["reviewer"],
+      "effects": [
+        { "entity_id": "Order", "from": "submitted", "to": "approved" }
+      ],
+      "error_contract": ["precondition_failed", "persona_rejected"],
+      "id": "approve_order",
+      "kind": "Operation",
+      "precondition": { "verdict_present": "account_active" },
+      "provenance": { "file": "flow_basic.tenor", "line": 46 },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": ["reviewer"],
+      "effects": [
+        { "entity_id": "Order", "from": "submitted", "to": "rejected" }
+      ],
+      "error_contract": ["precondition_failed", "persona_rejected"],
+      "id": "reject_order",
+      "kind": "Operation",
+      "precondition": { "verdict_present": "account_active" },
+      "provenance": { "file": "flow_basic.tenor", "line": 53 },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": ["system"],
+      "effects": [
+        { "entity_id": "Order", "from": "approved", "to": "draft" }
+      ],
+      "error_contract": ["precondition_failed", "persona_rejected"],
+      "id": "revert_submission",
+      "kind": "Operation",
+      "precondition": { "verdict_present": "account_active" },
+      "provenance": { "file": "flow_basic.tenor", "line": 60 },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": ["buyer"],
+      "effects": [
+        { "entity_id": "Order", "from": "draft", "to": "submitted" }
+      ],
+      "error_contract": ["precondition_failed", "persona_rejected"],
+      "id": "submit_order",
+      "kind": "Operation",
+      "precondition": { "verdict_present": "account_active" },
+      "provenance": { "file": "flow_basic.tenor", "line": 39 },
+      "tenor": "0.3"
+    },
+    {
+      "entry": "step_submit",
+      "id": "order_approval",
+      "kind": "Flow",
+      "provenance": { "file": "flow_basic.tenor", "line": 67 },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_submit",
+          "kind": "OperationStep",
+          "on_failure": { "kind": "Terminate", "outcome": "failure" },
+          "op": "submit_order",
+          "outcomes": { "success": "step_check_review" },
+          "persona": "buyer"
+        },
+        {
+          "condition": { "verdict_present": "review_required" },
+          "id": "step_check_review",
+          "if_false": { "kind": "Terminal", "outcome": "success" },
+          "if_true": "step_handoff",
+          "kind": "BranchStep",
+          "persona": "buyer"
+        },
+        {
+          "from_persona": "buyer",
+          "id": "step_handoff",
+          "kind": "HandoffStep",
+          "next": "step_review",
+          "to_persona": "reviewer"
+        },
+        {
+          "id": "step_review",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Compensate",
+            "steps": [
+              {
+                "on_failure": { "kind": "Terminal", "outcome": "failure" },
+                "op": "revert_submission",
+                "persona": "system"
+              }
+            ],
+            "then": { "kind": "Terminal", "outcome": "failure" }
+          },
+          "op": "approve_order",
+          "outcomes": { "success": { "kind": "Terminal", "outcome": "success" } },
+          "persona": "reviewer"
+        }
+      ],
+      "tenor": "0.3"
+    }
+  ],
+  "id": "flow_basic",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

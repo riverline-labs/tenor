@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "bad_comparison",
+  "field": "body.when",
+  "file": "bool_int_comparison.tenor",
+  "line": 12,
+  "message": "type error: operator '>' not defined for Bool; Bool supports only = and ≠"
+}

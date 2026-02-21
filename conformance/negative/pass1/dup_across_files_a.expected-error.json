@@ -1,0 +1,9 @@
+{
+  "pass": 1,
+  "construct_kind": "Fact",
+  "construct_id": "shared_id",
+  "field": "id",
+  "file": "dup_across_files_b.tenor",
+  "line": 4,
+  "message": "duplicate Fact id 'shared_id': first declared in dup_across_files_a.tenor"
+}

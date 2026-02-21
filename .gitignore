@@ -1,0 +1,11 @@
+# Rust build artifacts
+target/
+elaborator/target/
+
+# Editor/IDE
+.DS_Store
+*.swp
+*.swo
+
+# Local protocol/process artifacts
+cffp.cue

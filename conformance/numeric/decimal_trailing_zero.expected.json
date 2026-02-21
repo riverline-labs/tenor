@@ -1,0 +1,16 @@
+{
+  "constructs": [
+    {
+      "default": { "kind": "decimal_value", "precision": 5, "scale": 2, "value": "0.10" },
+      "id": "rate",
+      "kind": "Fact",
+      "provenance": { "file": "decimal_trailing_zero.tenor", "line": 7 },
+      "source": { "field": "tax_rate", "system": "pricing" },
+      "tenor": "0.3",
+      "type": { "base": "Decimal", "precision": 5, "scale": 2 }
+    }
+  ],
+  "id": "decimal_trailing_zero",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

@@ -1,0 +1,10 @@
+// Shorthand expansion test — arrow_canonical
+// Uses ASCII arrow "->" for entity transitions.
+// Must produce interchange byte-for-byte identical to arrow_alias.tenor.
+// §12.2 Pass 0: "`->` and `→` are the same token."
+
+entity Switch {
+  states:  [off, on]
+  initial: off
+  transitions: [(off, on), (on, off)]
+}

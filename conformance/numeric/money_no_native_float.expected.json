@@ -1,0 +1,20 @@
+{
+  "constructs": [
+    {
+      "default": {
+        "amount": { "kind": "decimal_value", "precision": 10, "scale": 2, "value": "10000.00" },
+        "currency": "USD",
+        "kind": "money_value"
+      },
+      "id": "threshold",
+      "kind": "Fact",
+      "provenance": { "file": "money_no_native_float.tenor", "line": 7 },
+      "source": { "field": "release_threshold", "system": "compliance" },
+      "tenor": "0.3",
+      "type": { "base": "Money", "currency": "USD" }
+    }
+  ],
+  "id": "money_no_native_float",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

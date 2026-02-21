@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Operation",
+  "construct_id": "skip_to_approved",
+  "field": "effects",
+  "file": "operation_effect_unknown_transition.tenor",
+  "line": 31,
+  "message": "effect (Order, draft, approved) is not a declared transition in entity Order; declared transitions are: [(draft, submitted), (submitted, approved)]"
+}

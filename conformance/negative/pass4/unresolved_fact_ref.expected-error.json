@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "bad_ref",
+  "field": "body.when",
+  "file": "unresolved_fact_ref.tenor",
+  "line": 7,
+  "message": "unresolved fact reference: 'nonexistent_fact' is not declared in this contract"
+}

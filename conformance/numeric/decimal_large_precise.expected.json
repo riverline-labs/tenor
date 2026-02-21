@@ -1,0 +1,16 @@
+{
+  "constructs": [
+    {
+      "default": { "kind": "decimal_value", "precision": 12, "scale": 2, "value": "1234567.89" },
+      "id": "invoice_total",
+      "kind": "Fact",
+      "provenance": { "file": "decimal_large_precise.tenor", "line": 6 },
+      "source": { "field": "invoice_total", "system": "billing" },
+      "tenor": "0.3",
+      "type": { "base": "Decimal", "precision": 12, "scale": 2 }
+    }
+  ],
+  "id": "decimal_large_precise",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "cross_currency",
+  "field": "body.when",
+  "file": "cross_currency_compare.tenor",
+  "line": 19,
+  "message": "type error: cannot compare Money(currency: USD) with Money(currency: EUR); Money comparisons require identical currency codes"
+}

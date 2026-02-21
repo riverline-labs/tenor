@@ -1,0 +1,866 @@
+{
+  "constructs": [
+    {
+      "default": {
+        "kind": "bool_literal",
+        "value": false
+      },
+      "id": "buyer_requested_refund",
+      "kind": "Fact",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 38
+      },
+      "source": {
+        "field": "refund_requested",
+        "system": "buyer_portal"
+      },
+      "tenor": "0.3",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "default": {
+        "amount": {
+          "kind": "decimal_value",
+          "precision": 10,
+          "scale": 2,
+          "value": "10000.00"
+        },
+        "currency": "USD",
+        "kind": "money_value"
+      },
+      "id": "compliance_threshold",
+      "kind": "Fact",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 32
+      },
+      "source": {
+        "field": "release_threshold",
+        "system": "compliance_service"
+      },
+      "tenor": "0.3",
+      "type": {
+        "base": "Money",
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "delivery_status",
+      "kind": "Fact",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 22
+      },
+      "source": {
+        "field": "status",
+        "system": "delivery_service"
+      },
+      "tenor": "0.3",
+      "type": {
+        "base": "Enum",
+        "values": [
+          "pending",
+          "confirmed",
+          "failed"
+        ]
+      }
+    },
+    {
+      "id": "escrow_amount",
+      "kind": "Fact",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 17
+      },
+      "source": {
+        "field": "current_balance",
+        "system": "escrow_service"
+      },
+      "tenor": "0.3",
+      "type": {
+        "base": "Money",
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "line_items",
+      "kind": "Fact",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 27
+      },
+      "source": {
+        "field": "line_items",
+        "system": "order_service"
+      },
+      "tenor": "0.3",
+      "type": {
+        "base": "List",
+        "element_type": {
+          "base": "Record",
+          "fields": {
+            "amount": {
+              "base": "Money",
+              "currency": "USD"
+            },
+            "description": {
+              "base": "Text",
+              "max_length": 256
+            },
+            "id": {
+              "base": "Text",
+              "max_length": 64
+            },
+            "valid": {
+              "base": "Bool"
+            }
+          }
+        },
+        "max": 100
+      }
+    },
+    {
+      "id": "DeliveryRecord",
+      "initial": "pending",
+      "kind": "Entity",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 58
+      },
+      "states": [
+        "pending",
+        "confirmed",
+        "failed"
+      ],
+      "tenor": "0.3",
+      "transitions": [
+        {
+          "from": "pending",
+          "to": "confirmed"
+        },
+        {
+          "from": "pending",
+          "to": "failed"
+        },
+        {
+          "from": "confirmed",
+          "to": "pending"
+        }
+      ]
+    },
+    {
+      "id": "EscrowAccount",
+      "initial": "held",
+      "kind": "Entity",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 46
+      },
+      "states": [
+        "held",
+        "released",
+        "refunded",
+        "disputed"
+      ],
+      "tenor": "0.3",
+      "transitions": [
+        {
+          "from": "held",
+          "to": "released"
+        },
+        {
+          "from": "held",
+          "to": "refunded"
+        },
+        {
+          "from": "held",
+          "to": "disputed"
+        },
+        {
+          "from": "disputed",
+          "to": "released"
+        },
+        {
+          "from": "disputed",
+          "to": "refunded"
+        }
+      ]
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "line_items_validated"
+        },
+        "when": {
+          "body": {
+            "left": {
+              "field_ref": {
+                "field": "valid",
+                "var": "item"
+              }
+            },
+            "op": "=",
+            "right": {
+              "literal": true,
+              "type": {
+                "base": "Bool"
+              }
+            }
+          },
+          "domain": {
+            "fact_ref": "line_items"
+          },
+          "quantifier": "forall",
+          "variable": "item",
+          "variable_type": {
+            "base": "Record",
+            "fields": {
+              "amount": {
+                "base": "Money",
+                "currency": "USD"
+              },
+              "description": {
+                "base": "Text",
+                "max_length": 256
+              },
+              "id": {
+                "base": "Text",
+                "max_length": 64
+              },
+              "valid": {
+                "base": "Bool"
+              }
+            }
+          }
+        }
+      },
+      "id": "all_line_items_valid",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 70
+      },
+      "stratum": 0,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "within_threshold"
+        },
+        "when": {
+          "comparison_type": {
+            "base": "Money",
+            "currency": "USD"
+          },
+          "left": {
+            "fact_ref": "escrow_amount"
+          },
+          "op": "<=",
+          "right": {
+            "fact_ref": "compliance_threshold"
+          }
+        }
+      },
+      "id": "amount_within_threshold",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 88
+      },
+      "stratum": 0,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "delivery_confirmed"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "delivery_status"
+          },
+          "op": "=",
+          "right": {
+            "literal": "confirmed",
+            "type": {
+              "base": "Enum",
+              "values": [
+                "pending",
+                "confirmed",
+                "failed"
+              ]
+            }
+          }
+        }
+      },
+      "id": "delivery_confirmed",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 76
+      },
+      "stratum": 0,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "delivery_failed"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "delivery_status"
+          },
+          "op": "=",
+          "right": {
+            "literal": "failed",
+            "type": {
+              "base": "Enum",
+              "values": [
+                "pending",
+                "confirmed",
+                "failed"
+              ]
+            }
+          }
+        }
+      },
+      "id": "delivery_failed",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 82
+      },
+      "stratum": 0,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "refund_requested"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "buyer_requested_refund"
+          },
+          "op": "=",
+          "right": {
+            "literal": true,
+            "type": {
+              "base": "Bool"
+            }
+          }
+        }
+      },
+      "id": "refund_requested",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 94
+      },
+      "stratum": 0,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "refund_approved"
+        },
+        "when": {
+          "left": {
+            "verdict_present": "delivery_failed"
+          },
+          "op": "and",
+          "right": {
+            "verdict_present": "refund_requested"
+          }
+        }
+      },
+      "id": "can_refund",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 118
+      },
+      "stratum": 1,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Text",
+              "max_length": 4
+            },
+            "value": "auto"
+          },
+          "verdict_type": "release_approved"
+        },
+        "when": {
+          "left": {
+            "left": {
+              "verdict_present": "line_items_validated"
+            },
+            "op": "and",
+            "right": {
+              "verdict_present": "delivery_confirmed"
+            }
+          },
+          "op": "and",
+          "right": {
+            "verdict_present": "within_threshold"
+          }
+        }
+      },
+      "id": "can_release_without_compliance",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 102
+      },
+      "stratum": 1,
+      "tenor": "0.3"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "compliance_review_required"
+        },
+        "when": {
+          "left": {
+            "left": {
+              "verdict_present": "line_items_validated"
+            },
+            "op": "and",
+            "right": {
+              "verdict_present": "delivery_confirmed"
+            }
+          },
+          "op": "and",
+          "right": {
+            "op": "not",
+            "operand": {
+              "verdict_present": "within_threshold"
+            }
+          }
+        }
+      },
+      "id": "requires_compliance_review",
+      "kind": "Rule",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 110
+      },
+      "stratum": 1,
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": [
+        "seller"
+      ],
+      "effects": [
+        {
+          "entity_id": "DeliveryRecord",
+          "from": "pending",
+          "to": "confirmed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "confirm_delivery",
+      "kind": "Operation",
+      "precondition": {
+        "body": {
+          "left": {
+            "field_ref": {
+              "field": "valid",
+              "var": "item"
+            }
+          },
+          "op": "=",
+          "right": {
+            "literal": true,
+            "type": {
+              "base": "Bool"
+            }
+          }
+        },
+        "domain": {
+          "fact_ref": "line_items"
+        },
+        "quantifier": "forall",
+        "variable": "item",
+        "variable_type": {
+          "base": "Record",
+          "fields": {
+            "amount": {
+              "base": "Money",
+              "currency": "USD"
+            },
+            "description": {
+              "base": "Text",
+              "max_length": 256
+            },
+            "id": {
+              "base": "Text",
+              "max_length": 64
+            },
+            "valid": {
+              "base": "Bool"
+            }
+          }
+        }
+      },
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 156
+      },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": [
+        "buyer",
+        "seller"
+      ],
+      "effects": [
+        {
+          "entity_id": "EscrowAccount",
+          "from": "held",
+          "to": "disputed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "flag_dispute",
+      "kind": "Operation",
+      "precondition": {
+        "left": {
+          "verdict_present": "delivery_confirmed"
+        },
+        "op": "or",
+        "right": {
+          "verdict_present": "delivery_failed"
+        }
+      },
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 148
+      },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": [
+        "escrow_agent"
+      ],
+      "effects": [
+        {
+          "entity_id": "DeliveryRecord",
+          "from": "pending",
+          "to": "failed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "record_delivery_failure",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "delivery_failed"
+      },
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 163
+      },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": [
+        "escrow_agent"
+      ],
+      "effects": [
+        {
+          "entity_id": "EscrowAccount",
+          "from": "held",
+          "to": "refunded"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "refund_escrow",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "refund_approved"
+      },
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 141
+      },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": [
+        "escrow_agent"
+      ],
+      "effects": [
+        {
+          "entity_id": "EscrowAccount",
+          "from": "held",
+          "to": "released"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "release_escrow",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "release_approved"
+      },
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 127
+      },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": [
+        "compliance_officer"
+      ],
+      "effects": [
+        {
+          "entity_id": "EscrowAccount",
+          "from": "held",
+          "to": "released"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "release_escrow_with_compliance",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "compliance_review_required"
+      },
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 134
+      },
+      "tenor": "0.3"
+    },
+    {
+      "allowed_personas": [
+        "escrow_agent"
+      ],
+      "effects": [
+        {
+          "entity_id": "DeliveryRecord",
+          "from": "confirmed",
+          "to": "pending"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "revert_delivery_confirmation",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "delivery_confirmed"
+      },
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 170
+      },
+      "tenor": "0.3"
+    },
+    {
+      "entry": "step_refund",
+      "id": "refund_flow",
+      "kind": "Flow",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 240
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_refund",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "failure"
+          },
+          "op": "refund_escrow",
+          "outcomes": {
+            "success": {
+              "kind": "Terminal",
+              "outcome": "success"
+            }
+          },
+          "persona": "escrow_agent"
+        }
+      ],
+      "tenor": "0.3"
+    },
+    {
+      "entry": "step_confirm",
+      "id": "standard_release",
+      "kind": "Flow",
+      "provenance": {
+        "file": "integration_escrow.tenor",
+        "line": 179
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_confirm",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "failure"
+          },
+          "op": "confirm_delivery",
+          "outcomes": {
+            "success": "step_check_threshold"
+          },
+          "persona": "seller"
+        },
+        {
+          "condition": {
+            "verdict_present": "within_threshold"
+          },
+          "id": "step_check_threshold",
+          "if_false": "step_handoff_compliance",
+          "if_true": "step_auto_release",
+          "kind": "BranchStep",
+          "persona": "escrow_agent"
+        },
+        {
+          "id": "step_auto_release",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Compensate",
+            "steps": [
+              {
+                "on_failure": {
+                  "kind": "Terminal",
+                  "outcome": "failure"
+                },
+                "op": "revert_delivery_confirmation",
+                "persona": "escrow_agent"
+              }
+            ],
+            "then": {
+              "kind": "Terminal",
+              "outcome": "failure"
+            }
+          },
+          "op": "release_escrow",
+          "outcomes": {
+            "success": {
+              "kind": "Terminal",
+              "outcome": "success"
+            }
+          },
+          "persona": "escrow_agent"
+        },
+        {
+          "from_persona": "escrow_agent",
+          "id": "step_handoff_compliance",
+          "kind": "HandoffStep",
+          "next": "step_compliance_release",
+          "to_persona": "compliance_officer"
+        },
+        {
+          "id": "step_compliance_release",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Compensate",
+            "steps": [
+              {
+                "on_failure": {
+                  "kind": "Terminal",
+                  "outcome": "failure"
+                },
+                "op": "revert_delivery_confirmation",
+                "persona": "escrow_agent"
+              }
+            ],
+            "then": {
+              "kind": "Terminal",
+              "outcome": "failure"
+            }
+          },
+          "op": "release_escrow_with_compliance",
+          "outcomes": {
+            "success": {
+              "kind": "Terminal",
+              "outcome": "success"
+            }
+          },
+          "persona": "compliance_officer"
+        }
+      ],
+      "tenor": "0.3"
+    }
+  ],
+  "id": "integration_escrow",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

@@ -1,0 +1,14 @@
+// Positive test — TypeDecl (§4.5)
+// Declares a named Record type and references it as a List element type.
+// Expected: elaborates without error, produces typedecl_basic.expected.json
+
+type ContactRecord {
+  name:  Text(max_length: 128)
+  email: Text(max_length: 256)
+  age:   Int(0, 150)
+}
+
+fact contacts {
+  type:   List(element_type: ContactRecord, max: 50)
+  source: "crm.contacts"
+}

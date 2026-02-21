@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Flow",
+  "construct_id": "bad_flow",
+  "field": "entry",
+  "file": "flow_missing_entry.tenor",
+  "line": 31,
+  "message": "entry step 'nonexistent_step' is not declared in steps"
+}

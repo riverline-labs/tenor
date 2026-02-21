@@ -1,0 +1,19 @@
+{
+  "constructs": [
+    {
+      "id": "Switch",
+      "initial": "off",
+      "kind": "Entity",
+      "provenance": { "file": "arrow_alias.tenor", "line": 6 },
+      "states": ["off", "on"],
+      "tenor": "0.3",
+      "transitions": [
+        { "from": "off", "to": "on" },
+        { "from": "on", "to": "off" }
+      ]
+    }
+  ],
+  "id": "arrow_alias",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

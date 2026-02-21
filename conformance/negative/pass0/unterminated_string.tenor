@@ -1,0 +1,8 @@
+// Negative test — Pass 0
+// A string literal is not closed before end of line.
+// Expected error: pass 0, unterminated string literal
+
+fact foo {
+  type:   Bool
+  source: "x.y
+}

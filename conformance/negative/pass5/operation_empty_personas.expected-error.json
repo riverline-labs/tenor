@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Operation",
+  "construct_id": "submit_order",
+  "field": "allowed_personas",
+  "file": "operation_empty_personas.tenor",
+  "line": 24,
+  "message": "allowed_personas must be non-empty; an Operation with no allowed personas can never be invoked"
+}

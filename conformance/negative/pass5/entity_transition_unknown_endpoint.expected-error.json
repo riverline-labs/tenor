@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Entity",
+  "construct_id": "Order",
+  "field": "transitions",
+  "file": "entity_transition_unknown_endpoint.tenor",
+  "line": 12,
+  "message": "transition endpoint 'cancelled' is not declared in states: [draft, submitted, approved]"
+}

@@ -1,0 +1,42 @@
+{
+  "constructs": [
+    {
+      "id": "min_threshold",
+      "kind": "Fact",
+      "provenance": { "file": "int_decimal_comparison.tenor", "line": 15 },
+      "source": { "field": "min_threshold", "system": "policy" },
+      "tenor": "0.3",
+      "type": { "base": "Decimal", "precision": 8, "scale": 2 }
+    },
+    {
+      "id": "quantity",
+      "kind": "Fact",
+      "provenance": { "file": "int_decimal_comparison.tenor", "line": 10 },
+      "source": { "field": "quantity", "system": "inventory" },
+      "tenor": "0.3",
+      "type": { "base": "Int", "max": 999, "min": 0 }
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": { "type": { "base": "Bool" }, "value": true },
+          "verdict_type": "above_threshold"
+        },
+        "when": {
+          "comparison_type": { "base": "Decimal", "precision": 9, "scale": 2 },
+          "left": { "fact_ref": "quantity" },
+          "op": ">=",
+          "right": { "fact_ref": "min_threshold" }
+        }
+      },
+      "id": "above_threshold",
+      "kind": "Rule",
+      "provenance": { "file": "int_decimal_comparison.tenor", "line": 20 },
+      "stratum": 0,
+      "tenor": "0.3"
+    }
+  ],
+  "id": "int_decimal_comparison",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

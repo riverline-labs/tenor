@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Flow",
+  "construct_id": "parallel_conflict",
+  "field": "steps.par_step.branches",
+  "file": "conflict_direct.tenor",
+  "line": 49,
+  "message": "parallel branches 'branch_submit' and 'branch_reject' both declare effects on entity 'Order'; parallel branch entity effect sets must be disjoint"
+}

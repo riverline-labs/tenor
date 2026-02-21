@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "bad_quantifier",
+  "field": "body.when",
+  "file": "quantifier_scalar_domain.tenor",
+  "line": 14,
+  "message": "type error: quantifier domain 'flag' has type Bool; domain must be List-typed"
+}

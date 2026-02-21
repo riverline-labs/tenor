@@ -1,0 +1,28 @@
+// Negative test — Pass 5
+// Operation declares an empty allowed_personas set.
+// §12.2 Pass 5 Operation: "allowed_personas non-empty"
+// §8.4: "An Operation with an empty allowed_personas set is a contract error."
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [(draft, submitted)]
+}
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+operation submit_order {
+  allowed_personas: []
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}

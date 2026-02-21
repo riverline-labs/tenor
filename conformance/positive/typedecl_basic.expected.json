@@ -1,0 +1,26 @@
+{
+  "constructs": [
+    {
+      "id": "contacts",
+      "kind": "Fact",
+      "provenance": { "file": "typedecl_basic.tenor", "line": 11 },
+      "source": { "field": "contacts", "system": "crm" },
+      "tenor": "0.3",
+      "type": {
+        "base": "List",
+        "element_type": {
+          "base": "Record",
+          "fields": {
+            "age": { "base": "Int", "max": 150, "min": 0 },
+            "email": { "base": "Text", "max_length": 256 },
+            "name": { "base": "Text", "max_length": 128 }
+          }
+        },
+        "max": 50
+      }
+    }
+  ],
+  "id": "typedecl_basic",
+  "kind": "Bundle",
+  "tenor": "0.3"
+}

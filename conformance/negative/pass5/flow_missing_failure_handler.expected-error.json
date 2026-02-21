@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Flow",
+  "construct_id": "no_handler_flow",
+  "field": "steps.step_one.on_failure",
+  "file": "flow_missing_failure_handler.tenor",
+  "line": 35,
+  "message": "OperationStep 'step_one' must declare a FailureHandler"
+}

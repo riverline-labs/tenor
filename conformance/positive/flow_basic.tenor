@@ -1,0 +1,110 @@
+// Positive test: Flow declaration
+// Covers: OperationStep, BranchStep, HandoffStep, FailureHandler (Terminate and Compensate),
+// Terminal outcomes, and snapshot policy
+// Expected: elaborates without error, produces flow_basic.expected.json
+
+entity Order {
+  states:  [draft, submitted, approved, rejected]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (submitted, approved),
+    (submitted, rejected),
+    (approved, draft)
+  ]
+}
+
+fact is_active {
+  type:   Bool
+  source: "account_service.active"
+}
+
+fact requires_review {
+  type:   Bool
+  source: "policy_service.requires_review"
+}
+
+rule account_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict account_active { payload: Bool = true }
+}
+
+rule review_required {
+  stratum: 0
+  when:    requires_review = true
+  produce: verdict review_required { payload: Bool = true }
+}
+
+operation submit_order {
+  allowed_personas: [buyer]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation approve_order {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, submitted, approved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation reject_order {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, submitted, rejected)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation revert_submission {
+  allowed_personas: [system]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, approved, draft)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow order_approval {
+  snapshot: at_initiation
+  entry:    step_submit
+
+  steps: {
+    step_submit: OperationStep {
+      op:      submit_order
+      persona: buyer
+      outcomes: {
+        success: step_check_review
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_check_review: BranchStep {
+      condition: verdict_present(review_required)
+      persona:   buyer
+      if_true:   step_handoff
+      if_false:  Terminal(success)
+    }
+
+    step_handoff: HandoffStep {
+      from_persona: buyer
+      to_persona:   reviewer
+      next:         step_review
+    }
+
+    step_review: OperationStep {
+      op:      approve_order
+      persona: reviewer
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Compensate(
+        steps: [{
+          op:         revert_submission
+          persona:    system
+          on_failure: Terminal(failure)
+        }]
+        then: Terminal(failure)
+      )
+    }
+  }
+}
