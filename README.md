@@ -146,7 +146,7 @@ docs/TENOR.md     — full formal specification (v0.3)
 STABILITY.md      — pre-release stability notice
 CONTRIBUTING.md   — contribution guidelines
 conformance/      — elaborator conformance suite (47/47 tests passing)
-elaborator/       — reference elaborator implementation (Rust)
+elaborator/       — reference implementation that transforms .tenor source → canonical JSON
 ```
 
 ---
