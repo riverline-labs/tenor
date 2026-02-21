@@ -11,7 +11,7 @@ Tenor is a finite, stratified, verdict-producing formal system for describing th
 
 ---
 
-## Why Tenor exists — and why nothing else does this
+## Differentiation
 
 Systems describe behavior across OpenAPI specs, policy YAML, RBAC configs, state machines, workflow engines, and implementation code. None of it is unified. None of it is fully legible. The fragmentation is real and worsening.
 
@@ -27,7 +27,7 @@ What no other implemented language combines:
 
 ---
 
-## A minimal example
+## Example
 
 A contract governing escrow release. Two entities, four personas, stratified verdict logic, a compensation flow.
 
@@ -89,7 +89,7 @@ From this contract alone a static analyzer can derive: every reachable entity st
 
 ---
 
-## Design constraints
+## Constraints
 
 Non-negotiable. Any proposed feature that violates them is rejected regardless of ergonomic benefit.
 
@@ -131,7 +131,7 @@ Eleven constructs across two layers.
 
 ---
 
-## Evaluation model
+## Evaluation
 
 ```
 Read path:     assemble_facts → eval_strata → resolve → ResolvedVerdictSet
@@ -145,7 +145,7 @@ Every step is bounded, deterministic, and statically analyzable.
 
 ---
 
-## Repository structure
+## Structure
 
 ```
 docs/TENOR.md     — full formal specification (v0.3)
