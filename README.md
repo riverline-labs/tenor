@@ -13,23 +13,17 @@ Tenor is a finite, stratified, verdict-producing formal system for describing th
 
 ## Why Tenor exists — and why nothing else does this
 
-Systems today describe behavior across OpenAPI specs, JSON Schema, policy YAML, ad hoc state machines, workflow engines, RBAC configurations, and implementation code. None of it is formally unified. None of it is fully agent-legible. The fragmentation is real and worsening. Anywhere authority, state, and audit matter. In multi-tenant SaaS, healthcare workflows, procurement, internal approvals — the behavioral description of a system is scattered across a dozen artifacts, none of which agree.
+Systems describe behavior across OpenAPI specs, policy YAML, RBAC configs, state machines, workflow engines, and implementation code. None of it is unified. None of it is fully legible. The fragmentation is real and worsening.
 
-Tenor is not a configuration format, a policy DSL, or a workflow engine. It is not a smart contract language — it has no notion of cryptography, distributed consensus, tokens, or blockchain. It is a **behavioral contract calculus**: a formal language where a contract is the complete description of a system's observable behavior, readable by humans, machines, and agents alike.
+Tenor is a behavioral contract calculus. Not a smart contract language. Not a policy DSL. Not a workflow engine. A contract is the complete description of a system's observable behavior — statically analyzable, provenance-complete, agent-legible.
 
-The research literature has behavioral contract calculi — formal models for proving properties about systems. Production languages (Clarity, Michelson) share some constraints but not this architecture. What's missing is a language that combines all of the following:
+What no other implemented language combines:
 
-**Stratification is a language construct, not a derived property.** Strata are declared. Same-stratum rule references are illegal. Termination is structurally guaranteed — not proved after the fact, not checked at runtime.
-
-**Provenance is part of the evaluation relation.** `eval_rules` returns `Set<Verdict × Provenance>`, not `Set<Verdict>`. The audit log is a theorem derived from evaluation, not a logging feature bolted on. Every decision carries its complete proof chain back to ground facts.
-
-**No built-in functions. None.** No `now()`. No `sum()`. No regex. Time is a Fact. Totals are Facts. Everything that varies at runtime enters through the ground layer. This is a harder constraint than any production language we found — and it's what makes static analysis complete rather than approximate.
-
-**Flow is part of the contract.** Orchestration is not external to the formal system. The flow graph, personas at each step, compensation logic, parallel branches — all of it is in the contract and statically analyzable. A static analyzer can enumerate every possible execution path without running anything.
-
-**Static analyzability is a rejection filter, not a goal.** Any proposed feature that breaks complete static derivability is rejected regardless of ergonomic benefit.
-
-Tenor is the first implemented language that combines these properties — with a working elaborator, a formal spec, and a conformance suite.
+- **Stratification is declared, not derived.** Termination is structural.
+- **Provenance is part of the evaluation relation.** The audit log is a theorem.
+- **No built-in functions.** Time, totals, classification — all Facts. Static analysis is complete, not approximate.
+- **Flow is in the contract.** Every execution path is statically enumerable.
+- **Static analyzability is a rejection filter.** Anything that breaks it is out.
 
 ---
 
