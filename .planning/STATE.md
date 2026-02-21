@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 1 of 9 (Spec Completion)
-Plan: 3 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: Executing
-Last activity: 2026-02-21 -- Plan 01-03 complete (P5 Shared type library CFFP + spec updates)
+Last activity: 2026-02-21 -- Plan 01-04 complete (Interchange versioning + JSON Schema)
 
-Progress: [##........] 7%
+Progress: [##........] 9%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 9.7min
-- Total execution time: 0.48 hours
+- Total plans completed: 4
+- Average duration: 8.5min
+- Total execution time: 0.57 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Spec Completion | 3 | 29min | 9.7min |
+| 1. Spec Completion | 4 | 34min | 8.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (11min), 01-02 (10min), 01-03 (8min)
+- Last 5 plans: 01-01 (11min), 01-02 (10min), 01-03 (8min), 01-04 (5min)
 - Trend: improving
 
 *Updated after each plan completion*
@@ -59,6 +59,9 @@ Recent decisions affecting current work:
 - Nominal typing (Candidate B) eliminated: incompatible with interchange self-containedness
 - Shared types placed as Section 4.6 under BaseType -- extends TypeDecl, not a new construct
 - Scoped-down P5 canonical form: module federation, generics, import depth, flat namespace, type extension, selective import all deferred to v2
+- Interchange schema authored from spec (not reverse-engineered from elaborator output) per user decision
+- Single schema file with $defs for all construct kinds (not split per construct)
+- Bundle-level tenor_version (semver) is canonical; per-construct tenor field is short version
 
 ### Pending Todos
 
@@ -71,5 +74,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 01-03-PLAN.md (P5 Shared type library CFFP + spec updates)
-Resume file: .planning/phases/01-spec-completion/01-03-SUMMARY.md
+Stopped at: Completed 01-04-PLAN.md (Interchange versioning + JSON Schema)
+Resume file: .planning/phases/01-spec-completion/01-04-SUMMARY.md
