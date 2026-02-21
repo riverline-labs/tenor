@@ -184,6 +184,40 @@ Duration promotion rules (cross-unit arithmetic promotes to the smaller unit):
   Duration(minutes) + Duration(seconds) → Duration(seconds), minutes × 60
 ```
 
+### 4.2.1 Text Comparison Is Exact Only
+
+Text values support only exact equality (`=`) and inequality (`≠`). Pattern matching operations — regex, substring, prefix/suffix, glob, wildcard — are not supported in any context: not in PredicateExpressions, not in Rule bodies, not in type constraints.
+
+**Why:** Pattern matching, particularly regex, introduces unbounded computation and can express non-regular languages. More fundamentally, classification based on text patterns is a business logic decision that should be explicit and statically analyzable. If a contract needs to distinguish values based on content patterns, that classification must be pre-computed into a Bool or Enum Fact by the executor, or modeled as an Enum Fact where each value carries its classification explicitly.
+
+Incorrect:
+
+```
+rule requires_legal_review {
+  stratum: 0
+  when:    item.sku matches "LEGAL-.*"  // ERROR: pattern matching not supported
+  produce: legal_review_required(true)
+}
+```
+
+Correct:
+
+```
+fact requires_legal_review {
+  type:   Bool
+  source: compliance_system.sku_classification(requisition_id)
+}
+```
+
+Or, if classification must be per-item, include it as a field in the Record type:
+
+```
+type LineItem {
+  sku:           Text(max_length: 32)
+  legal_review:  Bool  // pre-classified by external system
+}
+```
+
 ### 4.3 Type Checking
 
 ```
@@ -242,7 +276,7 @@ type LineItemRecord {
 A TypeDecl may be referenced anywhere a Record or TaggedUnion BaseType is expected:
 
 ```
-Fact line_items {
+fact line_items {
   type:   List(element_type: LineItemRecord, max: 100)
   source: "order_service.line_items"
 }
@@ -323,6 +357,31 @@ Facts do not carry derivation provenance — they are the root. When a default i
 - The complete set of Fact identifiers is statically enumerable from the contract.
 - Fact identifiers are fixed at contract definition time. No Fact may be dynamically named or dynamically typed.
 - The ground property is enforced within the evaluation model. Whether a conforming executor populates Facts from genuinely external sources is outside the language's enforcement scope. Conformance requires this.
+
+### 5.5 No Aggregate Computation
+
+A common incorrect assumption is that aggregate functions (`sum`, `count`, `average`, `min`, `max`) can be computed over List-typed Facts within Rule bodies or PredicateExpressions. This is not permitted.
+
+**Why:** Rules produce verdicts from Facts and lower-stratum verdicts. A verdict is a logical conclusion — a statement about the state of the world that the contract derives. A sum over line items is not a verdict; it is a derived value of the same kind as the Facts themselves. Tenor has no construct for producing intermediate computed values that are not verdicts. The total belongs as a Fact because it is a statement about the world that the contract takes as given, not a logical consequence the contract derives. If a contract needs a total, it must arrive as a Fact from an external system.
+
+Incorrect:
+
+```
+rule requisition_total {
+  stratum: 0
+  when:    true
+  produce: requisition_total(sum(item.amount for item in line_items))  // ERROR: no aggregate functions
+}
+```
+
+Correct:
+
+```
+fact requisition_total {
+  type:   MoneyAmount
+  source: order_system.calculated_total(requisition_id)
+}
+```
 
 ---
 
@@ -512,6 +571,38 @@ The execution sequence is fixed and invariant: (1) persona check, (2) preconditi
 - Atomicity is an executor obligation. Either all declared state transitions occur, or none do.
 - The executor must validate that the current entity state matches the transition source for each declared effect. This is an executor obligation not encoded in the Operation formalism.
 
+### 8.4.1 No Wildcard Transitions
+
+Every effect must name an explicit source state and an explicit target state. Wildcard notation (e.g., `* -> approved`) is not permitted.
+
+**Why:** The executor has an explicit obligation (§15, E2) to validate that the current entity state matches the transition source for each declared effect before applying it. A wildcard would make this validation impossible — the executor would not know which source state to expect. If an operation should be invocable from multiple source states, the contract must either declare multiple operations each with a single explicit source state, or declare multiple effects in the same operation each with a different explicit source state. Multiple effects in one operation are applied atomically; the executor validates the current state against each declared source and applies the matching transition.
+
+Incorrect:
+
+```
+operation reject_requisition {
+  personas: [approver]
+  require:  true
+  effects:  [Requisition: * -> rejected]  // ERROR: wildcard source not permitted
+}
+```
+
+Correct (multiple effects in one operation):
+
+```
+operation reject_requisition {
+  personas: [approver]
+  require:  true
+  effects:  [
+    Requisition: submitted -> rejected,
+    Requisition: pm_approved -> rejected,
+    Requisition: dept_review -> rejected,
+    Requisition: finance_review -> rejected,
+    Requisition: legal_review -> rejected
+  ]
+}
+```
+
 ### 8.5 Provenance
 
 ```
@@ -606,6 +697,34 @@ resolve_list_ref(fact_id.field, F) = F[fact_id].field
 ### 9.5 Complexity
 
 Scalar predicate evaluation is O(|expression tree|). Quantified predicate evaluation is O(max × |body|) per quantifier level. Nested quantifiers multiply bounds. All bounds are statically derivable from declared maxes and expression tree size.
+
+### 9.6 Entity State Is Not a Predicate Term
+
+A common incorrect assumption is that the current state of an Entity can be tested in a precondition using expressions like `Requisition.state = "draft"`. This is not permitted.
+
+**Why:** The term grammar in §9.2 defines the only legal atoms in PredicateExpressions: fact references, literals, verdict presence tests, and arithmetic expressions. Entity state is not in this grammar. Facts and verdicts are the only inputs to predicate evaluation. State is an output of Operations, not an input to Rules. If an operation should only be available in certain states, that constraint is enforced through the operation's effect declarations — the executor validates that the current state matches the source state of each declared transition before applying any effect.
+
+Incorrect:
+
+```
+operation submit_requisition {
+  personas: [requestor]
+  require:  requisition_total present and
+            Requisition.state = "draft"  // ERROR: entity state not a predicate term
+  effects:  [Requisition: draft -> submitted]
+}
+```
+
+Correct:
+
+```
+operation submit_requisition {
+  personas: [requestor]
+  require:  requisition_total present and
+            line_items_validated present
+  effects:  [Requisition: draft -> submitted]  // state constraint is here
+}
+```
 
 ---
 
@@ -958,6 +1077,41 @@ FlowOutcome
 
 Every chain terminates at Facts. Facts are the provenance roots. No derivation precedes them.
 
+### 13.5 No Built-in Functions
+
+Tenor provides no built-in functions. There is no `now()`, no `length()`, no `abs()`, no `sqrt()`, no string functions, no date arithmetic functions. All values that vary at runtime must enter the evaluation model through Facts.
+
+**Why:** Built-in functions would break closed-world semantics and introduce implicit dependencies on the execution environment. `now()` is not a fact about the contract — it is a fact about the moment of evaluation, and must be provided as a Fact by the executor. Time-relative reasoning (e.g., "is this delegation currently valid?") is expressed by comparing DateTime Facts, not by invoking runtime functions.
+
+Note: `len(list)` defined in §4.2 is an operator on a ground term — it returns a value derived from a Fact already in the FactSet. It is not a built-in function that queries external state.
+
+Incorrect:
+
+```
+rule active_delegation {
+  stratum: 2
+  when:    d.valid_from <= now() and  // ERROR: no built-in functions
+           d.valid_until >= now()
+  produce: delegation_active(true)
+}
+```
+
+Correct:
+
+```
+fact current_time {
+  type:   DateTime
+  source: executor.clock
+}
+
+rule active_delegation {
+  stratum: 2
+  when:    d.valid_from <= current_time and
+           d.valid_until >= current_time
+  produce: delegation_active(true)
+}
+```
+
 ---
 
 ## 14. Static Analysis Obligations
@@ -1199,28 +1353,28 @@ List(element_type: LineItemRecord, max: 100)
 ### D.3 Facts
 
 ```
-Fact escrow_amount {
+fact escrow_amount {
   type:   Money("USD")
   source: "escrow_service.current_balance"
 }
 
-Fact delivery_status {
+fact delivery_status {
   type:   Enum(["pending", "confirmed", "failed"])
   source: "delivery_service.status"
 }
 
-Fact line_items {
+fact line_items {
   type:   List(element_type: LineItemRecord, max: 100)
   source: "order_service.line_items"
 }
 
-Fact compliance_threshold {
+fact compliance_threshold {
   type:    Money("USD")
   source:  "compliance_service.release_threshold"
   default: Money { amount: Decimal(10000.00), currency: "USD" }
 }
 
-Fact buyer_requested_refund {
+fact buyer_requested_refund {
   type:    Bool
   source:  "buyer_portal.refund_requested"
   default: false
@@ -1232,7 +1386,7 @@ Fact buyer_requested_refund {
 ### D.4 Entities
 
 ```
-Entity EscrowAccount {
+entity EscrowAccount {
   states:  [held, released, refunded, disputed]
   initial: held
   transitions: [
@@ -1244,7 +1398,7 @@ Entity EscrowAccount {
   ]
 }
 
-Entity DeliveryRecord {
+entity DeliveryRecord {
   states:  [pending, confirmed, failed]
   initial: pending
   transitions: [
@@ -1261,31 +1415,31 @@ Entity DeliveryRecord {
 **Stratum 0 — Base fact verdicts:**
 
 ```
-Rule all_line_items_valid {
+rule all_line_items_valid {
   stratum: 0
   when: ∀ item ∈ line_items . item.valid = true
   produce: verdict line_items_validated { payload: Bool = true }
 }
 
-Rule delivery_confirmed {
+rule delivery_confirmed {
   stratum: 0
   when: delivery_status = "confirmed"
   produce: verdict delivery_confirmed { payload: Bool = true }
 }
 
-Rule delivery_failed {
+rule delivery_failed {
   stratum: 0
   when: delivery_status = "failed"
   produce: verdict delivery_failed { payload: Bool = true }
 }
 
-Rule amount_within_threshold {
+rule amount_within_threshold {
   stratum: 0
   when: escrow_amount ≤ compliance_threshold
   produce: verdict within_threshold { payload: Bool = true }
 }
 
-Rule refund_requested {
+rule refund_requested {
   stratum: 0
   when: buyer_requested_refund = true
   produce: verdict refund_requested { payload: Bool = true }
@@ -1295,7 +1449,7 @@ Rule refund_requested {
 **Stratum 1 — Composite verdicts:**
 
 ```
-Rule can_release_without_compliance {
+rule can_release_without_compliance {
   stratum: 1
   when: verdict_present(line_items_validated)
       ∧ verdict_present(delivery_confirmed)
@@ -1303,7 +1457,7 @@ Rule can_release_without_compliance {
   produce: verdict release_approved { payload: Text = "auto" }
 }
 
-Rule requires_compliance_review {
+rule requires_compliance_review {
   stratum: 1
   when: verdict_present(line_items_validated)
       ∧ verdict_present(delivery_confirmed)
@@ -1311,7 +1465,7 @@ Rule requires_compliance_review {
   produce: verdict compliance_review_required { payload: Bool = true }
 }
 
-Rule can_refund {
+rule can_refund {
   stratum: 1
   when: verdict_present(delivery_failed)
       ∧ verdict_present(refund_requested)
@@ -1326,28 +1480,28 @@ Rule can_refund {
 ### D.6 Operations
 
 ```
-Operation release_escrow {
+operation release_escrow {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(release_approved)
   effects:          [(EscrowAccount, held, released)]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
-Operation release_escrow_with_compliance {
+operation release_escrow_with_compliance {
   allowed_personas: [compliance_officer]
   precondition:     verdict_present(compliance_review_required)
   effects:          [(EscrowAccount, held, released)]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
-Operation refund_escrow {
+operation refund_escrow {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(refund_approved)
   effects:          [(EscrowAccount, held, refunded)]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
-Operation flag_dispute {
+operation flag_dispute {
   allowed_personas: [buyer, seller]
   precondition:     verdict_present(delivery_confirmed)
                   ∨ verdict_present(delivery_failed)
@@ -1355,14 +1509,14 @@ Operation flag_dispute {
   error_contract:   [precondition_failed, persona_rejected]
 }
 
-Operation confirm_delivery {
+operation confirm_delivery {
   allowed_personas: [seller]
   precondition:     ∀ item ∈ line_items . item.valid = true
   effects:          [(DeliveryRecord, pending, confirmed)]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
-Operation record_delivery_failure {
+operation record_delivery_failure {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(delivery_failed)
   effects:          [(DeliveryRecord, pending, failed)]
@@ -1370,7 +1524,7 @@ Operation record_delivery_failure {
 }
 
 // Compensation operation — used in failure recovery
-Operation revert_delivery_confirmation {
+operation revert_delivery_confirmation {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(delivery_confirmed)
   effects:          [(DeliveryRecord, confirmed, pending)]
@@ -1385,7 +1539,7 @@ Operation revert_delivery_confirmation {
 **Standard release flow:**
 
 ```
-Flow standard_release {
+flow standard_release {
   snapshot: at_initiation
   entry:    step_confirm
 
@@ -1450,7 +1604,7 @@ Flow standard_release {
 **Refund flow:**
 
 ```
-Flow refund_flow {
+flow refund_flow {
   snapshot: at_initiation
   entry:    step_refund
 
