@@ -88,7 +88,7 @@ Fact                — ground typed assertions; the evaluation root
 Entity              — finite state machines in a static DAG
 Rule                — stratified verdict-producing evaluation (includes variable×variable)
 Persona             — declared identity tokens for authority gating
-Operation           — persona-gated, precondition-guarded state transitions
+Operation           — persona-gated, precondition-guarded state transitions with declared outcomes
 PredicateExpression — quantifier-free FOL with arithmetic and bounded quantification
 Flow                — finite DAG orchestration with sequential and parallel steps
 NumericModel        — fixed-point decimal with total promotion rules (cross-cutting)
@@ -606,7 +606,7 @@ Existing persona string references in Operation `allowed_personas` arrays and Fl
 
 ### 9.1 Definition
 
-An Operation is a declared, persona-gated, precondition-guarded unit of work that produces entity state transitions as its sole side effect. Operations are the only construct in the evaluation model that produces side effects.
+An Operation is a declared, persona-gated, precondition-guarded unit of work that produces entity state transitions as its sole side effect and declares a finite set of named outcomes. Operations are the only construct in the evaluation model that produces side effects.
 
 ```
 Operation = (
@@ -614,14 +614,46 @@ Operation = (
   allowed_personas: Set<PersonaId>,
   precondition:     PredicateExpression,              // over ResolvedVerdictSet
   effects:          Set<(EntityId × StateId × StateId)>,  // entity-scoped transitions
-  error_contract:   Set<ErrorType>
+  error_contract:   Set<ErrorType>,
+  outcomes:         Set<OutcomeLabel>                  // named success-path results
 )
 ```
+
+OutcomeLabel is a non-empty UTF-8 string, unique within the Operation's outcome set. The outcome set must be non-empty (`|outcomes| >= 1`). The outcome set and error_contract set must be disjoint: `outcomes INTERSECT error_contract = EMPTY`. Outcome labels are Operation-local: the label `"approved"` on one Operation is not related to the label `"approved"` on another.
+
+When an Operation declares multiple outcomes and multiple effects, each effect must be associated with exactly one outcome. This association is part of the Operation declaration, not an executor determination.
+
+**DSL syntax:**
+
+```
+operation approve_order {
+  personas: [reviewer, admin]
+  require:  verdict_present(account_active)
+  effects:  [Order: submitted -> approved]
+  outcomes: [approved]
+}
+```
+
+Multi-outcome Operation with effect-to-outcome associations:
+
+```
+operation decide_claim {
+  personas: [adjudicator]
+  require:  verdict_present(claim_eligible)
+  outcomes: [approved, rejected]
+  effects:  [
+    Claim: review -> approved  -> approved,
+    Claim: review -> rejected  -> rejected
+  ]
+}
+```
+
+In the multi-outcome form, each effect tuple is extended with `-> OutcomeLabel` to declare which outcome it belongs to. All effects for a given outcome are applied atomically when that outcome is produced.
 
 ### 9.2 Evaluation
 
 ```
-execute : Operation × PersonaId × ResolvedVerdictSet × EntityState → EntityState' | Error
+execute : Operation × PersonaId × ResolvedVerdictSet × EntityState → (EntityState', OutcomeLabel) | Error
 
 execute(op, persona, verdict_set, entity_state) =
   if persona ∉ op.allowed_personas:
@@ -629,24 +661,33 @@ execute(op, persona, verdict_set, entity_state) =
   if ¬eval_pred(op.precondition, FactSet, verdict_set):
     return Error(op.error_contract, "precondition_failed")
   // Executor obligation: validate entity_state matches transition source for each effect
-  // apply_atomic applies each (entity_id, from, to) transition atomically
-  apply_atomic(op.effects, entity_states) → entity_states'
-  emit_provenance(op, persona, verdict_set, entity_state, entity_state')
-  return entity_state'
+  // Determine which outcome to produce based on entity state and effect-to-outcome mapping
+  outcome = determine_outcome(op, entity_state)
+  // apply_atomic applies effects associated with the produced outcome atomically
+  apply_atomic(op.effects[outcome], entity_states) → entity_states'
+  emit_provenance(op, persona, verdict_set, entity_state, entity_state', outcome)
+  return (entity_state', outcome)
 ```
+
+For single-outcome Operations, `determine_outcome` trivially returns the sole member of `op.outcomes`. For multi-outcome Operations, the outcome is determined by the effect-to-outcome mapping declared in the contract — the executor matches the current entity state against the declared effect source states and selects the outcome whose associated effects are applicable. This is not an executor discretion: the contract declares which effects belong to which outcome, and the entity state determines which effects are applicable.
 
 ### 9.3 Execution Sequence
 
-The execution sequence is fixed and invariant: (1) persona check, (2) precondition evaluation, (3) atomic effect application, (4) provenance emission. No step may be reordered. No step may be skipped if the preceding step succeeds.
+The execution sequence is fixed and invariant: (1) persona check, (2) precondition evaluation, (3) outcome determination, (4) atomic effect application for the determined outcome, (5) provenance emission (including outcome label). No step may be reordered. No step may be skipped if the preceding step succeeds.
 
 ### 9.4 Constraints
 
 - An Operation with an empty `allowed_personas` set is a contract error detectable at load time.
 - Every PersonaId in `allowed_personas` must resolve to a declared Persona construct (Section 8). Unresolved persona references are elaboration errors (Pass 5).
 - Each declared effect `(entity_id, from_state, to_state)` must reference an entity declared in the contract, and the transition `(from_state, to_state)` must exist in that entity's declared transition relation. Checked at contract load time. An Operation may declare effects across multiple entities — each is validated independently.
+- An Operation must declare at least one outcome (`|outcomes| >= 1`). An Operation with an empty outcome set is a contract error detectable at load time.
+- Outcome labels must be unique within each Operation's outcome set. Duplicate outcome labels are elaboration errors (Pass 5).
+- The outcome set and error_contract set must be disjoint (`outcomes INTERSECT error_contract = EMPTY`). A label appearing in both sets is an elaboration error (Pass 5).
+- For multi-outcome Operations, every declared effect must be associated with exactly one outcome. Effects with no outcome association, or effects associated with an undeclared outcome, are elaboration errors (Pass 5).
 - Operations do not produce verdict instances. Verdict production belongs exclusively to Rules.
-- Atomicity is an executor obligation. Either all declared state transitions occur, or none do.
+- Atomicity is an executor obligation. Either all declared state transitions for the produced outcome occur, or none do.
 - The executor must validate that the current entity state matches the transition source for each declared effect. This is an executor obligation not encoded in the Operation formalism.
+- Outcome exhaustiveness is a contract authoring obligation. The elaborator validates that Flow routing handles all declared outcomes (see §11.5), but cannot verify that the declared outcome set is exhaustive of all possible executor success-path behaviors. This parallels AL11 (source-state validation is an executor obligation).
 
 ### 9.4.1 No Wildcard Transitions
 
@@ -686,12 +727,58 @@ operation reject_requisition {
 OperationProvenance = (
   op:            OperationId,
   persona:       PersonaId,
+  outcome:       OutcomeLabel,
   facts_used:    Set<FactId>,
   verdicts_used: ResolvedVerdictSet,
   state_before:  EntityState,
   state_after:   EntityState'
 )
 ```
+
+The `outcome` field records which declared outcome was produced by this execution. This enables provenance chains to track not just state transitions but which success-path result led to subsequent Flow routing decisions.
+
+### 9.6 Interchange Representation
+
+Operation constructs in the interchange format include the declared `outcomes` field as a sorted array of outcome label strings.
+
+Single-outcome Operation:
+
+```json
+{
+  "allowed_personas": ["reviewer", "admin"],
+  "effects": [
+    { "entity_id": "Order", "from": "submitted", "to": "approved" }
+  ],
+  "error_contract": ["precondition_failed", "persona_rejected"],
+  "id": "approve_order",
+  "kind": "Operation",
+  "outcomes": ["approved"],
+  "precondition": { "verdict_present": "account_active" },
+  "provenance": { "file": "order.tenor", "line": 33 },
+  "tenor": "0.3"
+}
+```
+
+Multi-outcome Operation with effect-to-outcome associations:
+
+```json
+{
+  "allowed_personas": ["adjudicator"],
+  "effects": [
+    { "entity_id": "Claim", "from": "review", "outcome": "approved", "to": "approved" },
+    { "entity_id": "Claim", "from": "review", "outcome": "rejected", "to": "rejected" }
+  ],
+  "error_contract": ["precondition_failed", "persona_rejected"],
+  "id": "decide_claim",
+  "kind": "Operation",
+  "outcomes": ["approved", "rejected"],
+  "precondition": { "verdict_present": "claim_eligible" },
+  "provenance": { "file": "claims.tenor", "line": 15 },
+  "tenor": "0.3"
+}
+```
+
+For multi-outcome Operations, each effect object includes an `"outcome"` field associating it with a declared outcome label. For single-outcome Operations, the `"outcome"` field on effects is optional (it can be inferred from the sole member of the outcome set). All JSON keys are sorted lexicographically within each object. The `outcomes` array values preserve declaration order (per Pass 6 serialization rules: array values are never sorted).
 
 ---
 
@@ -827,7 +914,7 @@ Step =
   OperationStep(
     op:         OperationId,
     persona:    PersonaId,
-    outcomes:   { OutcomeLabel → StepId | Terminal },
+    outcomes:   { OutcomeLabel → StepId | Terminal },  // keys must match op.outcomes
     on_failure: FailureHandler
   )
   | BranchStep(
@@ -899,9 +986,13 @@ execute_flow(flow, initiating_persona, snapshot) =
     step = flow.steps[current]
     match step:
       OperationStep →
-        result  = execute(step.op, step.persona, snapshot.verdict_set)
-        emit_provenance(step, result)
-        current = step.outcomes[classify(result)] or handle_failure(step.on_failure)
+        result = execute(step.op, step.persona, snapshot.verdict_set)
+        match result:
+          (state', outcome_label) →
+            emit_provenance(step, result)
+            current = step.outcomes[outcome_label]
+          Error →
+            handle_failure(step.on_failure)
       BranchStep →
         val     = eval_pred(step.condition, snapshot.facts, snapshot.verdict_set)
         emit_branch_record(step, val)
@@ -919,6 +1010,8 @@ execute_flow(flow, initiating_persona, snapshot) =
         return step.outcome
 ```
 
+The key change from v0.3: when an OperationStep executes, the result is a `(state', outcome_label)` pair on success. The Flow routes on `outcome_label` by looking it up directly in the step's `outcomes` map — there is no `classify()` function. The outcome label comes from the Operation's declared outcome set, ensuring type-safe routing. Error results continue to be handled by `on_failure`.
+
 ### 11.5 Constraints
 
 - Step graph must be acyclic. Verified at load time via topological sort.
@@ -927,7 +1020,8 @@ execute_flow(flow, initiating_persona, snapshot) =
 - All PersonaIds in step `persona` fields (OperationStep, BranchStep, SubFlowStep), HandoffStep `from_persona`/`to_persona`, CompensationStep `persona`, and Escalate `to_persona` must resolve to declared Persona constructs (Section 8). Unresolved persona references are elaboration errors (Pass 5).
 - Flow reference graph (SubFlowStep references) must be acyclic. Verified via DFS across all contract files.
 - Sub-flows inherit the invoking Flow's snapshot. Sub-flows do not take independent snapshots.
-- Typed outcome routing is Flow-side classification only. The Operation canonical form is unchanged.
+- OperationStep outcome routing is grounded in Operation-declared outcomes. Each key in an OperationStep's `outcomes` map must be a member of the referenced Operation's declared outcome set. This is validated at elaboration time (Pass 5).
+- OperationStep outcome handling must be exhaustive: the keys of the `outcomes` map must exactly equal the declared outcome set of the referenced Operation. Missing outcomes are elaboration errors (Pass 5). No implicit fall-through to on_failure for unhandled success-path outcomes.
 - Compensation failure handlers are Terminal only. No nested compensation.
 - Parallel branches execute under the parent Flow's frozen snapshot. No branch sees entity state changes produced by another branch during execution.
 - No two parallel branches may declare effects on overlapping entity sets. Verified at contract load time by transitively resolving all Operation effects across all branches.
@@ -1043,9 +1137,9 @@ Input: Unified parse tree, type environment, construct index. Output: Typed expr
 Input: Typed ASTs, construct index, type environment. Output: Validation report.
 
 - Entity: initial ∈ states; transition endpoints ∈ states; hierarchy acyclic.
-- Operation: allowed_personas non-empty; all allowed_personas entries resolve to declared Persona constructs; effect entity_ids resolve; effect transitions exist in entity; effects ⊆ entity.transitions.
+- Operation: allowed_personas non-empty; all allowed_personas entries resolve to declared Persona constructs; effect entity_ids resolve; effect transitions exist in entity; effects ⊆ entity.transitions; outcomes non-empty; outcome labels unique within Operation; outcomes ∩ error_contract = ∅; for multi-outcome Operations, every effect has an outcome association referencing a declared outcome.
 - Rule: stratum ≥ 0; all refs resolve; verdict_refs reference strata < this rule's stratum; produce clauses reference declared VerdictType ids (unresolved VerdictType references are Pass 5 errors).
-- Flow: entry exists; all step refs resolve; all step persona fields resolve to declared Persona constructs; step graph acyclic; flow reference graph acyclic; all OperationSteps and SubFlowSteps declare FailureHandlers.
+- Flow: entry exists; all step refs resolve; all step persona fields resolve to declared Persona constructs; step graph acyclic; flow reference graph acyclic; all OperationSteps and SubFlowSteps declare FailureHandlers; all OperationStep outcome map keys are members of the referenced Operation's declared outcomes; OperationStep outcome handling is exhaustive (map keys = Operation's declared outcomes).
 - Parallel: branch sub-DAGs acyclic; no overlapping entity effect sets across branches (transitively resolved).
 - **Error attribution:** errors are reported at the source line of the specific field or sub-expression responsible for the violation (e.g., the `initial:` field line, not the `Entity` keyword line; the `verdict_present(...)` call line, not the enclosing `Rule` keyword line). This requires AST nodes at all levels — RawExpr variants, RawStep variants, construct sub-field lines — to carry their own source line, set by the parser at token consumption time and treated as immutable by all elaboration passes.
 
@@ -1053,6 +1147,7 @@ Input: Typed ASTs, construct index, type environment. Output: Validation report.
 Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON bundle.
 
 - Canonical construct order: Personas (alphabetical), VerdictTypes, Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical).
+- Serialize Operation `outcomes` as an array of strings preserving declaration order. For multi-outcome Operations, serialize each effect with an `"outcome"` field associating it with the declared outcome label.
 - Serialize Flow steps as an array. Entry step is first; remaining steps follow in topological order of the step DAG.
 - Sort all JSON object keys lexicographically within each construct document.
 - Represent all Decimal, Money, and Duration values as structured typed objects. No JSON native floats for Decimal or Money values.
@@ -1116,6 +1211,14 @@ The following checks are performed when a contract is loaded. A contract that fa
 
 8.  stratum_check
     — for all rules r, r': if r references output of r' then stratum(r') < stratum(r)
+
+9.  outcome_check
+    — every Operation declares a non-empty outcome set
+    — outcome labels are unique within each Operation
+    — outcomes ∩ error_contract = ∅ for each Operation
+    — for multi-outcome Operations, every effect is associated with a declared outcome
+    — every OperationStep outcome map key is a member of the referenced Operation's outcomes
+    — every OperationStep outcome map is exhaustive (covers all declared outcomes)
 ```
 
 ### 14.2 Flow Initiation
@@ -1133,7 +1236,7 @@ facts       = assemble_facts(contract, external_inputs)   // → FactSet | Abort
 verdicts    = eval_strata(contract.rules, facts)           // → ResolvedVerdictSet
 
 // Write path (per Operation invocation)
-state'      = execute(op, persona, verdicts, state)        // → EntityState' | Error
+(state', outcome_label) = execute(op, persona, verdicts, state) // → (EntityState', OutcomeLabel) | Error
 
 // Orchestration
 outcome     = execute_flow(flow, persona, snapshot)        // → FlowOutcome
@@ -1211,9 +1314,9 @@ A stronger version of S3a: for each Entity state and each persona, determine whe
 
 **S4 — Authority topology.** For any declared Persona P (Section 8) and Entity state S, the set of Operations P can invoke in S is derivable. Whether a persona can cause a transition from S to S' is answerable. The complete set of declared Personas is statically known, enabling exhaustive enumeration of the authority relation.
 
-**S5 — Verdict space.** The complete set of possible verdict types producible by a contract's rules is enumerable.
+**S5 — Verdict and outcome space.** The complete set of possible verdict types producible by a contract's rules is enumerable. The complete set of possible outcomes for each Operation is enumerable from the declared outcome set (§9.1). For any Operation O, the analyzer can report: "O can produce outcomes {o1, ..., on}" without executing the Operation.
 
-**S6 — Flow path enumeration.** For each Flow, the complete set of possible execution paths, all personas at each step, all entity states reachable via the Flow, and all terminal outcomes are derivable.
+**S6 — Flow path enumeration.** For each Flow, the complete set of possible execution paths, all personas at each step, all Operation outcomes at each OperationStep, all entity states reachable via the Flow, and all terminal outcomes are derivable. Because OperationStep outcome handling is exhaustive (§11.5), the set of possible paths through an OperationStep is exactly the set of declared outcomes of the referenced Operation.
 
 **S7 — Evaluation complexity bounds.** For each PredicateExpression, the evaluation complexity bound is statically derivable. For each Flow, the maximum execution depth is statically derivable.
 
@@ -1282,11 +1385,11 @@ The join step evaluates after all branches have reached a terminal state. The jo
 
 **P8 — Persona declaration.** Persona is now a first-class declared construct (§8). Previously, persona identifiers were bare strings in Operation `allowed_personas` and Flow step `persona` fields with no declaration requirement. In v1.0, all persona references must resolve to declared Persona constructs. Formalized via CFFP (see `docs/cffp/persona.json`).
 
+**P7 — Operation outcome typing.** Operations now declare named outcome types (§9.1). The outcome set is a non-empty, finite, closed set of outcome labels per Operation. Flow OperationStep routing references declared outcomes with exhaustive handling required (§11.5). The previous ad-hoc outcome classification (AL13) is superseded. Formalized via CFFP (see `docs/cffp/p7-outcome-typing.json`).
+
 **Deferred to v2:**
 
 **P5 — Shared type library.** Record and TaggedUnion types are per-contract in v0.3. Cross-contract type reuse is deferred.
-
-**P7 — Operation outcome typing.** Named outcome types on Operations are deferred. Current typed outcome routing is Flow-side classification only.
 
 ---
 
@@ -1330,8 +1433,8 @@ The Operation construct does not encode source-state validation internally.
 **AL12 — Operation atomicity is executor obligation** _(Operation)_  
 The language defines what atomicity means but cannot enforce it internally.
 
-**AL13 — Flow typed outcomes are Flow-side only** _(Flow, CE1)_  
-Typed outcome routing is Flow-side classification of Operation results. The Operation canonical form is unchanged.
+**AL13 — ~~Flow typed outcomes are Flow-side only~~ Superseded by P7** _(Flow, CE1; resolved in v1.0)_
+~~Typed outcome routing is Flow-side classification of Operation results. The Operation canonical form is unchanged.~~ Superseded: Operations now declare named outcomes (§9.1). Flow OperationStep routing references Operation-declared outcomes with exhaustive handling (§11.5). Outcome routing is grounded in Operation declarations, not Flow-side classification. See `docs/cffp/p7-outcome-typing.json` for the CFFP record.
 
 **AL14 — Sub-flow snapshot inheritance** _(Flow, CE2)_  
 Sub-flows inherit the invoking Flow's snapshot and do not take independent snapshots.
@@ -1371,6 +1474,18 @@ Persona is a pure identity token with no description, display name, role, or oth
 
 **AL26 — Unreferenced Persona declarations are not errors** _(Persona)_
 A Persona declared but never referenced in any Operation or Flow is valid. Static analysis tooling may optionally warn about unreferenced Personas, but this is not an elaboration obligation.
+
+**AL27 — Outcome exhaustiveness is a contract authoring obligation** _(Operation, P7 CFFP CE3)_
+The elaborator validates that Flow OperationStep outcome routing handles all declared outcomes and that outcome labels are members of the referenced Operation's declared set. However, the elaborator cannot verify that the declared outcome set is exhaustive of all possible executor success-path behaviors. A contract author who omits a possible outcome from the declaration has a contract authoring error that cannot be detected statically. This parallels AL11 (source-state validation is an executor obligation).
+
+**AL28 — Outcome labels carry no typed payload** _(Operation, P7 CFFP Phase 4)_
+Outcome labels are bare strings with no associated payload data. An outcome `"approved"` cannot carry the approval amount, the approving persona, or other context. If outcome-specific data is needed, it must be conveyed through entity state changes or separate Facts. Typed outcome payloads were considered during the CFFP run (Candidate B) and rejected because payload values have no derivation chain within the contract's closed-world evaluation model, violating C7 (provenance as semantics).
+
+**AL29 — Multi-outcome effect-to-outcome mapping is explicit** _(Operation, P7 CFFP CE7)_
+When an Operation declares multiple outcomes and multiple effects, the contract must explicitly declare which effects belong to which outcome. The executor does not determine this mapping. This ensures cross-executor determinism: two conforming executors given the same inputs will produce the same outcome. The DSL syntax and interchange format encode the effect-to-outcome association directly.
+
+**AL30 — Operation outcome declarations are mandatory in v1.0** _(Operation, P7)_
+Contracts written against v0.3 that use ad-hoc outcome labels in Flow OperationSteps (e.g., `outcomes: {success: next_step}`) must add corresponding `outcomes` declarations to their Operations when migrating to v1.0 (e.g., `outcomes: [success]`). This is a breaking change covered by the v0.3 to v1.0 major version bump. The migration path is additive: existing outcome labels used in Flows become the declared outcome set on the referenced Operation.
 
 ---
 
