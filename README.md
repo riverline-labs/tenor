@@ -79,6 +79,8 @@ Systems today describe behavior across OpenAPI specs, JSON Schema, policy YAML, 
 
 Tenor is not a configuration format, a policy DSL, or a workflow engine. It is a formal language where a contract is a complete behavioral description — readable by humans, machines, and agents alike.
 
+**Tenor is not a smart contract language.** It has no notion of cryptography, distributed consensus, tokens, or blockchain. The surface resemblance — non-Turing complete, static analysis, explicit authority — is coincidental. The problem Tenor addresses is behavioral fragmentation in ordinary enterprise software: multi-tenant SaaS, healthcare workflows, procurement systems, internal approval processes. Anywhere authority, state, and audit matter and are currently scattered across OpenAPI specs, policy YAML, RBAC configs, and implementation code.
+
 ---
 
 ## Design constraints
