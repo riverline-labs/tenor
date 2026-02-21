@@ -11,6 +11,28 @@ Tenor is a finite, stratified, verdict-producing formal system for describing th
 
 ---
 
+## Why Tenor exists — and why nothing else does this
+
+Systems today describe behavior across OpenAPI specs, JSON Schema, policy YAML, ad hoc state machines, workflow engines, RBAC configurations, and implementation code. None of it is formally unified. None of it is fully agent-legible. The fragmentation is real and worsening. Anywhere authority, state, and audit matter. In multi-tenant SaaS, healthcare workflows, procurement, internal approvals — the behavioral description of a system is scattered across a dozen artifacts, none of which agree.
+
+Tenor is not a configuration format, a policy DSL, or a workflow engine. It is not a smart contract language — it has no notion of cryptography, distributed consensus, tokens, or blockchain. It is a **behavioral contract calculus**: a formal language where a contract is the complete description of a system's observable behavior, readable by humans, machines, and agents alike.
+
+The research literature has behavioral contract calculi — formal models for proving properties about systems. Production languages (Clarity, Michelson) share some constraints but not this architecture. What's missing is a language that combines all of the following:
+
+**Stratification is a language construct, not a derived property.** Strata are declared. Same-stratum rule references are illegal. Termination is structurally guaranteed — not proved after the fact, not checked at runtime.
+
+**Provenance is part of the evaluation relation.** `eval_rules` returns `Set<Verdict × Provenance>`, not `Set<Verdict>`. The audit log is a theorem derived from evaluation, not a logging feature bolted on. Every decision carries its complete proof chain back to ground facts.
+
+**No built-in functions. None.** No `now()`. No `sum()`. No regex. Time is a Fact. Totals are Facts. Everything that varies at runtime enters through the ground layer. This is a harder constraint than any production language we found — and it's what makes static analysis complete rather than approximate.
+
+**Flow is part of the contract.** Orchestration is not external to the formal system. The flow graph, personas at each step, compensation logic, parallel branches — all of it is in the contract and statically analyzable. A static analyzer can enumerate every possible execution path without running anything.
+
+**Static analyzability is a rejection filter, not a goal.** Any proposed feature that breaks complete static derivability is rejected regardless of ergonomic benefit.
+
+Tenor is the first implemented language that combines these properties — with a working elaborator, a formal spec, and a conformance suite.
+
+---
+
 ## A minimal example
 
 A contract governing escrow release. Two entities, four personas, stratified verdict logic, a compensation flow.
@@ -70,16 +92,6 @@ flow release {
 ```
 
 From this contract alone a static analyzer can derive: every reachable entity state, every persona's authority in every state, every verdict the rules can produce, every execution path through every flow, and the complete provenance chain for any outcome. No implementation required.
-
----
-
-## Why
-
-Systems today describe behavior across OpenAPI specs, JSON Schema, policy YAML, ad hoc state machines, workflow engines, RBAC configurations, and implementation code. None of it is formally unified. None of it is fully agent-legible. The fragmentation is real and worsening.
-
-Tenor is not a configuration format, a policy DSL, or a workflow engine. It is a formal language where a contract is a complete behavioral description — readable by humans, machines, and agents alike.
-
-**Tenor is not a smart contract language.** It has no notion of cryptography, distributed consensus, tokens, or blockchain. The surface resemblance — non-Turing complete, static analysis, explicit authority — is coincidental. The problem Tenor addresses is behavioral fragmentation in ordinary enterprise software: multi-tenant SaaS, healthcare workflows, procurement systems, internal approval processes. Anywhere authority, state, and audit matter and are currently scattered across OpenAPI specs, policy YAML, RBAC configs, and implementation code.
 
 ---
 
@@ -146,7 +158,7 @@ docs/TENOR.md     — full formal specification (v0.3)
 STABILITY.md      — pre-release stability notice
 CONTRIBUTING.md   — contribution guidelines
 conformance/      — elaborator conformance suite (47/47 tests passing)
-elaborator/       — reference implementation that transforms .tenor source → canonical JSON
+elaborator/       — reference elaborator implementation (Rust)
 ```
 
 ---
