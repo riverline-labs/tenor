@@ -94,7 +94,7 @@ Flow                — finite DAG orchestration with sequential and parallel st
 NumericModel        — fixed-point decimal with total promotion rules (cross-cutting)
 ```
 
-Named type aliases (TypeDecl) are a DSL-layer convenience only. The elaborator resolves all named type references during Pass 3 and inlines the full BaseType structure at every point of use. TypeDecl does not appear in TenorInterchange output.
+Named type aliases (TypeDecl) are a DSL-layer convenience only. The elaborator resolves all named type references during Pass 3 and inlines the full BaseType structure at every point of use. TypeDecl does not appear in TenorInterchange output. TypeDecl definitions may be shared across contracts via shared type library files (§4.6). Shared type libraries are Tenor files containing only TypeDecl constructs, imported via the existing import mechanism.
 
 **Tooling layer:**
 
@@ -288,10 +288,76 @@ fact line_items {
 
 **Constraints:**
 
-- TypeDecl ids are unique within a contract. Two TypeDecls may not share an id.
+- TypeDecl ids are unique within a contract (including imported TypeDecl ids — see §4.6). Two TypeDecls may not share an id, whether both are local, both are imported, or one is local and one is imported.
 - TypeDecl ids occupy a distinct namespace from other construct kinds. A TypeDecl named `Foo` does not conflict with an Entity named `Foo`.
-- The TypeDecl reference graph must be acyclic. If TypeDecl A contains a field of type TypeDecl B, and TypeDecl B contains a field of type TypeDecl A, this is a declaration cycle and is a Pass 3 error. Cycle detection uses DFS over the TypeDecl reference graph.
+- The TypeDecl reference graph must be acyclic. If TypeDecl A contains a field of type TypeDecl B, and TypeDecl B contains a field of type TypeDecl A, this is a declaration cycle and is a Pass 3 error. Cycle detection uses DFS over the TypeDecl reference graph. This applies to the unified TypeDecl graph including both local and imported definitions (§4.6).
 - A TypeDecl may only alias Record or TaggedUnion types.
+
+### 4.6 Shared Type Libraries
+
+A shared type library is a Tenor file containing zero or more TypeDecl constructs and no other construct kinds (no Fact, Entity, Rule, Persona, Operation, Flow). Type libraries enable cross-contract type reuse: a Record or TaggedUnion type can be declared once in a library and imported by multiple contracts.
+
+**Import mechanism:** A contract file imports a type library using the existing `import` syntax:
+
+```
+import "shared_types.tenor"
+```
+
+Imported TypeDecl definitions are merged into the unified parse tree during Pass 1 and participate in type environment construction (Pass 3) identically to local TypeDecl definitions. Imported types may be referenced anywhere a local TypeDecl can be referenced: Fact type fields, List element_type positions, and other TypeDecl definitions.
+
+**DSL example — type library file** (`types/common.tenor`):
+
+```
+type Address {
+  street: Text(max_length: 256)
+  city:   Text(max_length: 128)
+  state:  Text(max_length: 64)
+  zip:    Text(max_length: 10)
+}
+
+type Currency {
+  code: Text(max_length: 3)
+  name: Text(max_length: 64)
+}
+```
+
+**DSL example — contract importing type library:**
+
+```
+import "types/common.tenor"
+
+fact shipping_address {
+  type:   Address
+  source: "order_service.shipping"
+}
+
+fact line_items {
+  type: List(element_type: LineItem, max: 100)
+  source: "order_service.line_items"
+}
+
+type LineItem {
+  id:          Text(max_length: 64)
+  description: Text(max_length: 256)
+  amount:      Money(currency: "USD")
+  address:     Address
+}
+```
+
+In this example, `Address` is imported from the type library. The local TypeDecl `LineItem` references `Address` as a field type. After Pass 3/4 elaboration, the `Address` reference is inlined to its full Record structure, identical to declaring `Address` locally.
+
+**Type identity:** Type identity is structural. After Pass 3/4 inlining, two types are identical if and only if their fully expanded BaseType structures are recursively equal, regardless of origin (local or imported). A Record imported from a library and a Record declared locally are the same type if they have identical field names and field types. This preserves the existing Tenor type identity semantics without change.
+
+**Type library constraints:**
+
+- A type library file may not contain import declarations. Type libraries are self-contained leaf files in the import graph. If a file identified as a type library (containing only TypeDecl constructs) also contains import declarations, this is an elaboration error. This restriction prevents transitive type propagation: if contract A imports library L, A gets exactly L's TypeDecl definitions. L cannot import other libraries, so there are no hidden transitive dependencies.
+- A type library file may contain only TypeDecl constructs. If a file contains any non-TypeDecl construct (Fact, Entity, Rule, Persona, Operation, Flow), it is treated as a regular contract file, not a type library.
+- TypeDecl names occupy a flat namespace. Imported TypeDecl ids must not conflict with local TypeDecl ids or with TypeDecl ids from other imported libraries. Duplicate TypeDecl ids across file boundaries are elaboration errors (Pass 1).
+- The unified TypeDecl reference graph (local + imported) must be acyclic. Cross-file TypeDecl cycles are structurally impossible under the type library constraint (libraries cannot see importing contract declarations), but the Pass 3 DFS cycle detection operates on the full unified graph as a safety guarantee.
+
+**Interchange representation:** Shared type libraries have no interchange representation. Imported TypeDecl definitions are consumed during Pass 3 (type environment construction) and inlined during Pass 4 (AST materialization). The interchange output for a contract that imports shared types is identical to the interchange for a contract that declares those same types locally. No import reference, file path, or TypeDecl entry appears in the interchange bundle. Interchange remains fully self-contained.
+
+**Elaboration integration:** See §13.2 for the pass-by-pass handling of shared type library imports.
 
 ---
 
@@ -1104,7 +1170,8 @@ Input: Parse trees from all DSL files. Output: Unified parse tree.
 
 - Resolve all `import` declarations. Missing files are elaboration errors.
 - Detect import cycles. Cycles are elaboration errors.
-- Merge parse trees into a unified bundle. Duplicate construct ids across files are elaboration errors.
+- Identify shared type library files: any imported file containing only TypeDecl constructs (no Fact, Entity, Rule, Persona, Operation, Flow) is a type library. Type library files may not contain import declarations — if present, this is an elaboration error (§4.6).
+- Merge parse trees into a unified bundle. Duplicate construct ids across files are elaboration errors. This includes TypeDecl ids: an imported TypeDecl id that conflicts with a local TypeDecl id or another imported TypeDecl id is an elaboration error.
 
 **Pass 2 — Construct indexing**
 Input: Unified parse tree. Output: Construct index keyed by `(construct_kind, id)`.
@@ -1115,10 +1182,10 @@ Input: Unified parse tree. Output: Construct index keyed by `(construct_kind, id
 **Pass 3 — Type environment construction**
 Input: Construct index (TypeDecl, Fact, and VerdictType declarations). Output: Type environment.
 
-- Resolve all declared TypeDecl definitions. Detect cycles in the TypeDecl reference graph via DFS. Build named type lookup table.
+- Resolve all declared TypeDecl definitions (local and imported — §4.6). Detect cycles in the unified TypeDecl reference graph via DFS. Build named type lookup table. Imported TypeDecl definitions from shared type libraries are treated identically to local TypeDecl definitions.
 - Resolve all BaseTypes in Fact and VerdictType declarations, expanding named type references using the TypeDecl lookup table. Detect any remaining Record/TaggedUnion declaration cycles.
 - Build complete type environment before any expression type-checking begins.
-- TypeDecl entries are consumed during type environment construction. They do not propagate to interchange output.
+- TypeDecl entries (both local and imported) are consumed during type environment construction. They do not propagate to interchange output.
 
 **Pass 4 — Expression type-checking and AST materialization**
 Input: Unified parse tree, type environment, construct index. Output: Typed expression AST nodes.
@@ -1387,9 +1454,9 @@ The join step evaluates after all branches have reached a terminal state. The jo
 
 **P7 — Operation outcome typing.** Operations now declare named outcome types (§9.1). The outcome set is a non-empty, finite, closed set of outcome labels per Operation. Flow OperationStep routing references declared outcomes with exhaustive handling required (§11.5). The previous ad-hoc outcome classification (AL13) is superseded. Formalized via CFFP (see `docs/cffp/p7-outcome-typing.json`).
 
-**Deferred to v2:**
+**P5 — Shared type library.** Record and TaggedUnion types can be declared in shared type library files and imported by contracts (§4.6). Type libraries are self-contained leaf files in the import graph (no imports within type libraries). Type identity is structural — imported types are fully inlined during elaboration and do not appear in interchange. Formalized via CFFP (see `docs/cffp/p5-shared-types.json`). Scoped-down canonical form: module federation, generic type parameters, type library composition, namespace prefixing, and selective imports are deferred to v2.
 
-**P5 — Shared type library.** Record and TaggedUnion types are per-contract in v0.3. Cross-contract type reuse is deferred.
+**Deferred to v2:**
 
 ---
 
@@ -1486,6 +1553,24 @@ When an Operation declares multiple outcomes and multiple effects, the contract 
 
 **AL30 — Operation outcome declarations are mandatory in v1.0** _(Operation, P7)_
 Contracts written against v0.3 that use ad-hoc outcome labels in Flow OperationSteps (e.g., `outcomes: {success: next_step}`) must add corresponding `outcomes` declarations to their Operations when migrating to v1.0 (e.g., `outcomes: [success]`). This is a breaking change covered by the v0.3 to v1.0 major version bump. The migration path is additive: existing outcome labels used in Flows become the declared outcome set on the referenced Operation.
+
+**AL31 — Module federation deferred to v2** _(P5 Shared Type Library, CFFP)_
+Inter-organization type sharing (type registries, versioned type packages, cross-repository type distribution) is explicitly out of scope for v1.0. The shared type library mechanism supports only direct file import within a single project. Module federation requires infrastructure (package registries, version resolution, dependency management) that exceeds the language specification's scope. See SPEC-06.
+
+**AL32 — Generic type parameters deferred to v2** _(P5 Shared Type Library, CFFP)_
+Shared type libraries cannot define parameterized types (e.g., `GenericList<T>`). Each concrete type variant must be declared separately. Generic type parameters for Records and TaggedUnions are a v2 requirement (SPEC-07).
+
+**AL33 — Type library files may not import other files** _(P5 Shared Type Library, CFFP Phase 4)_
+Type library files are self-contained leaf files in the import graph. A type library cannot reference types from another type library. Complex type hierarchies that span multiple files must be flattened into a single type library file. This restriction prevents transitive type propagation (implicit cross-file type visibility) and eliminates the need for a module visibility system. It may be relaxed in v2 if a visibility/module system is introduced.
+
+**AL34 — TypeDecl flat namespace across imports** _(P5 Shared Type Library, CFFP CE6)_
+TypeDecl names occupy a flat namespace. Two imported type libraries that declare the same TypeDecl id cause an elaboration error, even if the type definitions are structurally identical. Namespace prefixing, aliasing, or selective imports are not supported in v1.0. Contracts importing multiple libraries must ensure no TypeDecl id conflicts.
+
+**AL35 — No type extension or inheritance across libraries** _(P5 Shared Type Library, CFFP CE5)_
+A contract cannot import a type from a library and extend it (add fields). To create a variant of a library type, the contract must declare a new TypeDecl with a different name containing the desired fields. Type extension and inheritance are not supported in v1.0.
+
+**AL36 — No selective type import** _(P5 Shared Type Library)_
+Importing a type library file loads all its TypeDecl definitions into the type environment, even if the contract uses only a subset. Unused imported types do not appear in interchange output and do not affect evaluation. This is a namespace concern, not a correctness issue.
 
 ---
 
