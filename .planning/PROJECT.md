@@ -39,7 +39,7 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 - [ ] Evaluator conformance suite
 - [ ] Static analyzer implementing S1–S7 from spec
 - [ ] Domain validation: 5–10 real contracts across distinct domains
-- [ ] Code generation (ports and adapters pattern, TypeScript first, Rust second)
+- [ ] Code generation (ports and adapters pattern, TypeScript first, then Rust and Go)
 - [ ] Local adapter package for dev/test use
 - [ ] VS Code extension (syntax highlighting, inline errors, check on save, go-to-definition)
 - [ ] Language reference documentation (author-facing)
@@ -54,7 +54,7 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 - P5 module federation (inter-org type sharing) — complexity explosion, defer to post-1.0
 - Runtime monitoring / contract enforcement in production — separate operational concern
 - GUI contract editor — premature; need CLI and authoring experience first
-- Code generation targets beyond TypeScript + Rust — prove the pattern first
+- Code generation targets beyond TypeScript, Rust, and Go — prove the pattern first
 - Formal proof of soundness — separate research track, not blocking 1.0
 
 ## Context
@@ -70,6 +70,7 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 
 ## Constraints
 
+- **CFFP for spec changes**: New constructs and construct modifications go through the Constraint-First Formalization Protocol (`~/Downloads/cffp (1).cue`) — invariant declaration, candidate formalisms, pressure testing, canonicalization. Applies to Persona declaration, P7 outcome typing, and P5 shared types.
 - **Spec-first**: Every language change must be specified in `docs/TENOR.md` before implementation
 - **Conformance-driven**: Every elaborator change must have conformance suite coverage
 - **Deterministic**: Elaboration must be deterministic — identical inputs always produce identical outputs
@@ -87,6 +88,7 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 | Ports and adapters for codegen | Separates generated domain from developer-supplied adapters | — Pending |
 | TypeScript as first codegen target | Widest adoption, fastest iteration for domain validation | — Pending |
 | Domain validation before codegen | Real contracts surface spec gaps before committing to code generation | — Pending |
+| CFFP for construct design | Invariant-driven pressure testing prevents ad-hoc spec changes; each new construct survives counterexamples or gets redesigned | — Pending |
 
 ---
 *Last updated: 2026-02-21 after initialization*

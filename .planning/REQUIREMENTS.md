@@ -76,6 +76,8 @@ Requirements for 1.0 release. Each maps to roadmap phases.
 - [ ] **CGEN-05**: Generated TypeScript uses fixed-point decimal (not native `number`) for Money/Decimal types
 - [ ] **CGEN-06**: Rust code generator as second target
 - [ ] **CGEN-07**: Generated code passes evaluation conformance suite (same verdicts as reference evaluator)
+- [ ] **CGEN-08**: Go code generator as third target
+- [ ] **CGEN-09**: Generated Go compiles and produces correct verdicts against reference evaluator
 
 ### Testing
 
@@ -84,6 +86,7 @@ Requirements for 1.0 release. Each maps to roadmap phases.
 - [ ] **TEST-03**: Static analyzer test suite covering each S1-S7 analysis with known-good and known-bad contracts
 - [ ] **TEST-04**: Code generation integration tests — generated TypeScript compiles and produces correct verdicts against reference evaluator
 - [ ] **TEST-05**: Code generation integration tests — generated Rust compiles and produces correct verdicts against reference evaluator
+- [ ] **TEST-10**: Code generation integration tests — generated Go compiles and produces correct verdicts against reference evaluator
 - [ ] **TEST-06**: Domain validation contracts serve as end-to-end integration tests (elaborate → check → eval → generate → run)
 - [ ] **TEST-07**: CLI integration tests for each subcommand (exit codes, output format, error handling)
 - [ ] **TEST-08**: Interchange JSON Schema validation test — every elaborator output validates against the formal schema
@@ -111,8 +114,8 @@ Deferred to post-1.0. Tracked but not in current roadmap.
 
 ### Extended Code Generation
 
-- **CGEN-08**: Additional code generation targets beyond TypeScript + Rust
-- **CGEN-09**: Code generation template customization API
+- **CGEN-10**: Additional code generation targets beyond TypeScript, Rust, and Go
+- **CGEN-11**: Code generation template customization API
 
 ### Extended Type System
 
@@ -132,6 +135,7 @@ Deferred to post-1.0. Tracked but not in current roadmap.
 | REPL | Contradicts Tenor's batch evaluation model; contracts are evaluated against complete fact sets, not interactively |
 | Runtime monitoring / enforcement | Separate operational concern; 1.0 focuses on authoring and static tooling |
 | GUI contract editor | Premature without established authoring patterns from CLI experience |
+| Code generation targets beyond TS, Rust, Go | Prove the pattern with three targets first |
 | Formal proof of soundness | Separate research track; not blocking 1.0 practical use |
 | Aggregates in DSL | Explicitly prohibited by spec design (decidability constraint) |
 | Turing completeness | Violates core language invariant (termination guarantee) |
@@ -143,78 +147,81 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SPEC-01 | — | Pending |
-| SPEC-02 | — | Pending |
-| SPEC-03 | — | Pending |
-| SPEC-04 | — | Pending |
-| SPEC-05 | — | Pending |
-| FNDN-01 | — | Pending |
-| FNDN-02 | — | Pending |
-| FNDN-03 | — | Pending |
-| FNDN-04 | — | Pending |
-| CLI-01 | — | Pending |
-| CLI-02 | — | Pending |
-| CLI-03 | — | Pending |
-| CLI-04 | — | Pending |
-| CLI-05 | — | Pending |
-| CLI-06 | — | Pending |
-| CLI-07 | — | Pending |
-| CLI-08 | — | Pending |
-| CLI-09 | — | Pending |
-| EVAL-01 | — | Pending |
-| EVAL-02 | — | Pending |
-| EVAL-03 | — | Pending |
-| EVAL-04 | — | Pending |
-| EVAL-05 | — | Pending |
-| EVAL-06 | — | Pending |
-| EVAL-07 | — | Pending |
-| ANLZ-01 | — | Pending |
-| ANLZ-02 | — | Pending |
-| ANLZ-03 | — | Pending |
-| ANLZ-04 | — | Pending |
-| ANLZ-05 | — | Pending |
-| ANLZ-06 | — | Pending |
-| ANLZ-07 | — | Pending |
-| ANLZ-08 | — | Pending |
-| DOMN-01 | — | Pending |
-| DOMN-02 | — | Pending |
-| DOMN-03 | — | Pending |
-| DOMN-04 | — | Pending |
-| DOMN-05 | — | Pending |
-| DOMN-06 | — | Pending |
-| DOMN-07 | — | Pending |
-| DOMN-08 | — | Pending |
-| DOMN-09 | — | Pending |
-| CGEN-01 | — | Pending |
-| CGEN-02 | — | Pending |
-| CGEN-03 | — | Pending |
-| CGEN-04 | — | Pending |
-| CGEN-05 | — | Pending |
-| CGEN-06 | — | Pending |
-| CGEN-07 | — | Pending |
-| DEVX-01 | — | Pending |
-| DEVX-02 | — | Pending |
-| DEVX-03 | — | Pending |
-| DEVX-04 | — | Pending |
-| DEVX-05 | — | Pending |
-| DEVX-06 | — | Pending |
-| DEVX-07 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| TEST-05 | — | Pending |
-| TEST-06 | — | Pending |
-| TEST-07 | — | Pending |
-| TEST-08 | — | Pending |
-| TEST-09 | — | Pending |
-| DEVX-08 | — | Pending |
+| SPEC-01 | Phase 1 | Pending |
+| SPEC-02 | Phase 1 | Pending |
+| SPEC-03 | Phase 1 | Pending |
+| SPEC-04 | Phase 1 | Pending |
+| SPEC-05 | Phase 1 | Pending |
+| FNDN-01 | Phase 2 | Pending |
+| FNDN-02 | Phase 2 | Pending |
+| FNDN-03 | Phase 2 | Pending |
+| FNDN-04 | Phase 2 | Pending |
+| CLI-01 | Phase 3 | Pending |
+| CLI-02 | Phase 3 | Pending |
+| CLI-03 | Phase 3 | Pending |
+| CLI-04 | Phase 4 | Pending |
+| CLI-05 | Phase 3 | Pending |
+| CLI-06 | Phase 5 | Pending |
+| CLI-07 | Phase 3 | Pending |
+| CLI-08 | Phase 6 | Pending |
+| CLI-09 | Phase 3 | Pending |
+| EVAL-01 | Phase 3 | Pending |
+| EVAL-02 | Phase 3 | Pending |
+| EVAL-03 | Phase 3 | Pending |
+| EVAL-04 | Phase 3 | Pending |
+| EVAL-05 | Phase 3 | Pending |
+| EVAL-06 | Phase 3 | Pending |
+| EVAL-07 | Phase 3 | Pending |
+| ANLZ-01 | Phase 4 | Pending |
+| ANLZ-02 | Phase 4 | Pending |
+| ANLZ-03 | Phase 4 | Pending |
+| ANLZ-04 | Phase 4 | Pending |
+| ANLZ-05 | Phase 4 | Pending |
+| ANLZ-06 | Phase 4 | Pending |
+| ANLZ-07 | Phase 4 | Pending |
+| ANLZ-08 | Phase 4 | Pending |
+| DOMN-01 | Phase 5 | Pending |
+| DOMN-02 | Phase 5 | Pending |
+| DOMN-03 | Phase 5 | Pending |
+| DOMN-04 | Phase 5 | Pending |
+| DOMN-05 | Phase 5 | Pending |
+| DOMN-06 | Phase 5 | Pending |
+| DOMN-07 | Phase 5 | Pending |
+| DOMN-08 | Phase 5 | Pending |
+| DOMN-09 | Phase 5 | Pending |
+| CGEN-01 | Phase 6 | Pending |
+| CGEN-02 | Phase 6 | Pending |
+| CGEN-03 | Phase 6 | Pending |
+| CGEN-04 | Phase 6 | Pending |
+| CGEN-05 | Phase 6 | Pending |
+| CGEN-06 | Phase 7 | Pending |
+| CGEN-07 | Phase 6 | Pending |
+| CGEN-08 | Phase 7 | Pending |
+| CGEN-09 | Phase 7 | Pending |
+| TEST-01 | Phase 2 | Pending |
+| TEST-02 | Phase 2 | Pending |
+| TEST-03 | Phase 4 | Pending |
+| TEST-04 | Phase 6 | Pending |
+| TEST-05 | Phase 7 | Pending |
+| TEST-10 | Phase 7 | Pending |
+| TEST-06 | Phase 7 | Pending |
+| TEST-07 | Phase 3 | Pending |
+| TEST-08 | Phase 2 | Pending |
+| TEST-09 | Phase 3 | Pending |
+| DEVX-01 | Phase 8 | Pending |
+| DEVX-02 | Phase 8 | Pending |
+| DEVX-03 | Phase 8 | Pending |
+| DEVX-04 | Phase 8 | Pending |
+| DEVX-05 | Phase 9 | Pending |
+| DEVX-06 | Phase 9 | Pending |
+| DEVX-07 | Phase 9 | Pending |
+| DEVX-08 | Phase 9 | Pending |
 
 **Coverage:**
-- v1 requirements: 62 total
-- Mapped to phases: 0
-- Unmapped: 62 (pending roadmap creation)
+- v1 requirements: 69 total
+- Mapped to phases: 69
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after initial definition*
+*Last updated: 2026-02-21 after roadmap creation*
