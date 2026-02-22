@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 ## Current Position
 
-Milestone: v0.9 Core (COMPLETE — shipped 2026-02-22)
-Next milestone: v1.0 — System Construct + Documentation
-Next phase: Phase 12 - System Construct (CFFP run required)
-Last activity: 2026-02-22 -- v0.9 milestone archived
+Milestone: v1.0 — System Construct + Documentation
+Phase: Not started (defining requirements)
+Status: Defining requirements for v1.0 milestone
+Last activity: 2026-02-22 — Milestone v1.0 started
 
 ## Performance Metrics
 

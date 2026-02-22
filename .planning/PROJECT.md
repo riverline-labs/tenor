@@ -4,6 +4,15 @@
 
 Tenor is a domain-specific language for expressing operational contracts — the rules, entities, operations, and flows that govern how decisions are made in complex business domains. The elaborator transforms `.tenor` source files into a canonical JSON interchange format through a six-pass pipeline. The evaluator executes contracts against fact sets with full provenance. Static analysis (S1-S8) verifies structural properties. The language specification is frozen at v0.9; v1.0 requires the System construct for multi-contract composition.
 
+## Current Milestone: v1.0 System Construct + Documentation
+
+**Goal:** Add the System construct for multi-contract composition, audit the full spec via AAP, freeze as v1.0, and ship documentation.
+
+**Target features:**
+- System construct: member contracts, shared persona identity, cross-contract flow triggers, cross-contract entity relationships
+- AAP audit of the complete v1.0 spec (gates freeze)
+- Language reference, authoring guide, executor guide
+
 ## Core Value
 
 A contract authored in TenorDSL must be statically verifiable, evaluable against facts, and generatable into working code — the full lifecycle from specification to execution with provenance at every step.
@@ -99,4 +108,4 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 | TypeScript as first codegen target | Widest adoption, fastest iteration for domain validation | — Pending |
 
 ---
-*Last updated: 2026-02-22 after v0.9 milestone completion*
+*Last updated: 2026-02-22 after v1.0 milestone start*
