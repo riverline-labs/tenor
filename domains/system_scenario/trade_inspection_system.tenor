@@ -1,0 +1,31 @@
+// Trade Inspection System — Multi-Contract System Scenario
+// Composes the supply chain inspection contract and the trade finance
+// letter of credit contract into a realistic cross-domain workflow.
+//
+// Domain rationale: In international trade, a cargo shipment must pass
+// port inspection (supply chain contract) before the letter of credit
+// documents can be presented for payment (trade finance contract).
+// This is a natural cross-contract dependency.
+//
+// Key features exercised:
+//   - System construct with 2 real domain member contracts
+//   - Cross-contract flow trigger (inspection success -> LC presentation)
+//   - Empty shared_personas (no natural persona overlap between domains)
+//   - Empty shared_entities (no natural entity overlap between domains)
+
+system trade_inspection_system {
+  members: [
+    inspection: "../supply_chain/inspection.tenor",
+    letter_of_credit: "../trade_finance/letter_of_credit.tenor"
+  ]
+  shared_personas: []
+  triggers: [
+    {
+      source: inspection.inspection_flow,
+      on: success,
+      target: letter_of_credit.lc_presentation_flow,
+      persona: beneficiary
+    }
+  ]
+  shared_entities: []
+}

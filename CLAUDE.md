@@ -15,6 +15,20 @@ Uppercase construct names (`Rule`, `Fact`, `Entity`, `Operation`, `Flow`) appear
 
 They do **not** appear in `.tenor` source files. Generated DSL must use lowercase.
 
+## Pre-commit quality gates (mandatory)
+
+**Before EVERY commit that touches Rust code, run ALL of the following in order:**
+
+```bash
+cargo fmt --all
+cargo build --workspace
+cargo test --workspace
+cargo run -p tenor-cli -- test conformance
+cargo clippy --workspace -- -D warnings
+```
+
+**Every single check must pass before committing.** No exceptions. No "I'll fix it later." If any check fails, fix it before the commit. You own all test failures, lint failures, and formatting issues. CI runs all five checks and treats clippy warnings as errors (`-D warnings`). This is non-negotiable.
+
 ## Build and test
 
 ```bash

@@ -19,6 +19,7 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
     let mut operations: Vec<&RawConstruct> = Vec::new();
     let mut flows: Vec<&RawConstruct> = Vec::new();
     let mut personas: Vec<&RawConstruct> = Vec::new();
+    let mut systems: Vec<&RawConstruct> = Vec::new();
 
     for c in constructs {
         match c {
@@ -30,6 +31,7 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
             RawConstruct::Operation { .. } => operations.push(c),
             RawConstruct::Flow { .. } => flows.push(c),
             RawConstruct::Persona { .. } => personas.push(c),
+            RawConstruct::System { .. } => systems.push(c),
             _ => {}
         }
     }
@@ -42,6 +44,7 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
     operations.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
     flows.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
     personas.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
+    systems.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
 
     let mut result: Vec<Value> = Vec::new();
     for c in &facts {
@@ -62,6 +65,9 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
         result.push(serialize_construct(c, &fact_types));
     }
     for c in &flows {
+        result.push(serialize_construct(c, &fact_types));
+    }
+    for c in &systems {
         result.push(serialize_construct(c, &fact_types));
     }
 
@@ -86,6 +92,7 @@ fn construct_id(c: &RawConstruct) -> &str {
         RawConstruct::Flow { id, .. } => id,
         RawConstruct::TypeDecl { id, .. } => id,
         RawConstruct::Persona { id, .. } => id,
+        RawConstruct::System { id, .. } => id,
         RawConstruct::Import { .. } => "",
     }
 }
@@ -250,6 +257,21 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             m.insert("tenor".to_owned(), json!("1.0"));
             Value::Object(m)
         }
+        RawConstruct::System {
+            id,
+            members,
+            shared_personas,
+            triggers,
+            shared_entities,
+            prov,
+        } => serialize_system(
+            id,
+            members,
+            shared_personas,
+            triggers,
+            shared_entities,
+            prov,
+        ),
         _ => json!(null),
     }
 }
@@ -911,4 +933,109 @@ fn serialize_comp_step(step: &RawCompStep) -> Value {
         "op": step.op,
         "persona": step.persona
     })
+}
+
+// ── System serialization ─────────────────────────────────────────────────────
+
+/// Serialize a System construct to canonical interchange JSON per Section 12.5
+/// of TENOR.md. All keys are lexicographically sorted within each object.
+fn serialize_system(
+    id: &str,
+    members: &[(String, String)],
+    shared_personas: &[(String, Vec<String>)],
+    triggers: &[RawTrigger],
+    shared_entities: &[(String, Vec<String>)],
+    prov: &Provenance,
+) -> Value {
+    let mut m = Map::new();
+
+    // flow_triggers -- empty array if none (omitted if empty per spec example)
+    // Per spec Section 12.5, triggers is always present as a field
+
+    // id
+    m.insert("id".to_owned(), json!(id));
+
+    // kind
+    m.insert("kind".to_owned(), json!("System"));
+
+    // members: sorted by member id (lex order for canonical output)
+    let mut sorted_members: Vec<(&String, &String)> =
+        members.iter().map(|(mid, path)| (mid, path)).collect();
+    sorted_members.sort_by_key(|(mid, _)| mid.as_str());
+    let members_arr: Vec<Value> = sorted_members
+        .iter()
+        .map(|(mid, path)| {
+            let mut mm = Map::new();
+            mm.insert("id".to_owned(), json!(mid));
+            mm.insert("path".to_owned(), json!(path));
+            Value::Object(mm)
+        })
+        .collect();
+    m.insert("members".to_owned(), Value::Array(members_arr));
+
+    // provenance
+    m.insert("provenance".to_owned(), serialize_prov(prov));
+
+    // shared_entities: sorted by entity id, contracts sorted within each entry
+    let mut sorted_entities: Vec<(&String, &Vec<String>)> =
+        shared_entities.iter().map(|(eid, cs)| (eid, cs)).collect();
+    sorted_entities.sort_by_key(|(eid, _)| eid.as_str());
+    let entities_arr: Vec<Value> = sorted_entities
+        .iter()
+        .map(|(eid, contracts)| {
+            let mut sorted_cs: Vec<&str> = contracts.iter().map(String::as_str).collect();
+            sorted_cs.sort_unstable();
+            let mut em = Map::new();
+            em.insert("contracts".to_owned(), json!(sorted_cs));
+            em.insert("entity".to_owned(), json!(eid));
+            Value::Object(em)
+        })
+        .collect();
+    m.insert("shared_entities".to_owned(), Value::Array(entities_arr));
+
+    // shared_personas: sorted by persona id, contracts sorted within each entry
+    let mut sorted_personas: Vec<(&String, &Vec<String>)> =
+        shared_personas.iter().map(|(pid, cs)| (pid, cs)).collect();
+    sorted_personas.sort_by_key(|(pid, _)| pid.as_str());
+    let personas_arr: Vec<Value> = sorted_personas
+        .iter()
+        .map(|(pid, contracts)| {
+            let mut sorted_cs: Vec<&str> = contracts.iter().map(String::as_str).collect();
+            sorted_cs.sort_unstable();
+            let mut pm = Map::new();
+            pm.insert("contracts".to_owned(), json!(sorted_cs));
+            pm.insert("persona".to_owned(), json!(pid));
+            Value::Object(pm)
+        })
+        .collect();
+    m.insert("shared_personas".to_owned(), Value::Array(personas_arr));
+
+    // tenor
+    m.insert("tenor".to_owned(), json!("1.0"));
+
+    // triggers: sorted by (source_contract, source_flow, target_contract, target_flow)
+    let mut sorted_triggers: Vec<&RawTrigger> = triggers.iter().collect();
+    sorted_triggers.sort_by(|a, b| {
+        a.source_contract
+            .cmp(&b.source_contract)
+            .then_with(|| a.source_flow.cmp(&b.source_flow))
+            .then_with(|| a.target_contract.cmp(&b.target_contract))
+            .then_with(|| a.target_flow.cmp(&b.target_flow))
+    });
+    let triggers_arr: Vec<Value> = sorted_triggers
+        .iter()
+        .map(|t| {
+            let mut tm = Map::new();
+            tm.insert("on".to_owned(), json!(t.on));
+            tm.insert("persona".to_owned(), json!(t.persona));
+            tm.insert("source_contract".to_owned(), json!(t.source_contract));
+            tm.insert("source_flow".to_owned(), json!(t.source_flow));
+            tm.insert("target_contract".to_owned(), json!(t.target_contract));
+            tm.insert("target_flow".to_owned(), json!(t.target_flow));
+            Value::Object(tm)
+        })
+        .collect();
+    m.insert("triggers".to_owned(), Value::Array(triggers_arr));
+
+    Value::Object(m)
 }

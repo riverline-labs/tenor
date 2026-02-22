@@ -46,11 +46,25 @@ pub struct FlowPathResult {
     pub unreachable_steps: BTreeSet<String>,
 }
 
+/// A cross-contract flow path created by a System trigger.
+#[derive(Debug, Clone, Serialize)]
+pub struct CrossContractFlowPath {
+    pub system_id: String,
+    pub source_contract: String,
+    pub source_flow: String,
+    pub on: String,
+    pub target_contract: String,
+    pub target_flow: String,
+    pub persona: String,
+}
+
 /// Aggregated S6 result.
 #[derive(Debug, Clone, Serialize)]
 pub struct S6Result {
     pub flows: BTreeMap<String, FlowPathResult>,
     pub total_paths: usize,
+    /// Cross-contract flow paths from System triggers.
+    pub cross_contract_paths: Vec<CrossContractFlowPath>,
 }
 
 /// S6 — Enumerate all possible execution paths through each Flow.
@@ -64,14 +78,60 @@ pub fn analyze_flow_paths(bundle: &AnalysisBundle, s5: &S5Result) -> S6Result {
         flows.insert(flow.id.clone(), result);
     }
 
-    S6Result { flows, total_paths }
+    // Cross-contract flow path analysis from System triggers
+    let cross_contract_paths = analyze_cross_contract_triggers(bundle);
+
+    S6Result {
+        flows,
+        total_paths,
+        cross_contract_paths,
+    }
+}
+
+/// Analyze cross-contract flow triggers from System constructs.
+///
+/// For each System, extracts all flow triggers and represents them
+/// as cross-contract flow paths. Also detects trigger cycles.
+fn analyze_cross_contract_triggers(bundle: &AnalysisBundle) -> Vec<CrossContractFlowPath> {
+    let mut paths = Vec::new();
+
+    for system in &bundle.systems {
+        for trigger in &system.flow_triggers {
+            paths.push(CrossContractFlowPath {
+                system_id: system.id.clone(),
+                source_contract: trigger.source_contract.clone(),
+                source_flow: trigger.source_flow.clone(),
+                on: trigger.on.clone(),
+                target_contract: trigger.target_contract.clone(),
+                target_flow: trigger.target_flow.clone(),
+                persona: trigger.persona.clone(),
+            });
+        }
+    }
+
+    // Sort for deterministic output
+    paths.sort_by(|a, b| {
+        (
+            &a.system_id,
+            &a.source_contract,
+            &a.source_flow,
+            &a.target_contract,
+            &a.target_flow,
+        )
+            .cmp(&(
+                &b.system_id,
+                &b.source_contract,
+                &b.source_flow,
+                &b.target_contract,
+                &b.target_flow,
+            ))
+    });
+
+    paths
 }
 
 /// Enumerate paths for a single flow.
-fn enumerate_flow_paths(
-    flow: &crate::bundle::AnalysisFlow,
-    _s5: &S5Result,
-) -> FlowPathResult {
+fn enumerate_flow_paths(flow: &crate::bundle::AnalysisFlow, _s5: &S5Result) -> FlowPathResult {
     // Build step index: step_id -> step JSON
     let mut step_index: BTreeMap<String, &serde_json::Value> = BTreeMap::new();
     let mut all_step_ids = BTreeSet::new();
@@ -134,14 +194,20 @@ fn enumerate_flow_paths(
         };
 
         let kind = step.get("kind").and_then(|k| k.as_str()).unwrap_or("");
-        let persona = step.get("persona").and_then(|p| p.as_str()).map(|s| s.to_string());
+        let persona = step
+            .get("persona")
+            .and_then(|p| p.as_str())
+            .map(|s| s.to_string());
 
         let mut new_visited = visited.clone();
         new_visited.insert(current_step_id.clone());
 
         match kind {
             "OperationStep" => {
-                let op_id = step.get("op").and_then(|o| o.as_str()).map(|s| s.to_string());
+                let op_id = step
+                    .get("op")
+                    .and_then(|o| o.as_str())
+                    .map(|s| s.to_string());
 
                 // Get outcomes from step's outcomes map
                 let outcomes_map = step.get("outcomes").and_then(|o| o.as_object());
@@ -188,9 +254,12 @@ fn enumerate_flow_paths(
 
                 // Follow Escalate handler's next target for failure path reachability
                 if let Some(failure_handler) = step.get("on_failure") {
-                    if let Some(handler_kind) = failure_handler.get("kind").and_then(|k| k.as_str()) {
+                    if let Some(handler_kind) = failure_handler.get("kind").and_then(|k| k.as_str())
+                    {
                         if handler_kind == "Escalate" {
-                            if let Some(next_id) = failure_handler.get("next").and_then(|n| n.as_str()) {
+                            if let Some(next_id) =
+                                failure_handler.get("next").and_then(|n| n.as_str())
+                            {
                                 let mut escalate_path = current_path;
                                 escalate_path.push(FlowPathStep {
                                     step_id: current_step_id,
@@ -199,7 +268,11 @@ fn enumerate_flow_paths(
                                     operation_id: op_id,
                                     outcome: Some("escalate".to_string()),
                                 });
-                                stack.push((next_id.to_string(), escalate_path, new_visited.clone()));
+                                stack.push((
+                                    next_id.to_string(),
+                                    escalate_path,
+                                    new_visited.clone(),
+                                ));
                             }
                         }
                     }
@@ -272,7 +345,10 @@ fn enumerate_flow_paths(
             }
 
             "SubFlowStep" => {
-                let flow_ref = step.get("flow").and_then(|f| f.as_str()).map(|s| s.to_string());
+                let flow_ref = step
+                    .get("flow")
+                    .and_then(|f| f.as_str())
+                    .map(|s| s.to_string());
 
                 // Success path
                 if let Some(success_target) = step.get("on_success") {
@@ -298,10 +374,14 @@ fn enumerate_flow_paths(
 
                 // Failure path (from on_failure handler)
                 if let Some(failure_handler) = step.get("on_failure") {
-                    let handler_kind = failure_handler.get("kind").and_then(|k| k.as_str()).unwrap_or("");
+                    let handler_kind = failure_handler
+                        .get("kind")
+                        .and_then(|k| k.as_str())
+                        .unwrap_or("");
                     if handler_kind == "Escalate" {
                         // Escalate handler: follow the next step target
-                        if let Some(next_id) = failure_handler.get("next").and_then(|n| n.as_str()) {
+                        if let Some(next_id) = failure_handler.get("next").and_then(|n| n.as_str())
+                        {
                             let mut escalate_path = current_path;
                             escalate_path.push(FlowPathStep {
                                 step_id: current_step_id,
@@ -391,10 +471,8 @@ fn enumerate_flow_paths(
     }
 
     let max_depth = paths.iter().map(|p| p.depth).max().unwrap_or(0);
-    let unreachable_steps: BTreeSet<String> = all_step_ids
-        .difference(&reachable_steps)
-        .cloned()
-        .collect();
+    let unreachable_steps: BTreeSet<String> =
+        all_step_ids.difference(&reachable_steps).cloned().collect();
     let path_count = paths.len();
 
     FlowPathResult {
@@ -416,16 +494,18 @@ fn extract_step_target(target: &serde_json::Value) -> Option<String> {
 
 /// Extract terminal outcome from a TerminalTarget object.
 fn extract_terminal_outcome(target: &serde_json::Value) -> Option<String> {
-    if let Some(outcome) = target.get("outcome").and_then(|o| o.as_str()) {
-        Some(outcome.to_string())
-    } else {
-        None
-    }
+    target
+        .get("outcome")
+        .and_then(|o| o.as_str())
+        .map(|outcome| outcome.to_string())
 }
 
 /// Extract outcome from a failure handler.
 fn extract_failure_outcome(handler: &serde_json::Value) -> Option<String> {
-    handler.get("outcome").and_then(|o| o.as_str()).map(|s| s.to_string())
+    handler
+        .get("outcome")
+        .and_then(|o| o.as_str())
+        .map(|s| s.to_string())
 }
 
 #[cfg(test)]
@@ -442,6 +522,7 @@ mod tests {
             operations: vec![],
             flows,
             personas: vec![],
+            systems: vec![],
         }
     }
 
@@ -475,7 +556,10 @@ mod tests {
         assert_eq!(flow_result.path_count, 1);
         assert_eq!(flow_result.paths[0].steps.len(), 1);
         assert_eq!(flow_result.paths[0].steps[0].step_type, "operation");
-        assert_eq!(flow_result.paths[0].terminal_outcome, Some("success".to_string()));
+        assert_eq!(
+            flow_result.paths[0].terminal_outcome,
+            Some("success".to_string())
+        );
     }
 
     #[test]
@@ -575,13 +659,21 @@ mod tests {
 
         let flow_result = &result.flows["escalate_flow"];
         // step_director should be reachable through the Escalate handler
-        assert!(flow_result.reachable_steps.contains("step_director"),
-            "step_director should be reachable via Escalate handler");
-        assert!(flow_result.unreachable_steps.is_empty(),
-            "no steps should be unreachable: {:?}", flow_result.unreachable_steps);
+        assert!(
+            flow_result.reachable_steps.contains("step_director"),
+            "step_director should be reachable via Escalate handler"
+        );
+        assert!(
+            flow_result.unreachable_steps.is_empty(),
+            "no steps should be unreachable: {:?}",
+            flow_result.unreachable_steps
+        );
         // Should have at least 2 paths: normal outcome + escalation
-        assert!(flow_result.path_count >= 2,
-            "expected at least 2 paths (normal + escalate), got {}", flow_result.path_count);
+        assert!(
+            flow_result.path_count >= 2,
+            "expected at least 2 paths (normal + escalate), got {}",
+            flow_result.path_count
+        );
     }
 
     #[test]

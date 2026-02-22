@@ -240,12 +240,7 @@ fn run_manifest_tests(suite_dir: &Path, tap: &mut Tap) {
     }
 }
 
-fn run_manifest_test(
-    tenor_path: &Path,
-    expected_path: &Path,
-    name: &str,
-    tap: &mut Tap,
-) {
+fn run_manifest_test(tenor_path: &Path, expected_path: &Path, name: &str, tap: &mut Tap) {
     let test_name = format!("manifest/{}", name);
 
     let expected_json = match read_json(expected_path) {

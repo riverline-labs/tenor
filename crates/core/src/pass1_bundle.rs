@@ -57,6 +57,7 @@ fn check_cross_file_dups(constructs: &[RawConstruct]) -> Result<(), ElabError> {
             RawConstruct::Flow { id, prov, .. } => ("Flow", id, prov),
             RawConstruct::TypeDecl { id, prov, .. } => ("TypeDecl", id, prov),
             RawConstruct::Persona { id, prov, .. } => ("Persona", id, prov),
+            RawConstruct::System { id, prov, .. } => ("System", id, prov),
             RawConstruct::Import { .. } => continue,
         };
         if let Some(first) = seen.get(&(kind, id)) {

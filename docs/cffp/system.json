@@ -1,0 +1,684 @@
+{
+  "protocol": {
+    "name": "Constraint-First Formalization Protocol",
+    "version": "0.2.1",
+    "description": "Invariant-driven semantic design. Candidates survive pressure or die."
+  },
+  "construct": {
+    "name": "System",
+    "description": "A composition layer for multi-contract systems. A System declares a finite set of member contracts, enables shared persona identity across contracts, declares cross-contract flow triggers (a flow completion in one contract triggers a flow in another), and declares cross-contract entity relationships (an entity id shared across contracts with compatible state machines). The System construct is the only additive change permitted between v0.9 and v1.0.",
+    "depends_on": ["Fact", "Entity", "Rule", "Operation", "Flow", "TypeDecl", "Persona"]
+  },
+  "version": "1.0",
+  "phase1": {
+    "invariants": [
+      {
+        "id": "I1",
+        "description": "A System declares a finite set of member contracts by id. Each member id must resolve to a file path that can be elaborated as a standalone contract. The member set is fixed at System definition time.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I2",
+        "description": "System member contract ids are unique within the System. No two member declarations may share the same id.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I3",
+        "description": "Shared persona identity: a shared_persona declaration in the System specifies a persona id and a set of member contract ids. The elaborator validates that each referenced member contract declares a Persona with that id. The shared persona binding creates no new evaluation semantics -- it asserts identity equivalence across contracts for the purpose of cross-contract authority analysis.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I4",
+        "description": "Cross-contract flow trigger: a trigger declaration in the System specifies (source_contract, source_flow, source_outcome, target_contract, target_flow). The elaborator validates that source_contract and target_contract are declared members, source_flow exists in source_contract, target_flow exists in target_contract, and source_outcome is a valid terminal outcome of source_flow. The trigger introduces no new evaluation semantics within any member contract -- it is a declarative assertion that the executor must honor at orchestration time.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I5",
+        "description": "Cross-contract entity relationship: a shared_entity declaration in the System specifies an entity id and a set of member contract ids. The elaborator validates that each referenced member contract declares an Entity with that id, and that all such Entity declarations have identical state sets and compatible transition declarations. Compatibility means the state sets are equal (same state names). Transition compatibility is not required -- each contract may define different Operations that operate on the same state machine.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I6",
+        "description": "System composition is statically determinable. The complete set of member contracts, shared persona bindings, flow triggers, and entity relationships is fixed at System definition time. There is no dynamic contract loading, no runtime composition, no conditional membership. The System's composition graph is fully known at elaboration time.",
+        "testable": true,
+        "structural": true,
+        "class": "analyzability"
+      },
+      {
+        "id": "I7",
+        "description": "System does not alter single-contract semantics. A contract within a System produces identical elaboration output as the same contract elaborated outside a System. The System adds cross-contract metadata (shared personas, triggers, entity relationships) as a separate layer. No member contract's Facts, Entities, Rules, Operations, Flows, or Personas are modified by System membership. The System is a pure composition overlay.",
+        "testable": true,
+        "structural": true,
+        "class": "determinism"
+      },
+      {
+        "id": "I8",
+        "description": "System does not permit recursive embedding. A System's member contracts are individual contracts, not other Systems. The System construct cannot appear inside a contract file. Systems are top-level composition units that reference contracts. This ensures System resolution is bounded by the finite set of member contracts with no recursive depth.",
+        "testable": true,
+        "structural": true,
+        "class": "termination"
+      },
+      {
+        "id": "I9",
+        "description": "Cross-contract flow triggers do not create cycles. The trigger graph (where nodes are flows across all member contracts and edges are trigger declarations) must be acyclic. A trigger chain A.flow1 -> B.flow2 -> A.flow3 is permitted only if the resulting directed graph has no cycles. Cycle detection is performed at elaboration time.",
+        "testable": true,
+        "structural": true,
+        "class": "termination"
+      },
+      {
+        "id": "I10",
+        "description": "Trigger source outcome is explicit. A cross-contract flow trigger fires on a specific terminal outcome of the source flow (success, failure, or escalation). There is no implicit trigger-on-any-outcome. The trigger outcome must be one of the Flow terminal outcome values defined in Section 11.2.",
+        "testable": true,
+        "structural": true,
+        "class": "completeness"
+      },
+      {
+        "id": "I11",
+        "description": "System elaboration preserves the closed-world property. The System construct does not introduce external references, runtime dependencies, or implicit behaviors beyond what is declared in the System definition and its member contracts. The combined system (System declaration + all member contracts) remains a complete, self-contained description.",
+        "testable": true,
+        "structural": true,
+        "class": "analyzability"
+      }
+    ]
+  },
+  "phase2": {
+    "candidates": [
+      {
+        "id": "A",
+        "description": "System as a top-level construct in a dedicated .tenor file. The System file uses the 'system' keyword and declares members, shared personas, triggers, and entity relationships inline. Member contracts are referenced by file path and assigned a local member id. The System file is elaborated as a separate unit that references (but does not modify) member contract elaborations.",
+        "formalism": {
+          "dsl_syntax": "system trade_platform {\n  members: [\n    order_mgmt: \"contracts/order.tenor\",\n    fulfillment: \"contracts/fulfillment.tenor\"\n  ]\n\n  shared_personas: [\n    { persona: admin, contracts: [order_mgmt, fulfillment] },\n    { persona: warehouse_ops, contracts: [order_mgmt, fulfillment] }\n  ]\n\n  triggers: [\n    {\n      source: order_mgmt.order_processing,\n      on: success,\n      target: fulfillment.shipment_flow\n    }\n  ]\n\n  shared_entities: [\n    { entity: Order, contracts: [order_mgmt, fulfillment] }\n  ]\n}",
+          "interchange_representation": "{\n  \"kind\": \"System\",\n  \"id\": \"trade_platform\",\n  \"members\": [\n    { \"id\": \"order_mgmt\", \"path\": \"contracts/order.tenor\" },\n    { \"id\": \"fulfillment\", \"path\": \"contracts/fulfillment.tenor\" }\n  ],\n  \"shared_personas\": [\n    { \"contracts\": [\"order_mgmt\", \"fulfillment\"], \"persona\": \"admin\" }\n  ],\n  \"triggers\": [\n    {\n      \"on\": \"success\",\n      \"source_contract\": \"order_mgmt\",\n      \"source_flow\": \"order_processing\",\n      \"target_contract\": \"fulfillment\",\n      \"target_flow\": \"shipment_flow\"\n    }\n  ],\n  \"shared_entities\": [\n    { \"contracts\": [\"order_mgmt\", \"fulfillment\"], \"entity\": \"Order\" }\n  ]\n}",
+          "elaboration_rule": "System elaboration occurs after all member contracts are individually elaborated. The System file is parsed, member paths are resolved to individually-elaborated contract bundles. Shared persona bindings are validated against the Persona index of each referenced member. Trigger references are validated against Flow ids and terminal outcomes. Shared entity declarations are validated for state set equality. The System construct is serialized as a top-level item in a System interchange bundle that references (by member id) the individual contract bundles.",
+          "resolution_rule": "Member resolution: each member path resolves to a file that can be independently elaborated. If elaboration fails, the System elaboration fails. Shared persona resolution: for each shared_persona declaration, the persona id must exist in the Persona index of each referenced member contract. Trigger resolution: source_contract and target_contract must be declared members, source_flow must be a Flow in source_contract, target_flow must be a Flow in target_contract. Entity resolution: for each shared_entity, the entity id must be an Entity in each referenced member contract with identical state sets."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "The members array declares a finite set of (id, path) pairs. Each path is resolved to a file at elaboration time. If the file does not exist or fails elaboration, the System elaboration fails with an error. The member set is fixed by the parse tree of the System file."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Member ids are declared in the members array. Duplicate member ids are detected during System parsing or indexing (Pass 2). This is the same uniqueness mechanism used for all construct ids."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Each shared_persona declaration specifies a persona id and a list of contract member ids. The elaborator loads each referenced member contract's Persona index and verifies that the persona id exists in each. If any member lacks the declared persona, an elaboration error is emitted. No new evaluation semantics are introduced -- the binding is a static assertion validated at elaboration time."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Each trigger declaration specifies source_contract, source_flow, source outcome, target_contract, and target_flow. All five references are validated: source_contract and target_contract must be member ids; source_flow must be a Flow in the source contract; target_flow must be a Flow in the target contract; the source outcome must be a valid terminal outcome. Validation occurs during System-level Pass 5."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Each shared_entity declaration specifies an entity id and a list of contract member ids. The elaborator loads each referenced member contract's Entity index and verifies: (1) the entity id exists in each, (2) the state sets are identical. State set equality is checked by comparing the sorted state name arrays. Different Operations or transitions across contracts are permitted -- only the state set must match."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "The System file is a static declaration. Members, shared personas, triggers, and entity relationships are all declared in the parse tree. No conditional declarations, no runtime resolution, no dynamic loading. The entire composition graph is determined by the System file content."
+          },
+          {
+            "invariant_id": "I7",
+            "argument": "Member contracts are elaborated independently before System-level validation begins. The System elaboration reads the already-completed member elaboration results but does not modify them. Each member contract's interchange output is identical whether elaborated standalone or as part of a System. The System adds a separate System construct to the output -- it does not inject into member outputs."
+          },
+          {
+            "invariant_id": "I8",
+            "argument": "The System construct references contract files (containing Fact, Entity, Rule, Persona, Operation, Flow constructs). A contract file cannot contain a System construct -- the parser rejects System declarations inside contract files. A System file cannot reference another System file as a member -- the member resolution step requires that member files elaborate as contracts (no System construct present). This structurally prevents recursive embedding."
+          },
+          {
+            "invariant_id": "I9",
+            "argument": "The trigger declarations form a directed graph where nodes are (contract_id, flow_id) pairs and edges are trigger bindings. After collecting all triggers, a DFS cycle detection pass runs over this graph. Any cycle is an elaboration error. This is analogous to the existing SubFlowStep cycle detection within a single contract."
+          },
+          {
+            "invariant_id": "I10",
+            "argument": "The 'on' field of each trigger declaration is validated against the set of Flow terminal outcomes: 'success', 'failure', 'escalation'. These are the same terminal outcomes defined in Section 11.2 (Terminal construct). Any other value is an elaboration error."
+          },
+          {
+            "invariant_id": "I11",
+            "argument": "The System construct adds cross-contract metadata that is derived entirely from the System declaration and member contract content. No external APIs, no runtime lookups, no implicit behaviors. The combined System plus member contracts forms a closed world: every reference in the System declaration resolves to a declared construct in a member contract."
+          }
+        ],
+        "complexity": {
+          "time": "O(|M|) for member resolution where |M| is the member count; O(|SP| * |M|) for shared persona validation; O(|T|) for trigger validation plus O(|T|) for cycle detection; O(|SE| * |M| * max|S(e)|) for entity state set comparison",
+          "space": "O(|M| * B) where B is the average member bundle size, for holding all member elaboration results during System validation",
+          "static": "All validation is performed at elaboration time with polynomial complexity in the number of members, personas, triggers, and entities"
+        },
+        "failure_modes": [
+          {
+            "description": "File path resolution is platform-dependent. Relative paths in member declarations depend on the working directory or a base path convention.",
+            "trigger": "System file in one directory references member contracts using relative paths; elaboration invoked from a different working directory",
+            "severity": "ergonomic"
+          },
+          {
+            "description": "Large systems with many members may have slow elaboration due to sequential member elaboration",
+            "trigger": "System with 20+ member contracts, each with complex elaboration",
+            "severity": "ergonomic"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "description": "System as a contract-level annotation. Instead of a separate System file, each member contract contains a 'system' annotation declaring its membership and bindings. A root contract collects all annotated contracts. Shared personas, triggers, and entity relationships are declared across multiple files rather than in one central declaration.",
+        "formalism": {
+          "dsl_syntax": "// In order.tenor:\nsystem_member trade_platform {\n  shared_personas: [admin]\n  shared_entities: [Order]\n}\n\n// In fulfillment.tenor:\nsystem_member trade_platform {\n  shared_personas: [admin, warehouse_ops]\n  shared_entities: [Order]\n}\n\n// Triggers declared in a separate system.tenor or inferred from annotations",
+          "interchange_representation": "Same as Candidate A but assembled from distributed annotations",
+          "elaboration_rule": "Each contract is parsed and its system_member annotations are collected. After all contracts are elaborated, a System assembly pass collects all annotations with the same system id, merges them, validates consistency, and produces a System construct in the interchange. Trigger declarations require a separate mechanism since they reference two contracts.",
+          "resolution_rule": "Shared persona resolution: each contract declares which of its own personas are shared. The System assembler validates that all contracts referencing the same persona id actually declare it. Entity resolution: each contract declares which of its own entities are shared. The assembler validates state set compatibility."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Member contracts are identified by the system_member annotation with a matching system id. The member set is the set of all contracts that declare system_member with the same id. However, this set is not declared in one place -- it is discovered by scanning all available contract files."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Member contract ids are the contract file identifiers. Uniqueness depends on file identity rather than explicit declaration."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Each contract declares its own shared personas. The assembler validates agreement. However, if Contract A declares persona admin as shared but Contract B does not include admin in its shared_personas list, the assembler must detect this asymmetry."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Triggers require referencing two contracts. In a distributed annotation model, triggers must either be declared in one of the two contracts (creating an asymmetric dependency) or in a separate coordination file (which is effectively Candidate A)."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Each contract declares its shared entities. The assembler validates state set equality across matching declarations."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "The member set is discovered rather than declared. The elaborator must scan all contract files to find system_member annotations. This introduces a discovery phase that depends on the file set available to the elaborator, which may vary between invocations."
+          },
+          {
+            "invariant_id": "I7",
+            "argument": "The system_member annotation is inside the contract file. While it could be treated as metadata-only, its presence changes the contract's parse tree. A contract with system_member is structurally different from the same contract without it."
+          },
+          {
+            "invariant_id": "I8",
+            "argument": "Annotations are inside contracts, not separate System constructs. Recursive embedding is not structurally possible since there is no System-as-file to reference."
+          },
+          {
+            "invariant_id": "I9",
+            "argument": "Trigger cycle detection is the same graph algorithm as Candidate A, but the trigger declarations must first be collected from distributed locations."
+          },
+          {
+            "invariant_id": "I10",
+            "argument": "Same as Candidate A -- trigger outcome is validated against terminal outcomes."
+          },
+          {
+            "invariant_id": "I11",
+            "argument": "The distributed annotation model requires file discovery, which means the closed-world property depends on the elaborator having access to all relevant contract files. If a contract with system_member is missing from the file set, the System is incomplete without any error."
+          }
+        ],
+        "complexity": {
+          "time": "Same as Candidate A for validation, plus O(|F|) for file scanning where |F| is the total number of contract files available",
+          "space": "Same as Candidate A",
+          "static": "Same as Candidate A for analysis after assembly"
+        },
+        "failure_modes": [
+          {
+            "description": "Distributed annotations mean the System membership is implicit -- determined by which files happen to be available rather than explicitly declared. This violates C6 (explicit over implicit).",
+            "trigger": "Elaborator invoked with a subset of contract files; some system_member contracts are missing, producing an incomplete System with no error",
+            "severity": "fatal"
+          },
+          {
+            "description": "Trigger declarations cannot be naturally expressed as annotations on a single contract because they reference two contracts. This forces either asymmetric declaration (trigger in source contract only) or a separate coordination file (which reverts to Candidate A).",
+            "trigger": "Any System with cross-contract flow triggers",
+            "severity": "fatal"
+          },
+          {
+            "description": "Contract file is no longer self-contained -- the system_member annotation creates a dependency on the System assembly process that is invisible to standalone contract elaboration",
+            "trigger": "Contract elaborated standalone does not report system membership errors",
+            "severity": "degraded"
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "description": "System as a separate file with import-based member resolution. Similar to Candidate A, but member contracts are loaded via the existing import mechanism rather than explicit path declarations. The System file imports member contracts and uses import-resolved identifiers for bindings.",
+        "formalism": {
+          "dsl_syntax": "import \"contracts/order.tenor\" as order_mgmt\nimport \"contracts/fulfillment.tenor\" as fulfillment\n\nsystem trade_platform {\n  members: [order_mgmt, fulfillment]\n\n  shared_personas: [\n    { persona: admin, contracts: [order_mgmt, fulfillment] }\n  ]\n\n  triggers: [\n    {\n      source: order_mgmt.order_processing,\n      on: success,\n      target: fulfillment.shipment_flow\n    }\n  ]\n\n  shared_entities: [\n    { entity: Order, contracts: [order_mgmt, fulfillment] }\n  ]\n}",
+          "interchange_representation": "Same as Candidate A",
+          "elaboration_rule": "The System file uses import declarations to load member contracts. The existing import mechanism (Pass 1) resolves file paths and loads parse trees. However, the existing import mechanism merges constructs into a unified bundle -- for System members, each contract must retain its separate identity. This requires modifying the import semantics for System files to keep member contracts as separate bundles rather than merging.",
+          "resolution_rule": "Member resolution via import -- each import resolves to a contract. The 'as' alias provides the member id. Shared persona, trigger, and entity resolution are identical to Candidate A using the import-resolved member ids."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Members are declared via import statements with 'as' aliases. Each import resolves to a file. The member set is the set of all imported contracts."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Member ids are the import aliases. Import alias uniqueness would need to be enforced (currently, the import mechanism does not support aliases)."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "Same as Candidate A. The import declarations are static."
+          },
+          {
+            "invariant_id": "I7",
+            "argument": "The existing import mechanism merges constructs into a single bundle. System membership requires keeping contracts separate. This means the import semantics must be changed for System files -- the same 'import' keyword has different behavior depending on context. This is a semantic inconsistency."
+          },
+          {
+            "invariant_id": "I8",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I9",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I10",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I11",
+            "argument": "Same as Candidate A."
+          }
+        ],
+        "complexity": {
+          "time": "Same as Candidate A",
+          "space": "Same as Candidate A",
+          "static": "Same as Candidate A"
+        },
+        "failure_modes": [
+          {
+            "description": "Reusing the import mechanism for System member loading requires either modifying import semantics (breaking change to existing behavior) or introducing a new 'import as' syntax that does not exist in the current language.",
+            "trigger": "Any System file using import to load member contracts",
+            "severity": "fatal"
+          },
+          {
+            "description": "The existing import mechanism is designed for type library sharing (Section 4.6) -- it merges constructs into a unified bundle. Using it for System composition, where contracts must remain separate, creates a semantic split in the meaning of 'import'.",
+            "trigger": "System file imports a contract; the import mechanism must decide whether to merge or keep separate based on context",
+            "severity": "fatal"
+          },
+          {
+            "description": "Import alias syntax ('as' keyword) does not exist in the current Tenor language. Adding it changes the import grammar, affecting all contracts, not just System files.",
+            "trigger": "Implementing 'import ... as ...' syntax",
+            "severity": "degraded"
+          }
+        ]
+      },
+      {
+        "id": "D",
+        "description": "System as a minimal coordination record with external member elaboration. The System file declares only composition bindings (shared personas, triggers, entity relationships) and references member contracts by opaque string ids. The mapping from member id to file path is provided externally (via CLI arguments or a manifest file). This separates composition semantics from file resolution.",
+        "formalism": {
+          "dsl_syntax": "system trade_platform {\n  members: [order_mgmt, fulfillment]\n\n  shared_personas: [\n    { persona: admin, contracts: [order_mgmt, fulfillment] }\n  ]\n\n  triggers: [\n    {\n      source: order_mgmt.order_processing,\n      on: success,\n      target: fulfillment.shipment_flow\n    }\n  ]\n\n  shared_entities: [\n    { entity: Order, contracts: [order_mgmt, fulfillment] }\n  ]\n}",
+          "interchange_representation": "Same as Candidate A, but the 'path' field in members is populated by the external resolution mechanism rather than declared in the DSL",
+          "elaboration_rule": "The System file is parsed and member ids are extracted. An external resolution mechanism (CLI arguments like --member order_mgmt=contracts/order.tenor, or a manifest JSON file) maps member ids to file paths. Each member is elaborated independently. System validation proceeds as in Candidate A.",
+          "resolution_rule": "Member resolution is external. All other resolution (shared personas, triggers, entities) is identical to Candidate A."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Members are declared by id in the System file. The mapping to file paths is external. The member set is fixed by the System file content (the set of member ids)."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Same as Candidate A -- member ids are unique within the System declaration."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "The member id set is static. However, the member-to-file mapping is external and may vary between invocations. The composition graph's identity depends on the external mapping, not just the System file."
+          },
+          {
+            "invariant_id": "I7",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I8",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I9",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I10",
+            "argument": "Same as Candidate A."
+          },
+          {
+            "invariant_id": "I11",
+            "argument": "The external member resolution introduces an out-of-band dependency. The System file alone is not a complete description -- it requires an external mapping to be fully resolved. This weakens the closed-world property: the same System file with different external mappings produces different results."
+          }
+        ],
+        "complexity": {
+          "time": "Same as Candidate A for validation; member resolution depends on the external mechanism",
+          "space": "Same as Candidate A",
+          "static": "Same as Candidate A"
+        },
+        "failure_modes": [
+          {
+            "description": "External member resolution breaks the closed-world property (C5). The System file is not self-contained -- its meaning depends on an out-of-band mapping that is not part of the contract.",
+            "trigger": "System file elaborated without the external mapping, or with a different mapping, produces different results or errors",
+            "severity": "fatal"
+          },
+          {
+            "description": "The external mapping introduces a configuration surface that is not governed by the Tenor language semantics. Errors in the mapping (wrong file, missing member) are configuration errors, not elaboration errors.",
+            "trigger": "Misconfigured member mapping in CLI or manifest",
+            "severity": "degraded"
+          }
+        ]
+      }
+    ]
+  },
+  "phase3": {
+    "counterexamples": [
+      {
+        "id": "CE1",
+        "target_candidate": "B",
+        "violates": "I6",
+        "witness": "Three contract files exist: order.tenor with 'system_member trade_platform', fulfillment.tenor with 'system_member trade_platform', and billing.tenor with 'system_member trade_platform'. The elaborator is invoked with only order.tenor and fulfillment.tenor. The resulting System has 2 members. Later, the elaborator is invoked with all three files. The System now has 3 members. The same system id 'trade_platform' produces different composition graphs depending on which files are available. The member set is not declared -- it is discovered. This is implicit composition, violating C6.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correct. The distributed annotation model makes the System membership implicit -- it depends on which files happen to be available to the elaborator. This directly violates C6 (explicit over implicit). A System's member set must be explicitly declared in one place, not discovered from file scanning. The candidate cannot satisfy I6 because the composition graph is not statically determinable from the System declaration alone.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I6"
+        }
+      },
+      {
+        "id": "CE2",
+        "target_candidate": "B",
+        "violates": "I4",
+        "witness": "System 'trade_platform' has a cross-contract flow trigger: when order_processing completes in order.tenor, trigger shipment_flow in fulfillment.tenor. In the distributed annotation model, this trigger must be declared somewhere. If declared in order.tenor, it creates a forward reference to fulfillment.tenor's flow. If declared in fulfillment.tenor, it creates a backward reference to order.tenor's flow. Either way, one contract must know the internal Flow structure of another contract. This breaks contract encapsulation. The alternative is a separate coordination file -- but that file is effectively a centralized System declaration (Candidate A).",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample correctly identifies that cross-contract triggers cannot be naturally expressed as annotations on individual contracts. Triggers inherently reference two contracts, which requires a centralized declaration point. The distributed annotation model either forces asymmetric dependencies between contracts or reverts to a centralized file, which is Candidate A.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I4"
+        }
+      },
+      {
+        "id": "CE3",
+        "target_candidate": "C",
+        "violates": "I7",
+        "witness": "The current import mechanism (Section 4.6, Pass 1) merges imported constructs into a unified bundle. For shared type libraries, this is correct: imported TypeDecl definitions are merged with local definitions. For System member contracts, this is incorrect: member contracts must retain separate identity (each has its own Fact, Entity, Rule, Persona, Operation, Flow namespaces). Using 'import' for System members requires either (a) changing import to keep contracts separate when used in a System file, or (b) adding a new import variant. Option (a) means the same 'import' keyword has different semantics depending on file context, violating the principle of uniform syntax. Option (b) adds a new syntax variant to all contract files, not just System files. Either way, the import mechanism's existing semantics are modified.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correct. The import mechanism is designed for type library merging (Section 4.6). Repurposing it for System member loading requires changing its semantics, which either creates context-dependent import behavior (different in System files vs contract files) or adds new syntax. Both options modify the existing language in ways that affect all contracts, not just System files. This violates I7 (System does not alter single-contract semantics) because the import mechanism is part of single-contract elaboration.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I7"
+        }
+      },
+      {
+        "id": "CE4",
+        "target_candidate": "D",
+        "violates": "I11",
+        "witness": "System file declares members: [order_mgmt, fulfillment]. The CLI provides --member order_mgmt=contracts/order.tenor --member fulfillment=contracts/fulfillment.tenor. Tomorrow, the CLI is invoked with --member order_mgmt=contracts/order_v2.tenor --member fulfillment=contracts/fulfillment.tenor. The same System file now refers to a different order contract. The System's meaning is not self-contained -- it depends on an external mapping that is not part of the contract text. This violates C5 (closed-world semantics): the contract is no longer the complete description of the system.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correct. External member resolution makes the System file incomplete without the external mapping. The same System file can produce different elaboration results depending on which files are mapped to which member ids. This directly violates C5 (closed-world semantics). The contract text must be sufficient to determine the system's composition without out-of-band configuration.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I11"
+        }
+      },
+      {
+        "id": "CE5",
+        "target_candidate": "A",
+        "violates": "I5",
+        "witness": "System declares shared_entity Order across contracts order_mgmt and fulfillment. Contract order_mgmt declares Entity Order with states: [draft, submitted, approved, rejected, fulfilled]. Contract fulfillment declares Entity Order with states: [draft, submitted, approved, rejected, fulfilled, shipped, delivered]. The state sets differ: fulfillment has 2 additional states. Is this compatible? Under the strict state set equality rule, it is not. But it might be reasonable for the fulfillment contract to extend the Order state machine with fulfillment-specific states.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "This is a design tension, not a refutation. The invariant I5 requires 'identical state sets.' The counterexample asks whether this is too strict. The strict equality rule is correct for v1.0: if two contracts share an entity, they must agree on what states that entity can be in, because cross-contract entity state is meaningful only if both contracts recognize the same states. Allowing state set extension would require defining which contract is the 'authoritative' state machine, which states are 'local extensions,' and how transitions interact -- significant complexity that is best deferred. For v1.0, state set equality is the correct requirement. The counterexample is acknowledged as a limitation: contracts that need extended state sets for a shared entity must declare the full state set in both contracts.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Shared entity state sets must be identical across all member contracts that share the entity. If one contract needs additional states, all sharing contracts must declare those states. This prevents partial state machine extension but ensures unambiguous cross-contract entity identity. State set extension semantics may be explored in a future spec version."
+        }
+      },
+      {
+        "id": "CE6",
+        "target_candidate": "A",
+        "violates": "I9",
+        "witness": "System declares trigger: order_mgmt.order_flow on success -> fulfillment.ship_flow. System also declares trigger: fulfillment.ship_flow on success -> order_mgmt.complete_flow. System also declares trigger: order_mgmt.complete_flow on success -> fulfillment.archive_flow. This is a chain of three triggers: order_flow -> ship_flow -> complete_flow -> archive_flow. The chain is acyclic. Now add a fourth trigger: fulfillment.archive_flow on success -> order_mgmt.order_flow. This creates a cycle: order_flow -> ship_flow -> complete_flow -> archive_flow -> order_flow. The cycle detection (I9) must catch this.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correctly handled by I9. The trigger graph has edges: (order_mgmt, order_flow) -> (fulfillment, ship_flow) -> (order_mgmt, complete_flow) -> (fulfillment, archive_flow) -> (order_mgmt, order_flow). DFS cycle detection finds the back edge to (order_mgmt, order_flow) and reports an elaboration error. I9 is satisfied -- the cycle is detected and rejected. This validates the cycle detection obligation rather than challenging it.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE7",
+        "target_candidate": "A",
+        "violates": "I3",
+        "witness": "System declares shared_persona admin across contracts order_mgmt and fulfillment. Contract order_mgmt declares Persona admin. Contract fulfillment does not declare Persona admin -- it uses a different naming convention and declares Persona system_admin. The shared persona validation fails because 'admin' does not exist in fulfillment's Persona index. But the contract author intended system_admin in fulfillment to be the same identity as admin in order_mgmt. The System construct has no mechanism for persona aliasing -- it can only assert that the same persona id exists in multiple contracts.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "This is correctly handled by I3. The shared_persona binding asserts identity by id -- if the ids do not match, the binding fails. Persona aliasing (mapping admin in one contract to system_admin in another) would require a new binding syntax and new elaboration logic. For v1.0, the simpler design is correct: shared persona identity means the same persona id in all participating contracts. If contracts use different naming conventions, they must be updated to use consistent persona ids for shared personas. This is an acknowledged limitation, not a design flaw.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Shared persona identity is based on exact persona id matching. There is no aliasing mechanism to map different persona names across contracts to the same identity. Contracts participating in a shared persona binding must use identical persona ids. Persona aliasing may be explored in a future spec version."
+        }
+      },
+      {
+        "id": "CE8",
+        "target_candidate": "A",
+        "violates": "I7",
+        "witness": "Contract order.tenor is elaborated standalone. It produces interchange JSON with constructs: [Fact, Entity, Rule, Persona, Operation, Flow]. The same contract is elaborated as a member of System trade_platform. The member contract's interchange output must be identical (by I7). But the System also produces a System construct in the interchange. Question: does the member contract's elaboration output change? If the System elaboration adds any metadata to the member contract output (e.g., 'system_membership' field), I7 is violated.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "I7 is preserved by design. The System elaboration does NOT modify member contract outputs. Each member contract's interchange JSON is identical whether elaborated standalone or as part of a System. The System construct is a separate top-level item in the System interchange bundle that sits alongside (not inside) the member contract bundles. The System construct references member contracts by id but does not inject into them. This is the composition overlay model: the System is layered on top of unmodified member outputs.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE9",
+        "target_candidate": "A",
+        "violates": "I8",
+        "witness": "System A declares member contracts: [order, fulfillment]. What if order.tenor itself contains a 'system' declaration? Can a member contract also be a System? This would create nested Systems.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "I8 explicitly prevents this. The parser enforces that a file is either a System file (contains a system declaration) or a contract file (contains Fact, Entity, Rule, Persona, Operation, Flow constructs). A file cannot contain both. When a member path is resolved and the file is parsed, if it contains a system declaration, the elaborator emits an error: 'member file contains a system declaration; nested systems are not permitted.' This is a structural parsing constraint, not a runtime check.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE10",
+        "target_candidate": "A",
+        "violates": "I4",
+        "witness": "System declares trigger: order_mgmt.order_flow on success -> fulfillment.ship_flow. The target flow ship_flow requires a persona 'warehouse_ops'. But the trigger declaration does not specify a persona for the target flow invocation. Who initiates ship_flow in fulfillment? The trigger is a declarative assertion that the executor must honor, but the executor needs to know which persona to use for the triggered flow.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "This is a genuine design gap. I4 validates the structural references (contracts, flows, outcomes exist) but does not address the operational question of persona resolution for triggered flows. Two options: (1) the trigger declaration includes a target_persona field that must be a shared persona, or (2) the trigger is purely declarative and the executor determines the persona based on System-level policy. Option 1 is more explicit (C6). The trigger declaration should be extended to include a target_persona field: { source: order_mgmt.order_flow, on: success, target: fulfillment.ship_flow, target_persona: warehouse_ops }. The target_persona must be declared as a shared persona in the System (or at minimum must be a valid Persona in the target contract). This is a scope narrowing: I4 is updated to require target_persona in trigger declarations.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Cross-contract flow trigger declarations must include a target_persona field specifying which persona initiates the triggered flow. The target_persona must be a valid Persona in the target contract. This makes the trigger fully explicit and avoids implicit persona resolution."
+        }
+      }
+    ],
+    "composition_failures": [
+      {
+        "target_candidate": "B",
+        "conflicts_with": "Contract",
+        "violates": "I7",
+        "description": "The system_member annotation is placed inside contract files, modifying their parse tree. A contract with system_member has a structurally different AST than the same contract without it. This means the contract's elaboration output may differ depending on whether the system_member annotation is present, violating I7 (System does not alter single-contract semantics). Even if the annotation is treated as pure metadata, it introduces a construct type (system_member) that does not exist in the current v0.9 spec, which is frozen."
+      },
+      {
+        "target_candidate": "C",
+        "conflicts_with": "Import mechanism (Section 4.6, Pass 1)",
+        "violates": "I7",
+        "description": "The existing import mechanism merges constructs into a unified bundle (Pass 1). System member loading requires keeping contracts separate. Reusing 'import' for System members creates context-dependent import semantics: in a contract file, import merges; in a System file, import keeps separate. This semantic split in the import keyword is a composition failure with the existing import mechanism."
+      },
+      {
+        "target_candidate": "D",
+        "conflicts_with": "Closed-world semantics (C5)",
+        "violates": "I11",
+        "description": "External member resolution introduces out-of-band configuration that is not part of the contract text. The System file alone is insufficient to determine the system's composition. This breaks C5 (closed-world semantics): the contract is no longer the complete description of the system."
+      }
+    ]
+  },
+  "derived": {
+    "eliminated": [
+      {
+        "candidate_id": "B",
+        "reason": "counterexample_unrebutted",
+        "source_id": "CE1"
+      },
+      {
+        "candidate_id": "C",
+        "reason": "counterexample_unrebutted",
+        "source_id": "CE3"
+      },
+      {
+        "candidate_id": "D",
+        "reason": "counterexample_unrebutted",
+        "source_id": "CE4"
+      }
+    ],
+    "survivors": [
+      {
+        "candidate_id": "A",
+        "scope_narrowings": [
+          "Shared entity state sets must be identical across all member contracts. State set extension semantics deferred to future spec version.",
+          "Shared persona identity is based on exact id matching. No aliasing mechanism. Contracts must use consistent persona ids.",
+          "Cross-contract flow trigger declarations must include a target_persona field specifying which persona initiates the triggered flow."
+        ]
+      }
+    ]
+  },
+  "phase4": {
+    "attempted": true,
+    "succeeded": true,
+    "reason": "Only Candidate A survived pressure testing. Candidates B, C, and D were each eliminated by unrebutted counterexamples targeting fundamental design constraints (C5, C6, I7). Candidate A satisfies all 11 invariants with three scope narrowings that are acknowledged limitations rather than design flaws. The scope narrowings (strict state set equality, exact persona id matching, explicit target_persona in triggers) are all consistent with design constraint C6 (explicit over implicit) and can be relaxed in future versions if needed.",
+    "selected": "A",
+    "selection_basis": "Candidate A is the only survivor. It provides centralized, explicit System declaration in a dedicated file with inline member paths, shared persona bindings, cross-contract flow triggers (with target persona), and cross-contract entity relationships. It preserves closed-world semantics (C5), maintains explicit declaration (C6), does not alter existing import mechanics or single-contract semantics (I7), and prevents recursive embedding (I8). All validation is performed at elaboration time with polynomial complexity.",
+    "canonical_form": {
+      "construct": "System",
+      "formal_statement": "A System is a top-level composition construct declared in a dedicated .tenor file using the 'system' keyword. System = (id: SystemId, members: Map<MemberId, FilePath>, shared_personas: List<SharedPersona>, triggers: List<Trigger>, shared_entities: List<SharedEntity>). SystemId is a non-empty UTF-8 string. MemberId is a non-empty UTF-8 string unique within the System. FilePath is a relative or absolute path to a .tenor contract file. SharedPersona = (persona: PersonaId, contracts: List<MemberId>). Trigger = (source_contract: MemberId, source_flow: FlowId, on: TerminalOutcome, target_contract: MemberId, target_flow: FlowId, target_persona: PersonaId). SharedEntity = (entity: EntityId, contracts: List<MemberId>). TerminalOutcome = 'success' | 'failure' | 'escalation'.",
+      "dsl_syntax": "system <system_id> {\n  members: [\n    <member_id>: \"<file_path>\",\n    ...\n  ]\n\n  shared_personas: [\n    { persona: <persona_id>, contracts: [<member_id>, ...] },\n    ...\n  ]\n\n  triggers: [\n    {\n      source: <member_id>.<flow_id>,\n      on: success | failure | escalation,\n      target: <member_id>.<flow_id>,\n      persona: <persona_id>\n    },\n    ...\n  ]\n\n  shared_entities: [\n    { entity: <entity_id>, contracts: [<member_id>, ...] },\n    ...\n  ]\n}",
+      "interchange_representation": {
+        "kind": "System",
+        "id": "<system_id>",
+        "members": [
+          {
+            "id": "<member_id>",
+            "path": "<file_path>"
+          }
+        ],
+        "shared_entities": [
+          {
+            "contracts": ["<member_id>"],
+            "entity": "<entity_id>"
+          }
+        ],
+        "shared_personas": [
+          {
+            "contracts": ["<member_id>"],
+            "persona": "<persona_id>"
+          }
+        ],
+        "triggers": [
+          {
+            "on": "<terminal_outcome>",
+            "persona": "<persona_id>",
+            "source_contract": "<member_id>",
+            "source_flow": "<flow_id>",
+            "target_contract": "<member_id>",
+            "target_flow": "<flow_id>"
+          }
+        ],
+        "tenor": "1.0"
+      },
+      "elaboration_pipeline": {
+        "overview": "System elaboration extends the existing six-pass pipeline. Member contracts are elaborated independently using the standard pipeline. System-level validation adds a post-elaboration phase that validates cross-contract bindings.",
+        "pass_integration": {
+          "pass0_parse": "The parser recognizes the 'system' keyword and parses System declarations. A file containing a 'system' declaration is identified as a System file. A System file may not contain Fact, Entity, Rule, Persona, Operation, or Flow declarations -- it contains only the System construct.",
+          "pass1_bundle": "Member contract file paths are resolved relative to the System file's directory. Each member contract is elaborated independently through the full six-pass pipeline. If any member fails elaboration, the System elaboration fails.",
+          "pass2_index": "The System construct is indexed by (System, id). Member contracts are indexed by their member ids within the System.",
+          "pass5_validate": "System-level validation: (1) member id uniqueness, (2) shared persona validation -- each persona id exists in each referenced member's Persona index, (3) trigger validation -- source/target contracts are members, source/target flows exist, source outcome is valid terminal outcome, target persona is valid in target contract, (4) shared entity validation -- entity exists in each referenced member, state sets are identical, (5) trigger graph acyclicity via DFS.",
+          "pass6_serialize": "The System construct is serialized as a top-level item in the interchange output. Member contract bundles are included as separate items referenced by member id. All JSON keys are sorted lexicographically."
+        }
+      },
+      "executor_obligations": {
+        "E_SYS1": "Cross-contract trigger execution. When a Flow in a source contract reaches a terminal outcome matching a trigger's 'on' condition, the executor must initiate the target flow in the target contract with the specified target persona. Trigger execution is asynchronous -- the source flow completes independently of the target flow's execution.",
+        "E_SYS2": "Cross-contract entity state coordination. For shared entities, the executor must ensure that entity state transitions in one contract are visible to other contracts sharing that entity. The coordination mechanism (shared storage, event propagation, etc.) is implementation-defined, but the executor must guarantee eventual consistency of entity state across all sharing contracts.",
+        "E_SYS3": "Shared persona identity enforcement. When the same persona id is declared as shared across contracts, the executor must treat persona authentication/authorization as unified. A persona authenticated in one member contract is considered authenticated in all member contracts that share that persona.",
+        "E_SYS4": "System-level snapshot isolation. When a System-level operation spans multiple member contracts, the executor must define and enforce a snapshot isolation policy. The minimum guarantee is per-contract snapshot isolation (each contract's snapshot is independent). Cross-contract snapshot coordination is implementation-defined."
+      },
+      "static_analysis_extensions": {
+        "S4_extended": "Authority topology analysis extends to the System level. For any shared persona P, the analyzer can derive the complete set of Operations P can invoke across all member contracts. Cross-contract authority analysis is the union of per-contract authority topologies for shared personas.",
+        "S6_extended": "Flow path enumeration extends to include cross-contract trigger chains. For any trigger chain A.flow1 -> B.flow2 -> ... -> N.flowN, the analyzer can enumerate the complete cross-contract execution path, subject to the acyclicity constraint (I9)."
+      },
+      "acknowledged_limitations": [
+        {
+          "id": "AL-1",
+          "description": "Shared entity state sets must be identical across all member contracts that share the entity. State set extension (one contract having additional states) is not supported in v1.0. If a contract needs additional states for a shared entity, all sharing contracts must declare the complete state set.",
+          "rationale": "State set extension would require defining authoritative vs. extended state machines and cross-contract transition interaction semantics. This complexity is deferred to post-v1.0."
+        },
+        {
+          "id": "AL-2",
+          "description": "Shared persona identity is based on exact persona id matching. There is no aliasing mechanism to map different persona names across contracts to the same identity.",
+          "rationale": "Persona aliasing would add a name-mapping layer that complicates the resolution model. For v1.0, contracts must use consistent persona ids. Aliasing may be explored in a future version."
+        },
+        {
+          "id": "AL-3",
+          "description": "Cross-contract flow triggers fire on terminal outcomes only (success, failure, escalation). There is no mechanism to trigger on specific Operation outcomes within a flow or on intermediate flow states.",
+          "rationale": "Intermediate-step triggering would require exposing internal flow structure across contract boundaries, significantly increasing coupling. Terminal outcome triggering preserves flow encapsulation."
+        },
+        {
+          "id": "AL-4",
+          "description": "System member file paths are resolved relative to the System file's directory. No absolute path resolution or path aliasing mechanism is provided.",
+          "rationale": "File resolution is a tooling concern. The elaborator resolves paths relative to the System file. Build systems or packaging tools may provide additional path resolution if needed."
+        },
+        {
+          "id": "AL-5",
+          "description": "A System file may contain only one System declaration. Multiple System declarations in a single file are not permitted.",
+          "rationale": "One System per file maintains a clear file-level identity for the System construct, analogous to how a contract file contains constructs for one logical contract."
+        },
+        {
+          "id": "AL-6",
+          "description": "Recursive System embedding is not permitted. A System member must be a contract file, not another System file. Multi-level System composition is not supported in v1.0.",
+          "rationale": "Recursive composition would require defining System-of-Systems semantics, including transitive trigger propagation and multi-level persona resolution. This is deferred to post-v1.0."
+        },
+        {
+          "id": "AL-7",
+          "description": "Cross-contract entity relationship validation checks state set equality only. Transition compatibility (do the contracts' Operations produce consistent state transitions?) is not checked at elaboration time. This is an executor obligation.",
+          "rationale": "Transition compatibility analysis across contracts requires knowledge of Operation execution order and external triggers, which are runtime concerns. Static analysis can report the combined transition graph (S2 extended) but cannot determine operational consistency without runtime context."
+        }
+      ]
+    }
+  },
+  "outcome": "canonical",
+  "outcome_notes": "Candidate A (System as top-level construct in dedicated file) is the sole survivor. Candidate B (distributed annotations) was eliminated by CE1: implicit membership discovery violates C6. Candidate C (import-based member loading) was eliminated by CE3: repurposing the import mechanism requires context-dependent semantics that violate I7 and modify the existing import grammar. Candidate D (external member resolution) was eliminated by CE4: out-of-band member mapping breaks C5 (closed-world semantics). Candidate A satisfies all 11 invariants with three scope narrowings (strict state set equality, exact persona id matching, explicit target persona in triggers). The canonical form establishes System as a centralized composition declaration that references but does not modify member contracts, preserving the composition overlay principle. All cross-contract bindings (shared personas, triggers, entity relationships) are explicitly declared and validated at elaboration time."
+}

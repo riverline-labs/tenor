@@ -1,0 +1,210 @@
+{
+  "constructs": [
+    {
+      "id": "score",
+      "kind": "Fact",
+      "provenance": {
+        "file": "system_member_b.tenor",
+        "line": 6
+      },
+      "source": {
+        "field": "score",
+        "system": "scoring_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Int",
+        "max": 100,
+        "min": 0
+      }
+    },
+    {
+      "id": "application",
+      "initial": "draft",
+      "kind": "Entity",
+      "provenance": {
+        "file": "system_member_b.tenor",
+        "line": 11
+      },
+      "states": [
+        "draft",
+        "submitted",
+        "approved",
+        "rejected"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "draft",
+          "to": "submitted"
+        },
+        {
+          "from": "submitted",
+          "to": "approved"
+        },
+        {
+          "from": "submitted",
+          "to": "rejected"
+        }
+      ]
+    },
+    {
+      "id": "applicant",
+      "kind": "Persona",
+      "provenance": {
+        "file": "system_member_b.tenor",
+        "line": 4
+      },
+      "tenor": "1.0"
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "qualified"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "score"
+          },
+          "op": ">=",
+          "right": {
+            "literal": 50,
+            "type": {
+              "base": "Int",
+              "max": 50,
+              "min": 50
+            }
+          }
+        }
+      },
+      "id": "check_score",
+      "kind": "Rule",
+      "provenance": {
+        "file": "system_member_b.tenor",
+        "line": 21
+      },
+      "stratum": 1,
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "applicant"
+      ],
+      "effects": [
+        {
+          "entity_id": "application",
+          "from": "submitted",
+          "to": "approved"
+        }
+      ],
+      "error_contract": [],
+      "id": "finalize_review",
+      "kind": "Operation",
+      "precondition": {
+        "left": {
+          "fact_ref": "score"
+        },
+        "op": ">=",
+        "right": {
+          "literal": 50,
+          "type": {
+            "base": "Int",
+            "max": 50,
+            "min": 50
+          }
+        }
+      },
+      "provenance": {
+        "file": "system_member_b.tenor",
+        "line": 36
+      },
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "applicant"
+      ],
+      "effects": [
+        {
+          "entity_id": "application",
+          "from": "draft",
+          "to": "submitted"
+        }
+      ],
+      "error_contract": [],
+      "id": "start_review",
+      "kind": "Operation",
+      "precondition": {
+        "left": {
+          "fact_ref": "score"
+        },
+        "op": ">=",
+        "right": {
+          "literal": 50,
+          "type": {
+            "base": "Int",
+            "max": 50,
+            "min": 50
+          }
+        }
+      },
+      "provenance": {
+        "file": "system_member_b.tenor",
+        "line": 29
+      },
+      "tenor": "1.0"
+    },
+    {
+      "entry": "step_start",
+      "id": "review_flow",
+      "kind": "Flow",
+      "provenance": {
+        "file": "system_member_b.tenor",
+        "line": 43
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_start",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "failure"
+          },
+          "op": "start_review",
+          "outcomes": {
+            "success": "step_finalize"
+          },
+          "persona": "applicant"
+        },
+        {
+          "id": "step_finalize",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "failure"
+          },
+          "op": "finalize_review",
+          "outcomes": {
+            "success": {
+              "kind": "Terminal",
+              "outcome": "success"
+            }
+          },
+          "persona": "applicant"
+        }
+      ],
+      "tenor": "1.0"
+    }
+  ],
+  "id": "system_member_b",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

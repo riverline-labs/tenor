@@ -1,0 +1,19 @@
+// Positive test: System with a cross-contract flow trigger.
+// On success of application_flow in contract_a, trigger review_flow in contract_b.
+
+system trigger_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: [
+    {
+      source: contract_a.application_flow,
+      on: success,
+      target: contract_b.review_flow,
+      persona: applicant
+    }
+  ]
+  shared_entities: []
+}

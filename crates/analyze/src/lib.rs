@@ -18,15 +18,18 @@ pub mod s6_flow_paths;
 pub mod s7_complexity;
 pub mod s8_verdict_uniqueness;
 
-pub use bundle::{AnalysisBundle, AnalysisError};
+pub use bundle::{
+    AnalysisBundle, AnalysisError, AnalysisSystem, FlowTrigger, SharedEntity, SharedPersona,
+    SystemMember,
+};
 pub use report::{AnalysisReport, Finding, FindingSeverity};
 pub use s1_state_space::{S1Result, StateSpaceResult};
 pub use s2_reachability::{ReachabilityResult, S2Result};
 pub use s3a_admissibility::{AdmissibilityKey, S3aResult};
-pub use s4_authority::{AuthorityMap, S4Result, TransitionAuthority};
+pub use s4_authority::{AuthorityMap, CrossContractAuthority, S4Result, TransitionAuthority};
 pub use s5_verdicts::{S5Result, VerdictTypeInfo};
-pub use s6_flow_paths::{S6Result, FlowPathResult};
-pub use s7_complexity::{S7Result, PredicateComplexity, FlowDepthBound};
+pub use s6_flow_paths::{CrossContractFlowPath, FlowPathResult, S6Result};
+pub use s7_complexity::{FlowDepthBound, PredicateComplexity, S7Result};
 pub use s8_verdict_uniqueness::S8Result;
 
 /// Run the full S1-S8 analysis suite on an interchange JSON bundle.

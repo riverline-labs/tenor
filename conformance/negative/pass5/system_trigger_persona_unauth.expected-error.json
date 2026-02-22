@@ -1,0 +1,9 @@
+{
+  "construct_id": "audit_system",
+  "construct_kind": "System",
+  "field": "triggers",
+  "file": "system_trigger_persona_unauth.tenor",
+  "line": 44,
+  "message": "trigger persona 'auditor' not in allowed_personas of entry operation 'do_review' in target flow 'review_flow'",
+  "pass": 5
+}

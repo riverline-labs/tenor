@@ -1,0 +1,20 @@
+// Negative test -- Pass 2
+// Two System constructs with the same id in one file. Must be rejected.
+
+system my_system {
+  members: [
+    contract_a: "member_a.tenor"
+  ]
+  shared_personas: []
+  triggers: []
+  shared_entities: []
+}
+
+system my_system {
+  members: [
+    contract_b: "member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: []
+  shared_entities: []
+}

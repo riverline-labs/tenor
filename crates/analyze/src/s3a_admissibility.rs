@@ -82,9 +82,10 @@ pub fn analyze_admissibility(bundle: &AnalysisBundle) -> S3aResult {
                     }
 
                     // Check 2: operation has an effect from this state on this entity
-                    let has_matching_effect = operation.effects.iter().any(|e| {
-                        e.entity_id == entity.id && e.from_state == *state
-                    });
+                    let has_matching_effect = operation
+                        .effects
+                        .iter()
+                        .any(|e| e.entity_id == entity.id && e.from_state == *state);
                     if !has_matching_effect {
                         continue;
                     }
@@ -135,8 +136,12 @@ fn is_structurally_satisfiable(expr: &serde_json::Value, facts: &[AnalysisFact])
         if let Some(op) = expr.get("op").and_then(|o| o.as_str()) {
             if let Some(arr) = operands.as_array() {
                 return match op {
-                    "and" => arr.iter().all(|child| is_structurally_satisfiable(child, facts)),
-                    "or" => arr.iter().any(|child| is_structurally_satisfiable(child, facts)),
+                    "and" => arr
+                        .iter()
+                        .all(|child| is_structurally_satisfiable(child, facts)),
+                    "or" => arr
+                        .iter()
+                        .any(|child| is_structurally_satisfiable(child, facts)),
                     _ => true, // Unknown op: conservative true
                 };
             }
@@ -294,6 +299,7 @@ mod tests {
             operations,
             flows: vec![],
             personas,
+            systems: vec![],
         }
     }
 
@@ -304,10 +310,15 @@ mod tests {
                 id: "Order".to_string(),
                 states: vec!["draft".to_string(), "submitted".to_string()],
                 initial: "draft".to_string(),
-                transitions: vec![Transition { from: "draft".to_string(), to: "submitted".to_string() }],
+                transitions: vec![Transition {
+                    from: "draft".to_string(),
+                    to: "submitted".to_string(),
+                }],
                 parent: None,
             }],
-            vec![AnalysisPersona { id: "admin".to_string() }],
+            vec![AnalysisPersona {
+                id: "admin".to_string(),
+            }],
             vec![AnalysisOperation {
                 id: "submit".to_string(),
                 allowed_personas: vec!["admin".to_string()],
@@ -344,7 +355,9 @@ mod tests {
                 transitions: vec![],
                 parent: None,
             }],
-            vec![AnalysisPersona { id: "user".to_string() }],
+            vec![AnalysisPersona {
+                id: "user".to_string(),
+            }],
             vec![AnalysisOperation {
                 id: "submit".to_string(),
                 allowed_personas: vec!["admin".to_string()], // user NOT authorized
@@ -380,7 +393,9 @@ mod tests {
                 transitions: vec![],
                 parent: None,
             }],
-            vec![AnalysisPersona { id: "admin".to_string() }],
+            vec![AnalysisPersona {
+                id: "admin".to_string(),
+            }],
             vec![AnalysisOperation {
                 id: "submit".to_string(),
                 allowed_personas: vec!["admin".to_string()],
@@ -423,7 +438,9 @@ mod tests {
                 transitions: vec![],
                 parent: None,
             }],
-            vec![AnalysisPersona { id: "admin".to_string() }],
+            vec![AnalysisPersona {
+                id: "admin".to_string(),
+            }],
             vec![AnalysisOperation {
                 id: "approve".to_string(),
                 allowed_personas: vec!["admin".to_string()],
@@ -468,7 +485,9 @@ mod tests {
                 transitions: vec![],
                 parent: None,
             }],
-            vec![AnalysisPersona { id: "admin".to_string() }],
+            vec![AnalysisPersona {
+                id: "admin".to_string(),
+            }],
             vec![AnalysisOperation {
                 id: "approve".to_string(),
                 allowed_personas: vec!["admin".to_string()],
@@ -512,8 +531,12 @@ mod tests {
                 parent: None,
             }],
             vec![
-                AnalysisPersona { id: "admin".to_string() },
-                AnalysisPersona { id: "user".to_string() },
+                AnalysisPersona {
+                    id: "admin".to_string(),
+                },
+                AnalysisPersona {
+                    id: "user".to_string(),
+                },
             ],
             vec![AnalysisOperation {
                 id: "submit".to_string(),
@@ -533,17 +556,21 @@ mod tests {
 
         let result = analyze_admissibility(&bundle);
         assert_eq!(result.total_combinations_checked, 2); // 1 entity * 1 state * 2 personas
-        // Both personas should have the operation admissible
-        assert!(result.admissible_operations.contains_key(&AdmissibilityKey {
-            entity_id: "Order".to_string(),
-            state: "draft".to_string(),
-            persona_id: "admin".to_string(),
-        }));
-        assert!(result.admissible_operations.contains_key(&AdmissibilityKey {
-            entity_id: "Order".to_string(),
-            state: "draft".to_string(),
-            persona_id: "user".to_string(),
-        }));
+                                                          // Both personas should have the operation admissible
+        assert!(result
+            .admissible_operations
+            .contains_key(&AdmissibilityKey {
+                entity_id: "Order".to_string(),
+                state: "draft".to_string(),
+                persona_id: "admin".to_string(),
+            }));
+        assert!(result
+            .admissible_operations
+            .contains_key(&AdmissibilityKey {
+                entity_id: "Order".to_string(),
+                state: "draft".to_string(),
+                persona_id: "user".to_string(),
+            }));
     }
 
     #[test]
@@ -556,7 +583,9 @@ mod tests {
                 transitions: vec![],
                 parent: None,
             }],
-            vec![AnalysisPersona { id: "admin".to_string() }],
+            vec![AnalysisPersona {
+                id: "admin".to_string(),
+            }],
             vec![AnalysisOperation {
                 id: "submit".to_string(),
                 allowed_personas: vec!["admin".to_string()],
@@ -575,10 +604,12 @@ mod tests {
 
         let result = analyze_admissibility(&bundle);
         // verdict_present is always structurally satisfiable
-        assert!(result.admissible_operations.contains_key(&AdmissibilityKey {
-            entity_id: "Order".to_string(),
-            state: "draft".to_string(),
-            persona_id: "admin".to_string(),
-        }));
+        assert!(result
+            .admissible_operations
+            .contains_key(&AdmissibilityKey {
+                entity_id: "Order".to_string(),
+                state: "draft".to_string(),
+                persona_id: "admin".to_string(),
+            }));
     }
 }

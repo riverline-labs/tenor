@@ -143,8 +143,20 @@ fn main() {
         Commands::Validate { bundle } => {
             cmd_validate(&bundle, cli.output, cli.quiet);
         }
-        Commands::Eval { bundle, facts, flow, persona } => {
-            cmd_eval(&bundle, &facts, flow.as_deref(), persona.as_deref(), cli.output, cli.quiet);
+        Commands::Eval {
+            bundle,
+            facts,
+            flow,
+            persona,
+        } => {
+            cmd_eval(
+                &bundle,
+                &facts,
+                flow.as_deref(),
+                persona.as_deref(),
+                cli.output,
+                cli.quiet,
+            );
         }
         Commands::Test { suite_dir } => {
             cmd_test(&suite_dir, cli.quiet);
@@ -233,8 +245,7 @@ static MANIFEST_SCHEMA_STR: &str = include_str!("../../../docs/manifest-schema.j
 
 fn cmd_validate(bundle_path: &Path, output: OutputFormat, quiet: bool) {
     // Parse the interchange schema
-    let interchange_schema: serde_json::Value = match serde_json::from_str(INTERCHANGE_SCHEMA_STR)
-    {
+    let interchange_schema: serde_json::Value = match serde_json::from_str(INTERCHANGE_SCHEMA_STR) {
         Ok(s) => s,
         Err(e) => {
             let msg = format!(
@@ -250,11 +261,7 @@ fn cmd_validate(bundle_path: &Path, output: OutputFormat, quiet: bool) {
     let doc_str = match std::fs::read_to_string(bundle_path) {
         Ok(s) => s,
         Err(e) => {
-            let msg = format!(
-                "error reading file '{}': {}",
-                bundle_path.display(),
-                e
-            );
+            let msg = format!("error reading file '{}': {}", bundle_path.display(), e);
             report_error(&msg, output, quiet);
             process::exit(1);
         }
@@ -434,10 +441,7 @@ fn cmd_eval(
                     match output {
                         OutputFormat::Json => {
                             let mut json_output = serde_json::Map::new();
-                            json_output.insert(
-                                "flow_id".to_string(),
-                                serde_json::json!(fid),
-                            );
+                            json_output.insert("flow_id".to_string(), serde_json::json!(fid));
                             json_output.insert(
                                 "outcome".to_string(),
                                 serde_json::json!(result.flow_result.outcome),
@@ -471,15 +475,12 @@ fn cmd_eval(
                                 })
                                 .collect();
                             json_output.insert("steps_executed".to_string(), steps);
-                            json_output.insert(
-                                "verdicts".to_string(),
-                                result.verdicts.to_json(),
-                            );
+                            json_output.insert("verdicts".to_string(), result.verdicts.to_json());
                             println!(
                                 "{}",
-                                serde_json::to_string_pretty(
-                                    &serde_json::Value::Object(json_output)
-                                )
+                                serde_json::to_string_pretty(&serde_json::Value::Object(
+                                    json_output
+                                ))
                                 .unwrap_or_else(|e| format!("serialization error: {}", e))
                             );
                         }
@@ -872,8 +873,11 @@ fn cmd_check(file: &Path, analysis: Option<&str>, output: OutputFormat, quiet: b
                 }
 
                 if let Some(ref s3a) = report.s3a_admissibility {
-                    let admissible_count: usize =
-                        s3a.admissible_operations.values().map(|ops| ops.len()).sum();
+                    let admissible_count: usize = s3a
+                        .admissible_operations
+                        .values()
+                        .map(|ops| ops.len())
+                        .sum();
                     println!(
                         "  Admissibility: {} combinations checked, {} admissible operations",
                         s3a.total_combinations_checked, admissible_count
@@ -885,6 +889,19 @@ fn cmd_check(file: &Path, analysis: Option<&str>, output: OutputFormat, quiet: b
                         "  Authority: {} personas, {} authority entries",
                         s4.total_personas, s4.total_authority_entries
                     );
+                    if !s4.cross_contract_authorities.is_empty() {
+                        // Count unique shared personas
+                        let unique_personas: std::collections::BTreeSet<&str> = s4
+                            .cross_contract_authorities
+                            .iter()
+                            .map(|cca| cca.persona_id.as_str())
+                            .collect();
+                        println!(
+                            "  Cross-Contract Authority (S4): {} shared personas, {} cross-contract authority entries",
+                            unique_personas.len(),
+                            s4.cross_contract_authorities.len()
+                        );
+                    }
                 }
 
                 if let Some(ref s5) = report.s5_verdicts {
@@ -897,10 +914,7 @@ fn cmd_check(file: &Path, analysis: Option<&str>, output: OutputFormat, quiet: b
                 if let Some(ref s6) = report.s6_flow_paths {
                     let truncated_count = s6.flows.values().filter(|f| f.truncated).count();
                     let flow_msg = if truncated_count > 0 {
-                        format!(
-                            " ({} flow(s) truncated)",
-                            truncated_count
-                        )
+                        format!(" ({} flow(s) truncated)", truncated_count)
                     } else {
                         String::new()
                     };
@@ -910,6 +924,27 @@ fn cmd_check(file: &Path, analysis: Option<&str>, output: OutputFormat, quiet: b
                         s6.flows.len(),
                         flow_msg
                     );
+                    if !s6.cross_contract_paths.is_empty() {
+                        // Count unique trigger targets
+                        let unique_triggers: std::collections::BTreeSet<String> = s6
+                            .cross_contract_paths
+                            .iter()
+                            .map(|p| {
+                                format!(
+                                    "{}.{}->{}.{}",
+                                    p.source_contract,
+                                    p.source_flow,
+                                    p.target_contract,
+                                    p.target_flow
+                                )
+                            })
+                            .collect();
+                        println!(
+                            "  Cross-Contract Flow Paths (S6): {} cross-contract triggers, {} cross-contract paths",
+                            unique_triggers.len(),
+                            s6.cross_contract_paths.len()
+                        );
+                    }
                 }
 
                 if let Some(ref s7) = report.s7_complexity {
@@ -971,10 +1006,7 @@ fn cmd_explain(
     quiet: bool,
 ) {
     // Determine input type by extension
-    let ext = file
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
+    let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
 
     let bundle: serde_json::Value = if ext == "json" {
         // Parse as interchange JSON

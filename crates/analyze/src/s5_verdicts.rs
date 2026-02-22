@@ -98,6 +98,7 @@ mod tests {
             operations,
             flows: vec![],
             personas: vec![],
+            systems: vec![],
         }
     }
 

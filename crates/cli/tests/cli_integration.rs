@@ -562,15 +562,14 @@ fn e10_manifest_valid_schema() {
         etag.len()
     );
     assert!(
-        etag.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()),
+        etag.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()),
         "etag should be lowercase hex, got: {}",
         etag
     );
 
     // tenor version is "1.1"
-    let tenor_version = manifest["tenor"]
-        .as_str()
-        .expect("tenor is not a string");
+    let tenor_version = manifest["tenor"].as_str().expect("tenor is not a string");
     assert_eq!(tenor_version, "1.1", "manifest tenor version should be 1.1");
 
     // bundle has kind: "Bundle"

@@ -537,8 +537,7 @@ pub fn classify_diff(diff: &BundleDiff) -> ClassifiedDiff {
     for c in &diff.changed {
         let mut classified_fields = Vec::new();
         for f in &c.fields {
-            let classification =
-                classify_field_change(&c.kind, &f.field, &f.before, &f.after);
+            let classification = classify_field_change(&c.kind, &f.field, &f.before, &f.after);
             match classification.severity {
                 ChangeSeverity::Breaking => breaking_count += 1,
                 ChangeSeverity::NonBreaking => non_breaking_count += 1,
@@ -579,7 +578,9 @@ fn classify_add(kind: &str) -> ChangeClassification {
         "Rule" => ChangeClassification {
             severity: ChangeSeverity::RequiresAnalysis,
             reason: "New rule may produce verdicts that affect existing operations".to_string(),
-            migration_action: Some("Verify new verdicts don't conflict with existing flow logic".to_string()),
+            migration_action: Some(
+                "Verify new verdicts don't conflict with existing flow logic".to_string(),
+            ),
         },
         _ => ChangeClassification {
             severity: ChangeSeverity::NonBreaking,
@@ -612,7 +613,12 @@ fn classify_remove(kind: &str) -> ChangeClassification {
 }
 
 /// Classify a field-level change using the Section 17.2 taxonomy.
-fn classify_field_change(kind: &str, field: &str, before: &Value, after: &Value) -> ChangeClassification {
+fn classify_field_change(
+    kind: &str,
+    field: &str,
+    before: &Value,
+    after: &Value,
+) -> ChangeClassification {
     // Skip metadata fields
     if matches!(field, "tenor" | "kind" | "id" | "provenance") {
         return ChangeClassification {
@@ -628,7 +634,9 @@ fn classify_field_change(kind: &str, field: &str, before: &Value, after: &Value)
         ("Entity", "initial") => ChangeClassification {
             severity: ChangeSeverity::Breaking,
             reason: "Changing initial state affects all new entity instances".to_string(),
-            migration_action: Some("Update all in-flight entities or version the entity".to_string()),
+            migration_action: Some(
+                "Update all in-flight entities or version the entity".to_string(),
+            ),
         },
         ("Entity", "transitions") => classify_transitions_change(before, after),
         ("Entity", "parent") => ChangeClassification {
@@ -651,15 +659,20 @@ fn classify_field_change(kind: &str, field: &str, before: &Value, after: &Value)
                 // Removing a default
                 ChangeClassification {
                     severity: ChangeSeverity::Breaking,
-                    reason: "Removing a default value breaks callers that don't supply this fact".to_string(),
-                    migration_action: Some("Ensure all callers now provide this fact explicitly".to_string()),
+                    reason: "Removing a default value breaks callers that don't supply this fact"
+                        .to_string(),
+                    migration_action: Some(
+                        "Ensure all callers now provide this fact explicitly".to_string(),
+                    ),
                 }
             } else {
                 // Changing a default
                 ChangeClassification {
                     severity: ChangeSeverity::RequiresAnalysis,
                     reason: "Changing default value may affect evaluation results".to_string(),
-                    migration_action: Some("Verify new default doesn't change verdict outcomes".to_string()),
+                    migration_action: Some(
+                        "Verify new default doesn't change verdict outcomes".to_string(),
+                    ),
                 }
             }
         }
@@ -672,8 +685,11 @@ fn classify_field_change(kind: &str, field: &str, before: &Value, after: &Value)
         // Rule fields
         ("Rule", "stratum") => ChangeClassification {
             severity: ChangeSeverity::Breaking,
-            reason: "Changing stratum affects rule evaluation order and verdict dependencies".to_string(),
-            migration_action: Some("Verify cross-stratum verdict dependencies still hold".to_string()),
+            reason: "Changing stratum affects rule evaluation order and verdict dependencies"
+                .to_string(),
+            migration_action: Some(
+                "Verify cross-stratum verdict dependencies still hold".to_string(),
+            ),
         },
         ("Rule", "body") => ChangeClassification {
             severity: ChangeSeverity::RequiresAnalysis,
@@ -686,7 +702,9 @@ fn classify_field_change(kind: &str, field: &str, before: &Value, after: &Value)
         ("Operation", "precondition") => ChangeClassification {
             severity: ChangeSeverity::RequiresAnalysis,
             reason: "Precondition change may affect operation admissibility".to_string(),
-            migration_action: Some("Run S3a analysis to verify structural admissibility".to_string()),
+            migration_action: Some(
+                "Run S3a analysis to verify structural admissibility".to_string(),
+            ),
         },
         ("Operation", "effects") => classify_effects_change(before, after),
         ("Operation", "outcomes") => classify_set_change(before, after, "outcome"),
@@ -700,7 +718,9 @@ fn classify_field_change(kind: &str, field: &str, before: &Value, after: &Value)
         ("Flow", "entry") => ChangeClassification {
             severity: ChangeSeverity::Breaking,
             reason: "Changing flow entry point breaks all in-flight flow instances".to_string(),
-            migration_action: Some("Version the flow or migrate all in-flight instances".to_string()),
+            migration_action: Some(
+                "Version the flow or migrate all in-flight instances".to_string(),
+            ),
         },
         ("Flow", "steps") => ChangeClassification {
             severity: ChangeSeverity::RequiresAnalysis,
@@ -751,7 +771,11 @@ fn classify_set_change(before: &Value, after: &Value, element_type: &str) -> Cha
             reason: format!(
                 "Removed {}(s): {}",
                 element_type,
-                removed.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                removed
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
             migration_action: Some(format!(
                 "Remove all references to removed {}(s) first",
@@ -764,7 +788,11 @@ fn classify_set_change(before: &Value, after: &Value, element_type: &str) -> Cha
             reason: format!(
                 "Added {}(s): {}",
                 element_type,
-                added.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                added
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
             migration_action: None,
         }
@@ -810,8 +838,11 @@ fn classify_transitions_change(before: &Value, after: &Value) -> ChangeClassific
     if !removed.is_empty() {
         ChangeClassification {
             severity: ChangeSeverity::Breaking,
-            reason: "Removed transition(s) may break operations with effects on those paths".to_string(),
-            migration_action: Some("Update operations that depend on removed transitions".to_string()),
+            reason: "Removed transition(s) may break operations with effects on those paths"
+                .to_string(),
+            migration_action: Some(
+                "Update operations that depend on removed transitions".to_string(),
+            ),
         }
     } else {
         ChangeClassification {
@@ -862,7 +893,9 @@ fn classify_type_change(before: &Value, after: &Value) -> ChangeClassification {
                 ChangeClassification {
                     severity: ChangeSeverity::Breaking,
                     reason: format!("Enum narrowing: removed values {:?}", removed),
-                    migration_action: Some("Update all references to removed enum values".to_string()),
+                    migration_action: Some(
+                        "Update all references to removed enum values".to_string(),
+                    ),
                 }
             } else {
                 ChangeClassification {
@@ -1395,7 +1428,10 @@ mod tests {
         let text = classified.to_text();
 
         assert!(text.contains("BREAKING:"), "should have BREAKING section");
-        assert!(text.contains("old_fact"), "should mention removed construct");
+        assert!(
+            text.contains("old_fact"),
+            "should mention removed construct"
+        );
     }
 
     #[test]
@@ -1408,9 +1444,6 @@ mod tests {
 
         assert!(json.get("summary").is_some());
         assert!(json.get("removed").unwrap().is_array());
-        assert_eq!(
-            json["summary"]["breaking_count"],
-            serde_json::json!(1)
-        );
+        assert_eq!(json["summary"]["breaking_count"], serde_json::json!(1));
     }
 }

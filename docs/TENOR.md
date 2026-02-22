@@ -1,21 +1,22 @@
 # Tenor
 
-## Tenor Language Specification v0.9
+## Tenor Language Specification v1.0
 
-**Status:** v0.9 — Spec frozen. Core constructs canonicalized via [CFFP](https://github.com/riverline-labs/iap) (Constraint-First Formalization Protocol).
+**Status:** v1.0 — Spec frozen. All constructs canonicalized via [CFFP](https://github.com/riverline-labs/iap) (Constraint-First Formalization Protocol). AAP audit complete.
 **Method:** Human-AI collaborative design. See [`CONTRIBUTORS.md`](../CONTRIBUTORS.md).
 **Creator:** Brandon W. Bush
 
-> **Stability: Frozen (v0.9)**
+> **Stability: Frozen (v1.0)**
 > This specification is frozen. No breaking changes to existing construct
 > semantics will occur without a new CFFP run. Additive changes (new analysis
 > results, new interchange metadata) are permitted.
 >
-> v1.0 requires the System construct — a composition layer for multi-contract
+> v1.0 includes the System construct — a composition layer for multi-contract
 > systems (shared persona identity, cross-contract flow triggers, cross-contract
-> entity relationships). System requires a dedicated CFFP run.
+> entity relationships). System was designed via a dedicated CFFP run and
+> audited via AAP (Assumption Audit Protocol).
 >
-> **Freeze date:** 2026-02-21
+> **Freeze date:** 2026-02-22
 
 ---
 
@@ -32,29 +33,35 @@
 9. Operation
 10. PredicateExpression
 11. Flow
-12. NumericModel
-13. ElaboratorSpec
-14. Complete Evaluation Model
-15. Static Analysis Obligations
-16. Executor Obligations
-17. Versioning & Migration
-    - 17.1 The Migration Problem
-    - 17.2 Breaking Change Taxonomy
-    - 17.3 Executor Migration Obligations
-    - 17.4 In-Flight Flow Migration Policy
-    - 17.5 Migration Contract Representation
-    - 17.6 Flow Migration Compatibility
-18. Contract Discovery & Agent Orientation
-    - 18.1 The Contract Manifest
-    - 18.2 Etag Semantics
-    - 18.3 Discovery Endpoint
-    - 18.4 Cold-Start Protocol
-    - 18.5 Change Detection
-    - 18.6 Dry-Run Evaluation
-    - 18.7 Executor Obligation Summary (E10-E14)
-19. Appendix A — Acknowledged Limitations
-20. Appendix C — Worked Example: Escrow Release Contract
-21. Appendix D — Glossary
+12. System
+    - 12.1 Definition
+    - 12.2 Semantics
+    - 12.3 Constraints
+    - 12.4 Provenance
+    - 12.5 Interchange Representation
+13. NumericModel
+14. ElaboratorSpec
+15. Complete Evaluation Model
+16. Static Analysis Obligations
+17. Executor Obligations
+18. Versioning & Migration
+    - 18.1 The Migration Problem
+    - 18.2 Breaking Change Taxonomy
+    - 18.3 Executor Migration Obligations
+    - 18.4 In-Flight Flow Migration Policy
+    - 18.5 Migration Contract Representation
+    - 18.6 Flow Migration Compatibility
+19. Contract Discovery & Agent Orientation
+    - 19.1 The Contract Manifest
+    - 19.2 Etag Semantics
+    - 19.3 Discovery Endpoint
+    - 19.4 Cold-Start Protocol
+    - 19.5 Change Detection
+    - 19.6 Dry-Run Evaluation
+    - 19.7 Executor Obligation Summary (E10-E14)
+20. Appendix A — Acknowledged Limitations
+21. Appendix C — Worked Example: Escrow Release Contract
+22. Appendix D — Glossary
 
 ---
 
@@ -96,7 +103,7 @@ These constraints are non-negotiable. They are not guidelines. Any proposed feat
 
 ## 3. Core Constructs Overview
 
-The language defines twelve constructs across three layers.
+The language defines thirteen constructs across three layers.
 
 **Semantic layer** (dependency order — each depends only on those above):
 
@@ -110,6 +117,12 @@ Operation           — persona-gated, precondition-guarded state transitions wi
 PredicateExpression — quantifier-free FOL with arithmetic and bounded quantification
 Flow                — finite DAG orchestration with sequential and parallel steps
 NumericModel        — fixed-point decimal with total promotion rules (cross-cutting)
+```
+
+**Composition layer:**
+
+```
+System              — multi-contract composition with shared personas, cross-contract triggers, and entity relationships
 ```
 
 Named type aliases (TypeDecl) are a DSL-layer convenience only. The elaborator resolves all named type references during Pass 3 and inlines the full BaseType structure at every point of use. TypeDecl does not appear in TenorInterchange output. TypeDecl definitions may be shared across contracts via shared type library files (§4.6). Shared type libraries are Tenor files containing only TypeDecl constructs, imported via the existing import mechanism.
@@ -373,7 +386,7 @@ In this example, `Address` is imported from the type library. The local TypeDecl
 
 **Interchange representation:** Shared type libraries have no interchange representation. Imported TypeDecl definitions are consumed during Pass 3 (type environment construction) and inlined during Pass 4 (AST materialization). The interchange output for a contract that imports shared types is identical to the interchange for a contract that declares those same types locally. No import reference, file path, or TypeDecl entry appears in the interchange bundle. Interchange remains fully self-contained.
 
-**Elaboration integration:** See §13.2 for the pass-by-pass handling of shared type library imports.
+**Elaboration integration:** See §14.2 for the pass-by-pass handling of shared type library imports.
 
 ---
 
@@ -572,7 +585,7 @@ This fold terminates because the number of strata is finite and each stratum is 
 
 ### 7.5 Verdict Resolution
 
-The resolution function `resolve : Set<VerdictInstance> → ResolvedVerdictSet` is the identity on sets — it returns the accumulated verdict set produced by `eval_strata`. Resolution is total and deterministic because same-VerdictType conflicts are prohibited by static analysis (S8, §15). Each VerdictType in a conforming contract is produced by exactly one rule. The ResolvedVerdictSet therefore contains at most one VerdictInstance per VerdictType, and `verdict_present(X)` unambiguously identifies at most one instance with a well-defined payload.
+The resolution function `resolve : Set<VerdictInstance> → ResolvedVerdictSet` is the identity on sets — it returns the accumulated verdict set produced by `eval_strata`. Resolution is total and deterministic because same-VerdictType conflicts are prohibited by static analysis (S8, §16). Each VerdictType in a conforming contract is produced by exactly one rule. The ResolvedVerdictSet therefore contains at most one VerdictInstance per VerdictType, and `verdict_present(X)` unambiguously identifies at most one instance with a well-defined payload.
 
 User-defined verdict precedence and resolution strategies are deferred to a future version (AL50).
 
@@ -605,7 +618,7 @@ rule eur_within_threshold {
 }
 ```
 
-Rate staleness is an executor concern — E1 (§16.2) requires facts to come from genuinely external sources, but does not mandate freshness guarantees. Executors should document their staleness policies for time-sensitive facts such as exchange rates. Multi-hop conversions require chained Rules across strata. Each conversion step is separately provenance-tracked.
+Rate staleness is an executor concern — E1 (§17.2) requires facts to come from genuinely external sources, but does not mandate freshness guarantees. Executors should document their staleness policies for time-sensitive facts such as exchange rates. Multi-hop conversions require chained Rules across strata. Each conversion step is separately provenance-tracked.
 
 ---
 
@@ -768,11 +781,11 @@ The execution sequence is fixed and invariant: (1) persona check, (2) preconditi
 - Operations do not produce verdict instances. Verdict production belongs exclusively to Rules.
 - Atomicity is an executor obligation. Either all declared state transitions for the produced outcome occur, or none do.
 - The executor must validate that the current entity state matches the transition source for each declared effect. This is an executor obligation not encoded in the Operation formalism.
-- Outcome exhaustiveness is a contract authoring obligation. The elaborator validates that Flow routing handles all declared outcomes (see §11.5), but cannot verify that the declared outcome set is exhaustive of all possible executor success-path behaviors. This parallels source-state validation (E2, §16.2).
+- Outcome exhaustiveness is a contract authoring obligation. The elaborator validates that Flow routing handles all declared outcomes (see §11.5), but cannot verify that the declared outcome set is exhaustive of all possible executor success-path behaviors. This parallels source-state validation (E2, §17.2).
 
 ### 9.4.1 No Wildcard Transitions
 
-Every effect must name an explicit source state and an explicit target state. Wildcard notation (e.g., `* -> approved`) is not permitted. Wildcards would prevent E2 source-state validation (§16). Operations invocable from multiple source states must declare multiple explicit effects.
+Every effect must name an explicit source state and an explicit target state. Wildcard notation (e.g., `* -> approved`) is not permitted. Wildcards would prevent E2 source-state validation (§17). Operations invocable from multiple source states must declare multiple explicit effects.
 
 Incorrect:
 
@@ -1121,13 +1134,268 @@ Flow provenance is the ordered composition of step-level records. No Flow-level 
 
 ---
 
-## 12. NumericModel
+## 12. System
 
 ### 12.1 Definition
 
+A System is a top-level composition construct that declares a finite set of member contracts and their cross-contract relationships. Systems enable multi-contract coordination: shared persona identity across contracts, cross-contract flow triggers, and cross-contract entity relationships.
+
+A System is declared in a dedicated `.tenor` file using the `system` keyword. A System file may not contain Fact, Entity, Rule, Persona, Operation, or Flow declarations — it contains only the System construct. Conversely, a contract file may not contain a System declaration. This structural separation ensures that System composition is layered on top of unmodified member contracts.
+
+```
+System = (
+  id:              SystemId,
+  members:         Map<MemberId, FilePath>,
+  shared_personas: List<SharedPersona>,
+  triggers:        List<Trigger>,
+  shared_entities: List<SharedEntity>
+)
+
+SharedPersona = (
+  persona:   PersonaId,
+  contracts: List<MemberId>
+)
+
+Trigger = (
+  source_contract: MemberId,
+  source_flow:     FlowId,
+  on:              TerminalOutcome,
+  target_contract: MemberId,
+  target_flow:     FlowId,
+  persona:         PersonaId
+)
+
+SharedEntity = (
+  entity:    EntityId,
+  contracts: List<MemberId>
+)
+
+TerminalOutcome = "success" | "failure" | "escalation"
+```
+
+SystemId is a non-empty UTF-8 string. MemberId is a non-empty UTF-8 string, unique within the System. FilePath is a relative or absolute path to a `.tenor` contract file. Member file paths are resolved relative to the System file's directory.
+
+**DSL syntax:**
+
+```
+system <system_id> {
+  members: [
+    <member_id>: "<file_path>",
+    ...
+  ]
+
+  shared_personas: [
+    { persona: <persona_id>, contracts: [<member_id>, ...] },
+    ...
+  ]
+
+  triggers: [
+    {
+      source: <member_id>.<flow_id>,
+      on: success | failure | escalation,
+      target: <member_id>.<flow_id>,
+      persona: <persona_id>
+    },
+    ...
+  ]
+
+  shared_entities: [
+    { entity: <entity_id>, contracts: [<member_id>, ...] },
+    ...
+  ]
+}
+```
+
+**Example:**
+
+```
+system trade_platform {
+  members: [
+    order_mgmt: "contracts/order.tenor",
+    fulfillment: "contracts/fulfillment.tenor"
+  ]
+
+  shared_personas: [
+    { persona: admin, contracts: [order_mgmt, fulfillment] },
+    { persona: warehouse_ops, contracts: [order_mgmt, fulfillment] }
+  ]
+
+  triggers: [
+    {
+      source: order_mgmt.order_processing,
+      on: success,
+      target: fulfillment.shipment_flow,
+      persona: warehouse_ops
+    }
+  ]
+
+  shared_entities: [
+    { entity: Order, contracts: [order_mgmt, fulfillment] }
+  ]
+}
+```
+
+### 12.2 Semantics
+
+System elaboration extends the existing six-pass pipeline. Member contracts are elaborated independently using the standard pipeline. System-level validation adds a post-elaboration phase that validates cross-contract bindings. A System does not alter single-contract semantics — a contract within a System produces identical elaboration output as the same contract elaborated outside a System (invariant I7). The System is a pure composition overlay.
+
+**Member contract resolution.** Each member declaration maps a MemberId to a FilePath. The elaborator resolves each file path relative to the System file's directory, then elaborates the member contract independently through the full six-pass pipeline. If any member contract fails elaboration, the System elaboration fails. Member contracts retain their separate identity — they are not merged into a unified bundle. Each member contract's interchange output is preserved as a separate bundle referenced by MemberId.
+
+**Shared persona binding.** A `shared_personas` declaration specifies a PersonaId and a set of MemberIds. The elaborator validates that each referenced member contract declares a Persona with that PersonaId. The binding creates no new evaluation semantics — it is a static assertion of identity equivalence across contracts for the purpose of cross-contract authority analysis. At runtime, the executor treats operations in different contracts bearing a shared persona as executed by the same actor (see §17, E-SYS-03, E-SYS-04).
+
+**Cross-contract flow triggers.** A `triggers` declaration specifies a source contract and flow, a terminal outcome, a target contract and flow, and a persona for the target flow invocation. The elaborator validates that all references resolve: source and target contracts are declared members, source and target flows exist in their respective contracts, the source outcome is a valid terminal outcome ("success", "failure", or "escalation"), and the persona is a valid Persona in the target contract. Trigger declarations are purely declarative assertions that the executor must honor at orchestration time (see §17, E-SYS-01). Trigger execution is asynchronous — the source flow completes independently of the target flow's execution.
+
+**Cross-contract entity relationships.** A `shared_entities` declaration specifies an EntityId and a set of MemberIds. The elaborator validates that each referenced member contract declares an Entity with that EntityId and that all such Entity declarations have identical state sets. State set equality is checked by comparing sorted state name arrays. Different Operations or transitions across contracts are permitted — only the state set must match. At runtime, the executor must coordinate entity state across sharing contracts (see §17, E-SYS-02).
+
+**Elaboration pipeline integration:**
+
+| Pass | System integration |
+|------|--------------------|
+| 0 (Parse) | The parser recognizes the `system` keyword and parses System declarations. A file containing a `system` declaration is identified as a System file. |
+| 1 (Bundle) | Member contract file paths are resolved relative to the System file's directory. Each member contract is elaborated independently through the full six-pass pipeline. |
+| 2 (Index) | The System construct is indexed by `(System, id)`. Member contracts are indexed by their MemberIds within the System. |
+| 5 (Validate) | System-level structural validation: member id uniqueness, shared persona validation, trigger validation (including target persona), shared entity state set equality, trigger graph acyclicity. |
+| 6 (Serialize) | The System construct is serialized as a top-level item in the interchange output. Member contract bundles are included as separate items referenced by MemberId. |
+
+### 12.3 Constraints
+
+System constraints are enforced during elaboration. Each constraint is identified by a constraint ID, specifies the enforcing pass, and describes the error produced on violation.
+
+**C-SYS-01 — Member id uniqueness.** _(Pass 2)_
+Member ids within a System must be unique. Two member declarations may not share the same id. Violation produces an elaboration error: `"duplicate member id '<id>' in System '<system_id>'"`.
+
+**C-SYS-02 — Member file resolution.** _(Pass 1)_
+Each member file path must resolve to a file that can be independently elaborated as a contract. If the file does not exist, cannot be parsed, or fails elaboration, the System elaboration fails with an error identifying the member and the underlying elaboration failure.
+
+**C-SYS-03 — Member file is a contract, not a System.** _(Pass 1)_
+A member file must not contain a `system` declaration. If a member file is identified as a System file during parsing, the elaborator emits an error: `"member '<member_id>' is a System file; nested Systems are not permitted"`. This prevents recursive System embedding.
+
+**C-SYS-04 — System file exclusivity.** _(Pass 0)_
+A file containing a `system` declaration may not contain Fact, Entity, Rule, Persona, Operation, or Flow declarations. If a `system` declaration coexists with contract constructs, the parser emits an error: `"System files may not contain contract constructs"`.
+
+**C-SYS-05 — One System per file.** _(Pass 0)_
+A System file may contain only one `system` declaration. If multiple `system` declarations are present, the parser emits an error: `"multiple System declarations in a single file"`.
+
+**C-SYS-06 — Shared persona existence.** _(Pass 5)_
+For each `shared_personas` entry, the specified PersonaId must exist in the Persona index of each referenced member contract. If any member lacks the declared persona, the elaborator emits an error: `"persona '<persona_id>' not declared in member contract '<member_id>'"`.
+
+**C-SYS-07 — Trigger source contract validity.** _(Pass 5)_
+The `source_contract` of each trigger must be a declared member of the System. Violation: `"trigger source contract '<contract_id>' is not a System member"`.
+
+**C-SYS-08 — Trigger target contract validity.** _(Pass 5)_
+The `target_contract` of each trigger must be a declared member of the System. Violation: `"trigger target contract '<contract_id>' is not a System member"`.
+
+**C-SYS-09 — Trigger source flow existence.** _(Pass 5)_
+The `source_flow` must be a declared Flow in the source contract. Violation: `"flow '<flow_id>' not found in member contract '<contract_id>'"`.
+
+**C-SYS-10 — Trigger target flow existence.** _(Pass 5)_
+The `target_flow` must be a declared Flow in the target contract. Violation: `"flow '<flow_id>' not found in member contract '<contract_id>'"`.
+
+**C-SYS-11 — Trigger outcome validity.** _(Pass 5)_
+The `on` field of each trigger must be a valid terminal outcome: `"success"`, `"failure"`, or `"escalation"`. These are the terminal outcomes defined in §11.2. Violation: `"invalid trigger outcome '<outcome>'; must be 'success', 'failure', or 'escalation'"`.
+
+**C-SYS-12 — Trigger target persona validity.** _(Pass 5)_
+The `persona` field of each trigger must be a valid Persona in the target contract. Additionally, if the target flow's entry step is an OperationStep, the trigger's persona must be a member of that entry step's referenced Operation's `allowed_personas` set. If the entry step is not an OperationStep (e.g., BranchStep, HandoffStep), persona authorization at the entry step is not checkable at elaboration time and is deferred to runtime. Violation: `"persona '<persona_id>' not declared in target contract '<contract_id>'"` or `"trigger persona '<persona_id>' not in allowed_personas of entry operation '<op_id>' in target flow '<flow_id>'"`.
+
+**C-SYS-13 — Shared entity existence.** _(Pass 5)_
+For each `shared_entities` entry, the specified EntityId must exist in the Entity index of each referenced member contract. Violation: `"entity '<entity_id>' not declared in member contract '<member_id>'"`.
+
+**C-SYS-14 — Shared entity state set equality.** _(Pass 5)_
+For each `shared_entities` entry, all referenced member contracts must declare the entity with identical state sets. State sets are compared as sorted arrays of state names. Violation: `"entity '<entity_id>' has different state sets in member contracts '<member_a>' and '<member_b>'"`.
+
+**C-SYS-15 — Trigger graph acyclicity.** _(Pass 5)_
+The trigger declarations form a directed graph where nodes are `(MemberId, FlowId)` pairs and edges are trigger bindings. This graph must be acyclic. Cycle detection is performed via DFS after all triggers are collected. Violation: `"trigger cycle detected: <cycle_path>"`. This is analogous to SubFlowStep cycle detection within a single contract (§11.5).
+
+**C-SYS-16 — Shared persona contracts are members.** _(Pass 5)_
+Every MemberId in a `shared_personas` entry must be a declared member of the System. Violation: `"contract '<member_id>' in shared_persona is not a System member"`.
+
+**C-SYS-17 — Shared entity contracts are members.** _(Pass 5)_
+Every MemberId in a `shared_entities` entry must be a declared member of the System. Violation: `"contract '<member_id>' in shared_entity is not a System member"`.
+
+### 12.4 Provenance
+
+```
+SystemProvenance = (
+  id:        SystemId,
+  file:      string,
+  line:      nat,
+  members:   [MemberProvenance]
+)
+
+MemberProvenance = (
+  id:   MemberId,
+  path: FilePath,
+  file: string,
+  line: nat
+)
+```
+
+System provenance records the declaration site of the System construct and each member declaration. Member contract provenance is carried in the individual member contract bundles. Cross-contract binding provenance (shared personas, triggers, entity relationships) is embedded in the System interchange representation, with each binding traceable to its declaration in the System file.
+
+```
+TriggerProvenance = (
+  source_contract:  MemberId,
+  source_flow:      FlowId,
+  source_outcome:   TerminalOutcome,
+  target_contract:  MemberId,
+  target_flow:      FlowId,
+  persona:          PersonaId,
+  initiated_at:     FlowInstanceId,  // id of the target flow instance initiated
+  status:           "initiated" | "failed",
+  failure_reason?:  string            // present when status = "failed"
+)
+
+TriggerFailureRecord = TriggerProvenance  // status = "failed", failure_reason present
+```
+
+### 12.5 Interchange Representation
+
+The System construct appears as a top-level item in the interchange output with `"kind": "System"`. Member contract bundles are included as separate items referenced by MemberId. All JSON keys are sorted lexicographically within each object.
+
+```json
+{
+  "id": "trade_platform",
+  "kind": "System",
+  "members": [
+    { "id": "fulfillment", "path": "contracts/fulfillment.tenor" },
+    { "id": "order_mgmt", "path": "contracts/order.tenor" }
+  ],
+  "provenance": {
+    "file": "trade_platform.tenor",
+    "line": 1
+  },
+  "shared_entities": [
+    { "contracts": ["fulfillment", "order_mgmt"], "entity": "Order" }
+  ],
+  "shared_personas": [
+    { "contracts": ["fulfillment", "order_mgmt"], "persona": "admin" },
+    { "contracts": ["fulfillment", "order_mgmt"], "persona": "warehouse_ops" }
+  ],
+  "tenor": "1.0",
+  "triggers": [
+    {
+      "on": "success",
+      "persona": "warehouse_ops",
+      "source_contract": "order_mgmt",
+      "source_flow": "order_processing",
+      "target_contract": "fulfillment",
+      "target_flow": "shipment_flow"
+    }
+  ]
+}
+```
+
+The System interchange bundle is a separate JSON document from the member contract bundles. Each member contract's interchange output is identical whether elaborated standalone or as part of a System. The System construct references member contracts by MemberId but does not inject into member outputs.
+
+---
+
+## 13. NumericModel
+
+### 13.1 Definition
+
 All numeric computation uses fixed-point decimal arithmetic. No floating-point arithmetic is permitted in conforming implementations. Integer arithmetic is exact within declared range. Decimal arithmetic uses declared precision and scale.
 
-### 12.2 Promotion Rules
+### 13.2 Promotion Rules
 
 The promotion function is total over all numeric type combinations:
 
@@ -1144,19 +1412,19 @@ any op integer_literal           → literal typed as Int(n,n), then Int rules
 any op decimal_literal           → literal typed as Decimal(digits, frac_digits), then rules
 ```
 
-### 12.3 Overflow
+### 13.3 Overflow
 
 Arithmetic that produces a result outside the declared range aborts evaluation with a typed overflow error. Silent wraparound and saturation are not permitted.
 
-### 12.4 Rounding
+### 13.4 Rounding
 
 Where a Decimal result has more fractional digits than the declared scale, rounding is applied. The rounding mode is **round half to even** (IEEE 754 roundTiesToEven). This mode is mandatory for all conforming implementations.
 
-### 12.5 Literal Types
+### 13.5 Literal Types
 
 Integer literals are typed as Int(n, n). Decimal literals are typed as Decimal(total_digits, fractional_digits) derived from the literal's written form.
 
-### 12.6 Implementation Bounds
+### 13.6 Implementation Bounds
 
 All conforming implementations must satisfy these bounds, regardless of language or numeric library used:
 
@@ -1169,22 +1437,22 @@ All conforming implementations must satisfy these bounds, regardless of language
 | Infinity | Not representable. Any operation producing infinity aborts with overflow error. |
 | NaN | Not representable. No operation produces NaN. |
 | Signed zero | Not representable. Zero has no sign. |
-| Rounding mode | Round half to even (IEEE 754 roundTiesToEven) — see §12.4 |
-| Overflow behavior | Abort with typed overflow error — see §12.3 |
+| Rounding mode | Round half to even (IEEE 754 roundTiesToEven) — see §13.4 |
+| Overflow behavior | Abort with typed overflow error — see §13.3 |
 
 These bounds are derived from the reference implementation's numeric library but are stated here as language-level requirements. An implementation that satisfies these bounds is conforming regardless of which numeric library it uses internally. An implementation that delegates to native floating-point arithmetic is not conforming even if its results happen to match within these bounds for common inputs — the requirement is structural, not empirical.
 
 ---
 
-## 13. ElaboratorSpec
+## 14. ElaboratorSpec
 
-### 13.1 Overview
+### 14.1 Overview
 
 The elaborator is the trust boundary between human authoring and formal guarantees. It transforms Tenor source into a valid TenorInterchange bundle through six deterministic, ordered passes. A bug in the elaborator is more dangerous than a bug in the executor — it silently produces malformed interchange that the executor then operates on correctly, producing wrong results from correct execution.
 
 A conforming elaborator must be deterministic: identical DSL input produces byte-for-byte identical interchange output on every invocation. No environmental dependency (timestamp, process id, random seed) may affect the output.
 
-### 13.2 Elaboration Passes
+### 14.2 Elaboration Passes
 
 **Pass 0 — Lexing and parsing**
 Input: DSL source text (UTF-8). Output: Parse tree.
@@ -1251,9 +1519,9 @@ Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON 
 - Preserve DSL source order for commutative binary expression operands.
 - Preserve DSL declaration order for all array values. Array values are never sorted.
 - Emit `"tenor"` version and `"kind"` on every top-level document.
-- Emit `"tenor_version"` at the bundle top level (see §13.2.1).
+- Emit `"tenor_version"` at the bundle top level (see §14.2.1).
 
-### 13.2.1 Interchange Format Versioning
+### 14.2.1 Interchange Format Versioning
 
 The TenorInterchange format is versioned independently of the Tenor language specification version. The canonical structure of TenorInterchange output is defined by the JSON Schema at `docs/interchange-schema.json`.
 
@@ -1296,13 +1564,13 @@ The v0.3 to v1.0 transition is a major version bump. v1.0 interchange is not bac
 - Per-construct `tenor` field updated from `"0.3"` to `"1.0"`.
 - Bundle-level `tenor_version` field added (required, not present in v0.3).
 
-> **Note:** This section covers interchange **format** versioning (JSON structure changes). For contract **content** versioning (breaking changes to Facts, Entities, Rules, etc.), see §17 (Versioning & Migration).
+> **Note:** This section covers interchange **format** versioning (JSON structure changes). For contract **content** versioning (breaking changes to Facts, Entities, Rules, etc.), see §18 (Versioning & Migration).
 
-### 13.3 Error Reporting Obligation
+### 14.3 Error Reporting Obligation
 
 Every elaboration error must identify: construct kind, construct id (if determinable), field name, source file, source line, and a human-readable description of the violation. Errors referencing internal elaborator state or elaborator-internal terminology are not conforming.
 
-### 13.4 Conformance Test Categories
+### 14.4 Conformance Test Categories
 
 A conforming elaborator must pass all tests in the Tenor Elaborator Conformance Suite:
 
@@ -1317,9 +1585,9 @@ A conforming elaborator must pass all tests in the Tenor Elaborator Conformance 
 
 _Note: The Tenor Elaborator Conformance Suite is at `conformance/`. It is a prerequisite for any implementation to be declared conforming._
 
-## 14. Complete Evaluation Model
+## 15. Complete Evaluation Model
 
-### 14.1 Contract Load Time
+### 15.1 Contract Load Time
 
 The following checks are performed when a contract is loaded. A contract that fails any check is inadmissible.
 
@@ -1364,14 +1632,14 @@ The following checks are performed when a contract is loaded. A contract that fa
     — every OperationStep outcome map is exhaustive (covers all declared outcomes)
 ```
 
-### 14.2 Flow Initiation
+### 15.2 Flow Initiation
 
 ```
 snapshot = take_snapshot(contract, current_rules, current_entity_states)
 // Point-in-time. Rule evolution after this point does not affect the Flow.
 ```
 
-### 14.3 Per-Evaluation Sequence
+### 15.3 Per-Evaluation Sequence
 
 ```
 // Read path
@@ -1385,7 +1653,7 @@ verdicts    = eval_strata(contract.rules, facts)           // → ResolvedVerdic
 outcome     = execute_flow(flow, persona, snapshot)        // → FlowOutcome
 ```
 
-### 14.4 Provenance Chain
+### 15.4 Provenance Chain
 
 Every terminal outcome has a complete provenance chain:
 
@@ -1404,7 +1672,9 @@ FlowOutcome
 
 Every chain terminates at Facts. Facts are the provenance roots. No derivation precedes them.
 
-### 14.5 No Built-in Functions
+At the System level, TriggerProvenance records link source flow terminal outcomes to target flow initiations. A complete System-level audit trail is the union of individual contract provenance chains plus all TriggerProvenance records. Every triggered flow initiation must be traceable to the source flow terminal outcome that caused it.
+
+### 15.5 No Built-in Functions
 
 Tenor provides no built-in functions. There is no `now()`, no `length()`, no `abs()`, no `sqrt()`, no string functions, no date arithmetic functions. All values that vary at runtime must enter the evaluation model through Facts. (`len(list)` in §4.2 is an operator on a ground term, not a built-in function.)
 
@@ -1437,7 +1707,7 @@ rule active_delegation {
 
 ---
 
-## 15. Static Analysis Obligations
+## 16. Static Analysis Obligations
 
 A conforming static analyzer must derive the following from a contract alone, without execution:
 
@@ -1465,13 +1735,23 @@ A stronger version of S3a: for each Entity state and each persona, determine whe
 
 ---
 
-## 16. Executor Obligations
+## 17. Executor Obligations
 
-### 16.1 The Conformance Gap
+### 17.1 The Conformance Gap
 
 Tenor's formal guarantees hold **conditional on executor conformance**. The language describes a closed world, but its foundations — Fact values, transition atomicity, snapshot isolation — depend on the executor and runtime environment. Where executor obligations are not met, the provenance chain is **corrupt**, not merely incomplete, and Tenor cannot detect non-conformance internally. Implementers should treat E1, E3, and E4 in particular as **trust boundaries**, not implementation details.
 
-### 16.2 Obligation Definitions
+#### 17.1.1 Logic Conformance vs. Operational Conformance
+
+**Logic conformance** means the executor correctly implements the contract's logic as expressed in the interchange JSON. Given the same interchange bundle and the same FactSet, a logic-conforming executor produces the same verdicts, the same entity state transitions, and the same flow outcomes as any other logic-conforming executor. Logic conformance is verifiable against the artifact — the conformance test suite exercises it with known-input/expected-output triples.
+
+**Operational conformance** means the executor honors E1–E14 under real production conditions. Atomicity under failure (E3). Snapshot isolation under concurrency (E4). External source integrity across network boundaries (E1). Branch isolation in parallel execution (E8). These obligations cannot be verified from the artifact alone — they depend on the executor's storage substrate, concurrency model, network topology, and failure recovery semantics.
+
+The distinction: a conforming elaborator plus a signed interchange artifact **proves** logic conformance. It makes **no claims** about operational conformance. Operational conformance is the executor's responsibility and must be verified separately — through integration testing, formal verification of the runtime, or independent audit of the executor's implementation against E1–E14.
+
+Obligations marked _(trust boundary)_ in § 17.2 and § 17.3 are specifically those where logic conformance and operational conformance diverge. The language specifies what must happen; only the executor can ensure it does.
+
+### 17.2 Obligation Definitions
 
 **E1 — External source integrity** _(trust boundary)_  
 Facts are populated from genuinely external sources as declared. An executor must not populate Facts from internal computations or cross-Fact dependencies. Violation of E1 corrupts the provenance root — every chain built on a non-externally-sourced Fact is semantically invalid, but the language cannot detect this.
@@ -1500,25 +1780,68 @@ Parallel branches execute under the parent Flow's snapshot. No branch sees entit
 **E9 — Join evaluation after full branch completion.**
 The join step evaluates after all branches have reached a terminal state. The join condition is evaluated against the set of branch terminal outcomes. Order of branch completion does not affect join outcome.
 
-> **Migration obligations:** When deploying updated contract versions, executors have additional obligations beyond E1-E9. See §17.3 for migration-specific obligations M1-M8, including breaking change detection, migration policy declaration, and entity state migration.
+> **Migration obligations:** When deploying updated contract versions, executors have additional obligations beyond E1-E9. See §18.3 for migration-specific obligations M1-M8, including breaking change detection, migration policy declaration, and entity state migration.
+
+### 17.3 System Executor Obligations
+
+When an executor evaluates a System (§12), the following additional obligations apply. These obligations extend E1-E9 to the multi-contract coordination context. Obligations E-SYS-01 through E-SYS-04 cover cross-contract trigger execution, entity state coordination, shared persona identity, and cross-contract snapshot isolation.
+
+**E-SYS-01 — Cross-contract trigger execution.**
+When a Flow in a source member contract reaches a terminal outcome matching a trigger's `on` condition, the executor MUST initiate the target flow in the target contract with the persona specified in the trigger's `persona` field. Trigger execution is asynchronous: the source flow completes independently of the target flow's execution. The executor MUST NOT block the source flow's completion on the target flow's initiation or outcome.
+
+The executor MUST satisfy the following atomicity guarantees for trigger execution:
+
+- **(a)** The trigger fires if and only if the source flow reaches the specified terminal outcome. If the source flow reaches a different terminal outcome, the trigger MUST NOT fire.
+- **(b)** The trigger fires at most once per source flow execution. If the source flow is re-executed (e.g., as part of a retry mechanism), each execution independently evaluates trigger conditions.
+- **(c)** The target flow MUST be initiated with a snapshot that reflects the state of the target contract at the logical moment the trigger fires. The target flow's snapshot is independent of the source flow's snapshot — it is a fresh snapshot of the target contract's state.
+- **(d)** If target flow initiation fails, the executor MUST record a TriggerFailureRecord (see §12.4, TriggerProvenance) and MUST NOT silently discard the failure. The TriggerFailureRecord must include: source_contract, source_flow, source_outcome, target_contract, target_flow, trigger_persona, and failure_reason. The source flow's terminal outcome is not affected by target flow initiation failure. Whether the executor retries failed trigger initiations is implementation-defined. The executor MUST document its trigger failure and retry policy.
+
+**E-SYS-02 — Cross-contract entity state coordination.** _(trust boundary)_
+For shared entities (declared via `shared_entities` in the System), the executor MUST ensure that entity state is coordinated across all member contracts sharing that entity. When an Operation in one member contract transitions a shared entity from state S1 to state S2, the executor MUST ensure that subsequent Operations in other member contracts sharing that entity observe state S2 (or a state reachable from S2 via intervening transitions).
+
+The coordination mechanism is implementation-defined. The executor MAY use shared storage, event propagation, distributed consensus, or any other mechanism that satisfies the following consistency guarantee:
+
+- **(a) Eventual consistency.** The executor MUST guarantee that entity state changes in one member contract are eventually visible to all other member contracts sharing that entity. "Eventually" means within a bounded, implementation-defined time window.
+- **(b) Transition source validation.** E2 (transition source validation) applies to shared entities across all member contracts. An Operation in any member contract MUST validate that the current entity state matches the transition source before applying effects. This validation uses the coordinated entity state, not a stale local copy.
+- **(c) Atomicity within a single contract.** E3 (atomicity enforcement) applies to shared entity transitions within a single Operation's effect set. Cross-contract atomicity (coordinating entity state changes across Operations in different contracts executing concurrently) is not required in v1.0. The executor SHOULD document its cross-contract concurrency model.
+
+**E-SYS-03 — Shared persona identity enforcement.**
+When a persona is declared as shared across member contracts in a System (via `shared_personas`), the executor MUST treat operations in different member contracts bearing that shared persona as executed by the same actor. Specifically:
+
+- **(a) Authentication equivalence.** A persona authenticated in one member contract MUST be considered authenticated in all member contracts that share that persona within the System. The executor MUST NOT require separate authentication for the same shared persona in each member contract.
+- **(b) Authorization consistency.** When evaluating `persona in op.allowed_personas` for an Operation in a member contract, the executor MUST use the System-level shared persona identity. If persona P is shared across contracts A and B, and an Operation in contract B lists P in its `allowed_personas`, then the actor authenticated as P in contract A MUST be authorized to invoke that Operation in contract B.
+- **(c) Per-contract allowed_personas scope.** Shared persona identity does not override per-contract `allowed_personas` sets. If persona P is shared across contracts A and B, but an Operation in contract B does not include P in its `allowed_personas`, then P is not authorized for that Operation in contract B — regardless of what P is authorized to do in contract A. The shared persona binding asserts identity equivalence, not authority equivalence.
+
+**E-SYS-04 — Cross-contract snapshot coordination.** _(trust boundary)_
+When a System-level operation spans multiple member contracts (e.g., a trigger chain that traverses multiple contracts), the executor MUST define and enforce a snapshot isolation policy for cross-contract coordination.
+
+The minimum guarantee is per-contract snapshot isolation: each member contract's Flow operates under its own snapshot (per E4), taken at the time the Flow is initiated in that contract. Cross-contract snapshot coordination — ensuring that snapshots across member contracts reflect a consistent logical moment — is implementation-defined.
+
+The executor MUST satisfy the following:
+
+- **(a) Per-contract isolation preserved.** E4 (snapshot isolation) applies independently to each member contract's Flows. A triggered flow in a target contract takes its own snapshot at initiation time. This snapshot reflects the target contract's state at that moment, not the source contract's snapshot.
+- **(b) Trigger-induced snapshot ordering.** When a trigger fires, the target flow's snapshot MUST be taken at a logical moment no earlier than the source flow's terminal outcome. The target flow SHOULD NOT observe a state of the target contract that predates the source flow's completion, though the executor MAY allow this if the target contract's state has not changed since the source flow's completion.
+- **(c) No cross-contract snapshot merging.** The executor MUST NOT merge snapshots across member contracts. Each contract's snapshot is independent. A flow in contract A does not see the snapshot of contract B, even if both are members of the same System.
+
+> **System obligations summary:** E-SYS-01 through E-SYS-04 extend the single-contract executor model to multi-contract Systems. E-SYS-01 (trigger execution) and E-SYS-03 (shared persona) are deterministic obligations — the executor's behavior is fully specified. E-SYS-02 (entity coordination) and E-SYS-04 (cross-contract snapshot) are trust boundaries — the language specifies the required guarantees but the executor's implementation mechanism is not constrained.
 
 ---
 
-## 17. Versioning & Migration
+## 18. Versioning & Migration
 
-### 17.1 The Migration Problem
+### 18.1 The Migration Problem
 
-Tenor's closed-world semantics (C5) mean that any change to a contract's content is visible and classifiable. This section defines **what** constitutes a breaking change and **what** obligations executors have when deploying a new version. It does not prescribe **how** to implement migration. This section covers **business logic content** versioning (Facts, Entities, Rules, etc.), not interchange **format** versioning (§13.2.1).
+Tenor's closed-world semantics (C5) mean that any change to a contract's content is visible and classifiable. This section defines **what** constitutes a breaking change and **what** obligations executors have when deploying a new version. It does not prescribe **how** to implement migration. This section covers **business logic content** versioning (Facts, Entities, Rules, etc.), not interchange **format** versioning (§14.2.1).
 
-### 17.2 Breaking Change Taxonomy
+### 18.2 Breaking Change Taxonomy
 
 Changes between two contract versions are classified into three categories:
 
-- **BREAKING**: The change may invalidate existing executor behavior, entity state, or in-flight flows. Executors deploying a contract version with BREAKING changes must declare a migration policy (§17.4).
+- **BREAKING**: The change may invalidate existing executor behavior, entity state, or in-flight flows. Executors deploying a contract version with BREAKING changes must declare a migration policy (§18.4).
 - **NON_BREAKING**: The change is safe — no existing executor behavior is affected. Executors may deploy the new version without a migration policy declaration.
-- **REQUIRES_ANALYSIS**: The change's impact depends on value-level analysis (typically predicate strength comparison) that cannot be resolved by structural inspection alone. Changes classified as REQUIRES_ANALYSIS must be treated as BREAKING unless static analysis (S1-S7 per §15) proves them non-breaking for the specific contract pair.
+- **REQUIRES_ANALYSIS**: The change's impact depends on value-level analysis (typically predicate strength comparison) that cannot be resolved by structural inspection alone. Changes classified as REQUIRES_ANALYSIS must be treated as BREAKING unless static analysis (S1-S7 per §16) proves them non-breaking for the specific contract pair.
 
-For each change, the taxonomy separately assesses: impact on **new flow initiations** (flows started under the new contract version) versus impact on **in-flight flows** (flows initiated under the old contract version that have not yet reached a terminal state). Frozen verdict semantics (§14) provide natural isolation at the verdict layer — in-flight flow snapshot verdicts are immutable, so Rule and Fact changes do not affect in-flight flow verdicts. However, Operation execution against live entity state IS affected by Entity state changes and Operation definition changes.
+For each change, the taxonomy separately assesses: impact on **new flow initiations** (flows started under the new contract version) versus impact on **in-flight flows** (flows initiated under the old contract version that have not yet reached a terminal state). Frozen verdict semantics (§15) provide natural isolation at the verdict layer — in-flight flow snapshot verdicts are immutable, so Rule and Fact changes do not affect in-flight flow verdicts. However, Operation execution against live entity state IS affected by Entity state changes and Operation definition changes.
 
 The taxonomy is exhaustive: every (construct_kind, field, change_type) triple that is representable in the interchange schema has a classification (MI4). The classification function is decidable: given a diff entry, the classification is a static lookup — no runtime information is needed (MI3).
 
@@ -1596,13 +1919,23 @@ The taxonomy is exhaustive: every (construct_kind, field, change_type) triple th
 | kind | N/A | N/A | N/A (discriminator constant). |
 | tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation. |
 
-### 17.3 Executor Migration Obligations
+#### 18.2.7 System Changes
 
-The following obligations parallel E1-E9 in §16.2 but are specific to contract version transitions. An executor that supports deploying updated contract versions must satisfy these obligations.
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| System (top-level) | NON_BREAKING: no existing executor behavior references a new System. | BREAKING: triggers, shared persona bindings, and shared entity coordination cease. | N/A |
+| members | Add member: NON_BREAKING. Remove member: BREAKING — triggers and shared bindings referencing that member are invalidated. | N/A | N/A |
+| shared_personas | Add entry: NON_BREAKING — widens shared identity. Remove entry: BREAKING — cross-contract persona authority changes. | N/A | Change contracts list: BREAKING. |
+| triggers | Add trigger: NON_BREAKING — new cross-contract coordination path. Remove trigger: BREAKING — target flow will never be initiated from this source. In-flight flows expecting the trigger to fire are affected. | N/A | Change any trigger field: BREAKING. |
+| shared_entities | Add entry: NON_BREAKING. Remove entry: BREAKING — cross-contract entity state coordination ceases. | N/A | Change contracts list: BREAKING. |
 
-- **M1 — Breaking change detection.** An executor MUST be able to determine whether a contract version transition contains breaking changes by applying the taxonomy from §17.2 to the structural diff between two interchange bundles. The diff compares every field of every construct in both bundles, keyed by `(kind, id)` — not by array position (MI1, MI2).
+### 18.3 Executor Migration Obligations
 
-- **M2 — Migration policy declaration.** An executor deploying a new contract version with any BREAKING changes (as classified by §17.2) MUST declare an in-flight flow migration policy per §17.4 (MI5).
+The following obligations parallel E1-E9 in §17.2 but are specific to contract version transitions. An executor that supports deploying updated contract versions must satisfy these obligations.
+
+- **M1 — Breaking change detection.** An executor MUST be able to determine whether a contract version transition contains breaking changes by applying the taxonomy from §18.2 to the structural diff between two interchange bundles. The diff compares every field of every construct in both bundles, keyed by `(kind, id)` — not by array position (MI1, MI2). Breaking change detection MUST include System construct diffs in addition to single-contract construct diffs. The diff compares every field of every System construct keyed by (kind, id) identically to single-contract diffs.
+
+- **M2 — Migration policy declaration.** An executor deploying a new contract version with any BREAKING changes (as classified by §18.2) MUST declare an in-flight flow migration policy per §18.4 (MI5).
 
 - **M3 — No silent breaking deployment.** An executor MUST NOT silently deploy a contract version with BREAKING changes without migration policy declaration. Deployment of a breaking change without a declared policy is a conformance violation (MI5).
 
@@ -1610,19 +1943,19 @@ The following obligations parallel E1-E9 in §16.2 but are specific to contract 
 
 - **M5 — In-flight flow coverage.** An executor MUST validate that all in-flight flows referencing removed or changed constructs are handled per the declared migration policy. No in-flight flow may be silently abandoned or left in an inconsistent state (MI7).
 
-- **M6 — Conservative REQUIRES_ANALYSIS handling.** Changes classified as REQUIRES_ANALYSIS MUST be treated as BREAKING unless static analysis (S1-S7 per §15) proves them non-breaking for the specific contract pair. An executor that cannot perform S1-S7 analysis must treat all REQUIRES_ANALYSIS classifications as BREAKING (MI3).
+- **M6 — Conservative REQUIRES_ANALYSIS handling.** Changes classified as REQUIRES_ANALYSIS MUST be treated as BREAKING unless static analysis (S1-S7 per §16) proves them non-breaking for the specific contract pair. An executor that cannot perform S1-S7 analysis must treat all REQUIRES_ANALYSIS classifications as BREAKING (MI3).
 
 - **M7 — Diff noise field exclusion.** The structural diff used for breaking change detection MUST exclude `provenance` and `line` fields from comparison. These fields are debugging metadata and do not affect evaluation semantics. Changes to provenance or line numbers alone do not constitute a contract change.
 
 - **M8 — Set-semantic comparison for primitive arrays.** Fields that represent unordered sets (`states`, `allowed_personas`) MUST be compared as sets, not as ordered arrays. Reordering elements within these fields is not a change.
 
-### 17.4 In-Flight Flow Migration Policy
+### 18.4 In-Flight Flow Migration Policy
 
-When a contract version transition contains BREAKING changes (per §17.2, classified by M1), the executor MUST declare one of three migration policies before the new version becomes active:
+When a contract version transition contains BREAKING changes (per §18.2, classified by M1), the executor MUST declare one of three migration policies before the new version becomes active:
 
 **1. Blue-Green.** New flow initiations use the new contract version. In-flight flows (initiated under the old version) complete execution under the old version. No in-flight flow is affected by the breaking changes. The executor must maintain both contract versions simultaneously until all in-flight flows under the old version reach terminal states. This policy provides the strongest isolation but requires the highest resource overhead (two concurrent contract version environments).
 
-**2. Force-Migrate.** All in-flight flows transition to the new contract version. The executor MUST handle the consequences of breaking changes: entities in removed states must be migrated to valid states, Operations with changed effects must be re-evaluated, Flows at removed steps must be routed to valid steps. The executor bears full responsibility for data consistency during the transition. This is the most complex policy and places the highest burden on the executor. See §17.6 for the formal conditions under which force-migration is safe for a specific flow instance.
+**2. Force-Migrate.** All in-flight flows transition to the new contract version. The executor MUST handle the consequences of breaking changes: entities in removed states must be migrated to valid states, Operations with changed effects must be re-evaluated, Flows at removed steps must be routed to valid steps. The executor bears full responsibility for data consistency during the transition. This is the most complex policy and places the highest burden on the executor. See §18.6 for the formal conditions under which force-migration is safe for a specific flow instance.
 
 **3. Abort.** In-flight flows that traverse any construct affected by a breaking change are terminated with a `migration_aborted` failure outcome. Flows that do not traverse affected constructs continue under the new version. The executor must identify affected flows and terminate them gracefully. This is the simplest policy but may lose in-progress work.
 
@@ -1631,13 +1964,13 @@ When a contract version transition contains BREAKING changes (per §17.2, classi
 - The policy is a **deployment concern**, not a contract concern. It does not appear in `.tenor` source files or interchange JSON. It does not affect evaluation semantics, verdict resolution, or any contract-level behavior (MI6). The policy is consumed by the executor's deployment infrastructure, not by the evaluation model.
 - The policy must address **all** in-flight flows, not a subset. Per-flow-type policies are permitted (e.g., abort Flow type A, blue-green Flow type B) but every active flow type must have a declared policy (MI7).
 - The spec does not prescribe which policy to use — only that one MUST be declared when BREAKING changes exist (MI5).
-- Frozen verdict semantics (§14) provide natural isolation at the verdict layer: in-flight flow snapshot verdicts are immutable, so Rule and Fact changes do NOT affect in-flight flow verdicts. However, Operation execution against live entity state IS affected by Entity state changes and Operation definition changes. The Blue-Green policy leverages verdict isolation fully; the Force-Migrate and Abort policies must account for entity state and Operation definition changes.
+- Frozen verdict semantics (§15) provide natural isolation at the verdict layer: in-flight flow snapshot verdicts are immutable, so Rule and Fact changes do NOT affect in-flight flow verdicts. However, Operation execution against live entity state IS affected by Entity state changes and Operation definition changes. The Blue-Green policy leverages verdict isolation fully; the Force-Migrate and Abort policies must account for entity state and Operation definition changes.
 
-### 17.5 Migration Contract Representation
+### 18.5 Migration Contract Representation
 
 The migration output between two contract versions is expressed as a hybrid representation (selected via CFFP, Candidate C — see `docs/cffp/migration-semantics.json`):
 
-**Primary output — DiffEntry JSON** (`tenor diff`): The authoritative diff output is structured JSON. Each change is a `DiffEntry` keyed by `(construct_kind, construct_id)` with field-level before/after values. The DiffEntry format is produced by `tenor diff` and is always complete, deterministic, and correct (MI1, MI2). The breaking change classification is a pure function applied to each DiffEntry field: `classify(kind, field, change_type)` returns the taxonomy classification from §17.2.
+**Primary output — DiffEntry JSON** (`tenor diff`): The authoritative diff output is structured JSON. Each change is a `DiffEntry` keyed by `(construct_kind, construct_id)` with field-level before/after values. The DiffEntry format is produced by `tenor diff` and is always complete, deterministic, and correct (MI1, MI2). The breaking change classification is a pure function applied to each DiffEntry field: `classify(kind, field, change_type)` returns the taxonomy classification from §18.2.
 
 **Secondary output — Tenor migration contract** (`tenor diff --migration`): An optional supplementary output generates a valid Tenor contract from the diff. The migration contract uses existing v1.0 constructs with conventionalized naming:
 
@@ -1656,11 +1989,11 @@ The migration contract is **classification-only** in v1.0. Migration orchestrati
 - Are not composable in v1.0. Transitive migration (v1-to-v3 via v1-to-v2 + v2-to-v3) requires direct diffing of endpoint versions. This is a v1.0 implementation constraint, not a fundamental design limitation: classification-only contracts do not carry enough state information to compose. Once migration contracts gain orchestration capabilities in v2 (Operations executing migration actions, Flows sequencing steps), composition becomes tractable — a completed v1-to-v2 migration produces a known state, which can be diffed against v3 to yield v2-to-v3. The composition model is sequential execution, not algebraic contract combination. See AL40.
 - Generation must follow canonical ordering rules (alphabetical Fact ids, deterministic Rule ids, canonical construct ordering) to ensure deterministic output across different generators (MI2).
 
-### 17.6 Flow Migration Compatibility
+### 18.6 Flow Migration Compatibility
 
-Flows are long-lived stateful processes that may outlive deployment cycles. A flow initiated under contract v1 may still be executing when contract v2 is deployed. When an executor uses the Force-Migrate policy (§17.4), it must determine per-flow-instance whether migration is safe. This section defines the formal conditions.
+Flows are long-lived stateful processes that may outlive deployment cycles. A flow initiated under contract v1 may still be executing when contract v2 is deployed. When an executor uses the Force-Migrate policy (§18.4), it must determine per-flow-instance whether migration is safe. This section defines the formal conditions.
 
-#### 17.6.1 Position and Reachable Paths
+#### 18.6.1 Position and Reachable Paths
 
 A flow instance's **position** is the step where it is currently waiting:
 
@@ -1676,7 +2009,7 @@ ReachablePaths(v2_flow, position) = { path | path is a sequence of steps
     following v2's routing edges }
 ```
 
-Reachable paths are computed per S6 (§15). The v1 step graph determines the current position; all forward analysis uses v2's definitions, since the migrated flow executes under v2.
+Reachable paths are computed per S6 (§16). The v1 step graph determines the current position; all forward analysis uses v2's definitions, since the migrated flow executes under v2.
 
 For each step type, the path computation branches as follows:
 - **OperationStep:** one successor per declared outcome in v2's operation definition.
@@ -1684,7 +2017,7 @@ For each step type, the path computation branches as follows:
 - **SubFlowStep:** success path + failure handler path. The referenced sub-flow's reachable paths are computed recursively.
 - **ParallelStep:** Cartesian product of branch paths, plus the join step.
 
-#### 17.6.2 Step Equivalence
+#### 18.6.2 Step Equivalence
 
 A v1 step at the current position has a v2 equivalent if and only if:
 
@@ -1694,17 +2027,17 @@ A v1 step at the current position has a v2 equivalent if and only if:
 
 Routing is NOT part of step equivalence. The migrated flow uses v2's routing definitions at and after the current position.
 
-#### 17.6.3 Compatibility Conditions
+#### 18.6.3 Compatibility Conditions
 
 A flow instance at position p in contract v1 is **force-migratable** to contract v2 if and only if ALL three conditions hold:
 
-**Condition 1 — Forward Path Existence (FMC1).** For every step in ReachablePaths(v2, p), there exists a step in v2 with equivalent semantics per §17.6.2. This ensures the flow can reach a terminal state under v2. Note that reachable paths are computed from the current position using **v2's** step graph, not v1's (§17.6.1). Routing changes at or after the current position are evaluated under v2's semantics — a step removed in v2 is not reachable; a step added in v2 may introduce new dependencies checked by FMC2.
+**Condition 1 — Forward Path Existence (FMC1).** For every step in ReachablePaths(v2, p), there exists a step in v2 with equivalent semantics per §18.6.2. This ensures the flow can reach a terminal state under v2. Note that reachable paths are computed from the current position using **v2's** step graph, not v1's (§18.6.1). Routing changes at or after the current position are evaluated under v2's semantics — a step removed in v2 is not reachable; a step added in v2 may introduce new dependencies checked by FMC2.
 
 **Condition 2 — Data Dependency Satisfaction (FMC2).** For every step s in ReachablePaths(v2, p), all data dependencies of s's operation under v2 are satisfiable from the execution context established by v1's partial execution:
 
-- **(a) Fact dependencies:** Every `fact_ref` in the operation's precondition must have a value in the frozen snapshot (taken at v1 flow initiation per §14), or the fact must have a declared default in v2.
-- **(b) Verdict dependencies:** Satisfied by construction. The frozen verdict snapshot is immutable (§14). Changes to Rule definitions, Fact types affecting verdict production, or Rule removal in v2 do not affect verdicts already frozen in the snapshot. Verdict-layer changes are categorically safe for in-flight flows (see §17.6.5).
-- **(c) Entity state dependencies:** The entity state required as a transition source by the operation's effects must be the current state of the entity (as established by v1 execution) or reachable from the current state via v2's declared transitions. Checked by Layer 2 (§17.6.6).
+- **(a) Fact dependencies:** Every `fact_ref` in the operation's precondition must have a value in the frozen snapshot (taken at v1 flow initiation per §15), or the fact must have a declared default in v2.
+- **(b) Verdict dependencies:** Satisfied by construction. The frozen verdict snapshot is immutable (§15). Changes to Rule definitions, Fact types affecting verdict production, or Rule removal in v2 do not affect verdicts already frozen in the snapshot. Verdict-layer changes are categorically safe for in-flight flows (see §18.6.5).
+- **(c) Entity state dependencies:** The entity state required as a transition source by the operation's effects must be the current state of the entity (as established by v1 execution) or reachable from the current state via v2's declared transitions. Checked by Layer 2 (§18.6.6).
 - **(d) Persona authorization:** The step's persona must be in the operation's `allowed_personas` under v2's definitions.
 
 **Condition 3 — Entity State Equivalence (FMC3).** For every entity e referenced by any step in ReachablePaths(v2, p):
@@ -1713,7 +2046,7 @@ A flow instance at position p in contract v1 is **force-migratable** to contract
 - All entity states that are transition targets of v2 operations in the reachable path must be declared in v2's entity definition.
 - Transitions from the current state to those targets must exist in v2's transition declarations.
 
-#### 17.6.4 Directional Asymmetry (FMC4)
+#### 18.6.4 Directional Asymmetry (FMC4)
 
 The compatibility function must account for a structural asymmetry between v1's executed path and v2's expected path. When v2 introduces new steps between existing steps, or changes existing steps to have stronger preconditions, the new data dependencies may reference state (facts, verdicts, entity states) that v1's execution path never established because v1 never executed the steps that would produce them.
 
@@ -1721,17 +2054,17 @@ Forward path existence (FMC1) alone is insufficient. A path may exist structural
 
 **Example:** v1 flow: step_confirm -> step_check_threshold -> step_auto_release -> Terminal(success). v2 inserts step_compliance_check between step_confirm and step_check_threshold, and step_auto_release in v2 now requires `verdict_present(compliance_cleared)`. A v1 flow at step_check_threshold has a compatible forward path (step_check_threshold and step_auto_release exist in v2). However, FMC2 fails: the compliance_cleared verdict was never produced because the v1 flow never executed step_compliance_check. The directional asymmetry makes FMC2 the hardest condition to verify — it requires analyzing what WOULD have been produced by steps the flow has already passed.
 
-#### 17.6.5 Frozen Verdict Layer Isolation
+#### 18.6.5 Frozen Verdict Layer Isolation
 
-The frozen verdict snapshot (§14) provides natural isolation at the verdict layer. Changes to Rules and Facts do NOT affect the frozen snapshot of an in-flight flow — verdicts were computed at initiation time and are immutable. This means Rule/Fact changes never cause FMC2 failures for verdict dependencies.
+The frozen verdict snapshot (§15) provides natural isolation at the verdict layer. Changes to Rules and Facts do NOT affect the frozen snapshot of an in-flight flow — verdicts were computed at initiation time and are immutable. This means Rule/Fact changes never cause FMC2 failures for verdict dependencies.
 
 However, entity state changes (live) and operation definition changes (evaluated at step execution time) ARE affected and must be checked. This insight means the compatibility analysis can skip the verdict layer entirely.
 
-#### 17.6.6 Three-Layer Analysis Model
+#### 18.6.6 Three-Layer Analysis Model
 
 The compatibility check decomposes into three analysis layers corresponding to Tenor's isolation properties:
 
-**Layer 1 — Verdict isolation.** ALWAYS PASSES for in-flight flows. The frozen verdict snapshot (§14) is immutable. Changes to Rule definitions, Fact types, or Rule removal in v2 do not affect verdicts already in the snapshot. This is a theorem of Tenor's evaluation model, not an assumption.
+**Layer 1 — Verdict isolation.** ALWAYS PASSES for in-flight flows. The frozen verdict snapshot (§15) is immutable. Changes to Rule definitions, Fact types, or Rule removal in v2 do not affect verdicts already in the snapshot. This is a theorem of Tenor's evaluation model, not an assumption.
 
 **Layer 2 — Entity state equivalence.** Checks FMC3. Entity states are live (mutable by operations), not frozen. For each entity e referenced in ReachablePaths(v2, p):
 
@@ -1753,7 +2086,7 @@ If any check fails: return `incompatible(layer=3, step=s, reason)`.
 
 Evaluation order: Layer 1 (trivial — no computation), Layer 2 (entity state — set membership checks), Layer 3 (structure and dependencies — graph traversal). Short-circuit on first failure.
 
-#### 17.6.7 Position Sensitivity (FMC5)
+#### 18.6.7 Position Sensitivity (FMC5)
 
 Flow compatibility is a function of:
 
@@ -1766,25 +2099,25 @@ It is NOT a static property of two flow definitions. A flow may be compatible at
 
 **Example:** v2 removes entity state `cancelled` from an Order entity. A flow instance at step_submit_order (Order in state `draft`, no future path transitions to `cancelled`) is compatible. A flow instance at step_cancel_order (which transitions Order to `cancelled`) is incompatible. Same flow definition pair, different results.
 
-#### 17.6.8 Recursive Sub-Flow Compatibility (FMC6)
+#### 18.6.8 Recursive Sub-Flow Compatibility (FMC6)
 
 If the reachable path from position p includes a SubFlowStep referencing sub-flow F, then F must be compatibility-checked at its entry point under the same conditions (same frozen snapshot, same entity state context). Compatibility checking is transitive through the flow reference DAG. The DAG is acyclic (Tenor spec constraint, §11.5), so the transitive check terminates.
 
-#### 17.6.9 Semantic Non-Interference (FMC7)
+#### 18.6.9 Semantic Non-Interference (FMC7)
 
 The compatibility analysis is a deployment-time static check with no side effects. It does not modify flow execution semantics, entity states, snapshots, or verdicts under either v1 or v2. A flow that passes the compatibility check executes under v2 semantics exactly as if it had been initiated under v2. A flow that fails the compatibility check continues under v1 semantics (or is aborted, depending on executor policy) with no change to its evaluation model.
 
-#### 17.6.10 Flow-Level Refinement of Breaking Changes
+#### 18.6.10 Flow-Level Refinement of Breaking Changes
 
-Flow-level compatibility refines the construct-level breaking change taxonomy (§17.2). A construct-level BREAKING change (e.g., a new operation outcome per §17.2.5) may be flow-level COMPATIBLE if v2's flow definition already handles the change. The construct-level taxonomy provides the initial signal; the flow-level check provides per-instance refinement.
+Flow-level compatibility refines the construct-level breaking change taxonomy (§18.2). A construct-level BREAKING change (e.g., a new operation outcome per §18.2.5) may be flow-level COMPATIBLE if v2's flow definition already handles the change. The construct-level taxonomy provides the initial signal; the flow-level check provides per-instance refinement.
 
-#### 17.6.11 Conservative and Aggressive Analysis
+#### 18.6.11 Conservative and Aggressive Analysis
 
 **Conservative analysis (REQUIRED):** Data dependency satisfaction considers only the frozen snapshot and current entity states. Dependencies not present in these sources fail the check. This may reject migrations that are actually safe (false negatives).
 
 **Aggressive analysis (OPTIONAL):** Additionally considers dependencies satisfiable from v2 steps that MUST execute before the dependent step (path dominance analysis). If step A always executes before step B on every path from the current position, and step A produces a verdict that step B requires, the dependency is satisfied by intra-path production. Aggressive analysis reduces false negatives at the cost of implementation complexity.
 
-#### 17.6.12 Coexistence Layer Pattern
+#### 18.6.12 Coexistence Layer Pattern
 
 When an executor declares Force-Migrate policy and some flow instances fail the compatibility check, the executor MAY implement a coexistence layer (informally called v1.5):
 
@@ -1797,7 +2130,7 @@ The coexistence layer is an **executor implementation strategy**, not a spec-lev
 
 ---
 
-## 18. Contract Discovery & Agent Orientation
+## 19. Contract Discovery & Agent Orientation
 
 This section specifies how executors expose contracts to agents and how agents
 orient themselves against a running executor. These are executor obligations and
@@ -1813,7 +2146,7 @@ generalize across executors. This section closes that gap.
 
 ---
 
-### 18.1 The Contract Manifest
+### 19.1 The Contract Manifest
 
 The contract manifest is a JSON document that exposes a Tenor interchange bundle
 at a well-known location. It is the entry point for agent cold-start and the
@@ -1837,7 +2170,7 @@ omit it. Dynamic executors that evaluate Operations, execute Flows, and apply
 entity state transitions include it. The `ExecutorCapabilities` object is
 explicitly extensible — future executor capability signals land here.
 
-The `capabilities` field is excluded from etag computation (§18.2). Capability
+The `capabilities` field is excluded from etag computation (§19.2). Capability
 changes do not constitute contract changes and do not invalidate cached bundles.
 
 **Manifest schema version:** The manifest's `tenor` field tracks the manifest
@@ -1871,7 +2204,7 @@ The interchange schema is embedded in the manifest schema as the type of the
 
 ---
 
-### 18.2 Etag Semantics
+### 19.2 Etag Semantics
 
 The etag is a SHA-256 hex digest of the canonical interchange bundle bytes.
 
@@ -1881,7 +2214,7 @@ etag(bundle) = lowercase_hex(SHA-256(canonical_json_bytes(bundle)))
 
 Where `canonical_json_bytes` is the deterministic JSON serialization produced
 by the elaborator's Pass 6. The elaborator is already required to be
-deterministic (§13.1): identical DSL input produces byte-for-byte identical
+deterministic (§14.1): identical DSL input produces byte-for-byte identical
 interchange output. The etag inherits this determinism — identical contracts
 produce identical etags across all conforming elaborators.
 
@@ -1897,13 +2230,13 @@ detection. An agent that has previously fetched the manifest may send
 `If-None-Match: <etag>` and receive `304 Not Modified` if the contract has not
 changed, without re-fetching the full bundle.
 
-The `capabilities` field (§18.1) is excluded from etag computation. Executor
+The `capabilities` field (§19.1) is excluded from etag computation. Executor
 capability changes do not constitute contract changes and do not invalidate
 cached bundles.
 
 ---
 
-### 18.3 Discovery Endpoint
+### 19.3 Discovery Endpoint
 
 A conforming executor MUST serve the contract manifest at:
 
@@ -1926,7 +2259,7 @@ and an `ETag` response header matching the manifest's `etag` field value.
 
 ---
 
-### 18.4 Cold-Start Protocol
+### 19.4 Cold-Start Protocol
 
 Agent cold-start is the sequence an agent follows from a bare URL to a complete
 understanding of the system. The protocol requires at most one network fetch.
@@ -1966,7 +2299,7 @@ fields may be omitted, no construct references may be unresolved.
 
 ---
 
-### 18.5 Change Detection
+### 19.5 Change Detection
 
 An agent that has previously fetched the manifest detects contract changes by
 comparing the current etag to its cached etag.
@@ -1992,11 +2325,11 @@ full bundle has changed and must be re-fetched and re-processed.
 **Executor obligation E12:** A conforming executor MUST update the manifest's
 `etag` field whenever the interchange bundle changes, and MUST NOT change the
 `etag` field when the bundle has not changed. The etag MUST be a pure function
-of bundle content as specified in §18.2.
+of bundle content as specified in §19.2.
 
 ---
 
-### 18.6 Dry-Run Evaluation
+### 19.6 Dry-Run Evaluation
 
 A dry-run is a read-only evaluation of an Operation against the current
 ResolvedVerdictSet. It executes the full evaluation sequence up to but not
@@ -2052,7 +2385,7 @@ to the authoritative audit log.
 
 ---
 
-### 18.7 Executor Obligation Summary (E10-E14)
+### 19.7 Executor Obligation Summary (E10-E14)
 
 | Obligation | Description |
 |------------|-------------|
@@ -2064,7 +2397,7 @@ to the authoritative audit log.
 
 ---
 
-## 19. Appendix A — Acknowledged Limitations
+## 20. Appendix A — Acknowledged Limitations
 
 These are conscious design decisions, not oversights.
 
@@ -2114,19 +2447,19 @@ A contract cannot import a type from a library and extend it (add fields). Type 
 Importing a type library file loads all its TypeDecl definitions into the type environment, even if the contract uses only a subset.
 
 **AL37 — Migration contracts cannot express complex type changes** _(Migration)_
-Migration contracts (§17.5) cannot represent arbitrary type changes involving complex types (Record, TaggedUnion, nested List). Only simple type parameter changes are faithfully representable as Tenor Facts.
+Migration contracts (§18.5) cannot represent arbitrary type changes involving complex types (Record, TaggedUnion, nested List). Only simple type parameter changes are faithfully representable as Tenor Facts.
 
 **AL38 — Migration contracts cannot compare predicate strength** _(Migration)_
-All precondition and predicate expression changes are conservatively classified as REQUIRES_ANALYSIS. Refinement requires S3a/S3b static analysis tooling (§15).
+All precondition and predicate expression changes are conservatively classified as REQUIRES_ANALYSIS. Refinement requires S3a/S3b static analysis tooling (§16).
 
 **AL39 — Migration contracts are self-contained** _(Migration)_
 Migration contracts do not import the contracts they migrate. All diff data is encoded as internal Facts with conventionalized source bindings (`system: "tenor-diff"`). This restriction is due to Pass 1 import resolution merging all constructs into a single namespace, which would cause id collisions.
 
 **AL40 — Migration contracts are not composable in v1.0** _(Migration)_
-Transitive migration requires directly diffing the endpoint versions' interchange bundles. Classification-only contracts encode what changed but not the resulting state, so they lack the information needed for composition. See §17.5.
+Transitive migration requires directly diffing the endpoint versions' interchange bundles. Classification-only contracts encode what changed but not the resulting state, so they lack the information needed for composition. See §18.5.
 
 **AL41 — Migration contracts are classification-only in v1.0** _(Migration)_
-Migration contracts express diff classification but NOT migration orchestration. Migration orchestration (Operations + Flows for multi-step migrations) requires meta-level constructs deferred to v2. See §17.5.
+Migration contracts express diff classification but NOT migration orchestration. Migration orchestration (Operations + Flows for multi-step migrations) requires meta-level constructs deferred to v2. See §18.5.
 
 **AL42 — Migration contract source bindings are conventionalized** _(Migration)_
 Migration contract Facts use conventionalized source bindings (`system: "tenor-diff"`) that do not correspond to real external systems.
@@ -2134,45 +2467,81 @@ Migration contract Facts use conventionalized source bindings (`system: "tenor-d
 **AL43 — Migration contract determinism requires canonical ordering** _(Migration)_
 Migration contract generation must follow canonical ordering rules to ensure deterministic output across different generators.
 
-**AL44 — Flow compatibility does not model time-based constraints** _(Flow Migration, §17.6)_
+**AL44 — Flow compatibility does not model time-based constraints** _(Flow Migration, §18.6)_
 The compatibility analysis does not account for timeout changes between contract versions. If v2 changes step-level or flow-level timeout values, the analysis treats timeouts as executor-level concerns outside the formal compatibility conditions.
 
-**AL45 — Recursive sub-flow compatibility depth is unbounded** _(Flow Migration, §17.6)_
+**AL45 — Recursive sub-flow compatibility depth is unbounded** _(Flow Migration, §18.6)_
 The formal definition permits arbitrary recursion depth through SubFlowStep references. Implementations may impose a practical depth limit. The flow reference DAG is acyclic (§11.5), so recursion terminates, but deeply nested sub-flow chains may be expensive to analyze.
 
-**AL46 — ParallelStep compatibility requires all branches compatible** _(Flow Migration, §17.6)_
+**AL46 — ParallelStep compatibility requires all branches compatible** _(Flow Migration, §18.6)_
 A ParallelStep is compatible only if ALL branches pass the compatibility check independently. Partial migration of parallel branches (some branches on v2, some on v1) is not supported. If any branch fails compatibility, the entire ParallelStep is incompatible.
 
-**AL47 — Conservative data dependency analysis may produce false negatives** _(Flow Migration, §17.6)_
-The required conservative analysis considers only the frozen snapshot and current entity states. It does not account for verdicts or state that v2 steps would produce during execution before the dependent step. This may reject migrations that are actually safe. Aggressive analysis with path dominance (§17.6.11) is optional and reduces false negatives at the cost of implementation complexity.
+**AL47 — Conservative data dependency analysis may produce false negatives** _(Flow Migration, §18.6)_
+The required conservative analysis considers only the frozen snapshot and current entity states. It does not account for verdicts or state that v2 steps would produce during execution before the dependent step. This may reject migrations that are actually safe. Aggressive analysis with path dominance (§18.6.11) is optional and reduces false negatives at the cost of implementation complexity.
 
-**AL48 — Entity parent changes require transitive analysis** _(Flow Migration, §17.6)_
+**AL48 — Entity parent changes require transitive analysis** _(Flow Migration, §18.6)_
 Entity parent field changes are detected through Layer 2 (entity state) and Layer 3 (operation effects), but the full impact of a parent change on state propagation chains may require transitive analysis not specified in v1.0. Parent changes are conservatively treated as compatibility failures.
 
-**AL49 — Reachable path computation uses v2's step graph** _(Flow Migration, §17.6)_
+**AL49 — Reachable path computation uses v2's step graph** _(Flow Migration, §18.6)_
 The compatibility analysis computes reachable paths from the current position using v2's step graph, not v1's. The v1 step graph is only used to identify the current position. This means routing changes at or after the current position are evaluated under v2's semantics. A step removed in v2 is simply not reachable; a step added in v2 may introduce new dependencies.
 
 **AL50 — User-defined verdict precedence deferred to v2** _(Rule, §7)_
 v1 contracts must use distinct VerdictType names for each verdict-producing rule (S8). User-defined verdict precedence, dominance relations, and contract-specified resolution strategies — which would allow multiple rules to produce the same VerdictType with an explicit conflict resolution mechanism — are deferred to a future version. Contracts requiring conditional same-verdict production should use distinct VerdictType names and a higher-stratum aggregation rule.
 
-**AL51 — Single contract per discovery endpoint** _(Contract Discovery, §18)_
-The `/.well-known/tenor` endpoint serves a single TenorManifest. Hosts exposing multiple independent contracts must use separate subdomains or path-scoped endpoints (served via the MAY clause in §18.3). A registry mechanism for multi-contract discovery is deferred to a future version.
+**AL51 — Single contract per discovery endpoint** _(Contract Discovery, §19)_
+The `/.well-known/tenor` endpoint serves a single TenorManifest. Hosts exposing multiple independent contracts must use separate subdomains or path-scoped endpoints (served via the MAY clause in §19.3). A registry mechanism for multi-contract discovery is deferred to a future version.
 
-**AL52 — Concurrent Operation isolation unspecified** _(Executor, §16)_
+**AL52 — Concurrent Operation isolation unspecified** _(Executor, §17)_
 E3 requires atomicity for a single Operation's effect set but does not specify isolation semantics for concurrent invocation of multiple Operations against the same entity. Two Operations that concurrently read the same entity state, compute valid transitions, and write may produce conflicting final states. Executors must document their concurrency model. Serializable isolation is recommended but not required by v1.
 
 **AL53 — Text equality uses byte-exact comparison** _(BaseType, §4)_
 Text equality (`=`, `≠`) compares UTF-8 byte sequences exactly. Two strings that are canonically equivalent under Unicode normalization (e.g., NFC vs. NFD) but differ in byte representation compare as unequal. Contract authors are responsible for ensuring consistent normalization of Text fact values before FactSet assembly.
 
-**AL54 — Sub-flow cross-version invocation unspecified** _(Flow Migration, §17.6)_
-§17.6 covers in-flight flow migration for flows within a single contract version transition. The case where a sub-flow is defined in a different contract version than its parent flow — for example, a v1 parent flow invoking a sub-flow that has been independently updated to v2 — is not addressed. Sub-flow compatibility analysis assumes parent and sub-flow are migrated together as part of the same version transition.
+**AL54 — Sub-flow cross-version invocation unspecified** _(Flow Migration, §18.6)_
+§18.6 covers in-flight flow migration for flows within a single contract version transition. The case where a sub-flow is defined in a different contract version than its parent flow — for example, a v1 parent flow invoking a sub-flow that has been independently updated to v2 — is not addressed. Sub-flow compatibility analysis assumes parent and sub-flow are migrated together as part of the same version transition.
 
-**AL55 — Per-flow-type capability advertisement not supported in v1.1** _(Contract Discovery, §18)_
+**AL55 — Per-flow-type capability advertisement not supported in v1.1** _(Contract Discovery, §19)_
 The `migration_analysis_mode` field in `ExecutorCapabilities` is per-executor. An executor uses one analysis mode for all flow migration decisions. Per-flow-type capability granularity (e.g., aggressive analysis for some flows, conservative for others) is deferred to v2.
+
+**AL56 — Shared entity state set equality required** _(System, §12)_
+Shared entity state sets must be identical across all member contracts that share the entity. State set extension (one contract having additional states) is not supported in v1.0. If a contract needs additional states for a shared entity, all sharing contracts must declare the complete state set. State set extension semantics may be explored in a future spec version.
+
+**AL57 — Shared persona identity by exact id only** _(System, §12)_
+Shared persona identity is based on exact persona id matching. There is no aliasing mechanism to map different persona names across contracts to the same identity. Contracts participating in a shared persona binding must use identical persona ids. Persona aliasing may be explored in a future spec version.
+
+**AL58 — Cross-contract triggers fire on terminal outcomes only** _(System, §12)_
+Cross-contract flow triggers fire on terminal outcomes only (success, failure, escalation). There is no mechanism to trigger on specific Operation outcomes within a flow or on intermediate flow states. Intermediate-step triggering would require exposing internal flow structure across contract boundaries, significantly increasing coupling. Terminal outcome triggering preserves flow encapsulation.
+
+**AL59 — System member file path resolution is relative** _(System, §12)_
+System member file paths are resolved relative to the System file's directory. No absolute path resolution or path aliasing mechanism is provided. File resolution is a tooling concern. Build systems or packaging tools may provide additional path resolution if needed.
+
+**AL60 — One System per file** _(System, §12)_
+A System file may contain only one System declaration. Multiple System declarations in a single file are not permitted. One System per file maintains a clear file-level identity for the System construct, analogous to how a contract file contains constructs for one logical contract.
+
+**AL61 — No recursive System embedding** _(System, §12)_
+Recursive System embedding is not permitted. A System member must be a contract file, not another System file. Multi-level System composition is not supported in v1.0. Recursive composition would require defining System-of-Systems semantics, including transitive trigger propagation and multi-level persona resolution. This is deferred to post-v1.0.
+
+**AL62 — Shared entity transition compatibility not checked** _(System, §12)_
+Cross-contract entity relationship validation checks state set equality only. Transition compatibility (do the contracts' Operations produce consistent state transitions?) is not checked at elaboration time. This is an executor obligation. Transition compatibility analysis across contracts requires knowledge of Operation execution order and external triggers, which are runtime concerns.
+
+**AL63 — System-level migration policy not specified** _(System, §12, §18)_
+System-level migration policy is not specified in v1.0. When System changes are BREAKING, the executor must declare a migration policy (§18.4) for affected in-flight flows and pending trigger executions. The specific obligations parallel M2-M8 but are not formally enumerated in v1.0.
+
+**AL64 — Trigger persona authorization at non-OperationStep entry steps** _(System, §12)_
+Trigger persona authorization at non-OperationStep entry steps is not checkable at elaboration time (System §12). If a target flow's entry step is a BranchStep or HandoffStep, C-SYS-12 only verifies persona existence in the target contract, not authorization at the entry step. Runtime authorization failure at the first OperationStep encountered after the entry step will cause trigger initiation to fail per E-SYS-01(d).
+
+**AL65 — System-level static analysis obligations not defined** _(System, §12, §16)_
+System-level static analysis obligations are not defined in v1.0. S1-S8 (§16) apply to individual member contracts only. Cross-contract authority topology (which personas can cause which entity state transitions across the System), cross-contract flow path enumeration, and cross-contract entity reachability are not formal static analysis obligations in v1.0.
+
+**AL66 — Trigger at-most-once delivery mechanism is implementation-defined** _(System, §12)_
+Trigger at-most-once delivery is stated as a guarantee (E-SYS-01) but the enforcement mechanism is implementation-defined. In distributed deployments, achieving at-most-once semantics requires either idempotent target flow initiation or a distributed deduplication mechanism. The spec states the guarantee; the executor is responsible for satisfying it.
+
+**AL67 — Cross-contract provenance retention policy not prescribed** _(System, §12)_
+Cross-contract provenance traceability requires that all TriggerProvenance records are retained alongside individual contract provenance chains. The spec defines TriggerProvenance (§12.4) but does not prescribe storage or retention obligations. Executors must document their provenance retention policy.
 
 ---
 
-## 20. Appendix C — Worked Example: Escrow Release Contract
+## 21. Appendix C — Worked Example: Escrow Release Contract
 
 This appendix demonstrates a non-trivial Tenor contract covering two entities, monetary threshold rules, multi-persona authority, bounded quantification over line items, and a compensation flow. It is intended as a reference for:
 
@@ -2672,48 +3041,50 @@ This is the frozen verdict semantic commitment in concrete form.
 
 ---
 
-## 21. Appendix D — Glossary
+## 22. Appendix D — Glossary
 
 | Term | Definition |
 |------|------------|
-| **ADP** | [Adversarial Design Protocol](https://github.com/riverline-labs/iap). Design space mapping method used when the solution space is unknown and must be explored before formalization. Part of the [Consensus](https://github.com/riverline-labs/iap) protocol suite. |
-| **Agent** | Any software component that reads a Tenor contract to understand a system's behavior. Agents discover contracts via the manifest (§18) and reason about the contract without reading implementation code. |
+| **ADP** | [Adversarial Design Protocol](https://github.com/riverline-labs/iap). Design space mapping method used when the solution space is unknown and must be explored before formalization. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
+| **Agent** | Any software component that reads a Tenor contract to understand a system's behavior. Agents discover contracts via the manifest (§19) and reason about the contract without reading implementation code. |
 | **BaseType** | One of twelve primitive types in Tenor's type system: Bool, Int, Decimal, Money, Text, Date, DateTime, Duration, Enum, List, Record, TaggedUnion (§4). |
-| **Bundle** | The top-level interchange document produced by the elaborator. Contains all constructs from a contract and its imports, serialized as canonical JSON (§13). |
-| **CFFP** | [Constraint-First Formalization Protocol](https://github.com/riverline-labs/iap). The design method used for all Tenor construct additions: invariant declaration, candidate formalisms, pressure testing via counterexamples, canonical form selection. Part of the [Consensus](https://github.com/riverline-labs/iap) protocol suite. |
-| **Cold-Start** | The sequence an agent follows from a bare URL to complete understanding of a system. Requires one fetch of the manifest at `/.well-known/tenor` (§18.4). |
+| **Bundle** | The top-level interchange document produced by the elaborator. Contains all constructs from a contract and its imports, serialized as canonical JSON (§14). |
+| **CFFP** | [Constraint-First Formalization Protocol](https://github.com/riverline-labs/iap). The design method used for all Tenor construct additions: invariant declaration, candidate formalisms, pressure testing via counterexamples, canonical form selection. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
+| **Cold-Start** | The sequence an agent follows from a bare URL to complete understanding of a system. Requires one fetch of the manifest at `/.well-known/tenor` (§19.4). |
 | **Conformance Suite** | The set of test fixtures (`conformance/`) that validate elaborator behavior. Positive tests verify correct output; negative tests verify correct error reporting. |
-| **Construct** | A top-level declaration in Tenor: Fact, Entity, Rule, Persona, Operation, or Flow (§3). |
+| **Construct** | A top-level declaration in Tenor: Fact, Entity, Rule, Persona, Operation, Flow, or System (§3). |
 | **Contract** | A complete Tenor specification of a system's behavior, comprising one or more `.tenor` source files that elaborate into a single interchange bundle. |
-| **Dry-Run** | A read-only evaluation of an Operation that executes steps (1)-(3) of the execution sequence without applying effects. Responses carry `"simulation": true` (§18.6). |
+| **Dry-Run** | A read-only evaluation of an Operation that executes steps (1)-(3) of the execution sequence without applying effects. Responses carry `"simulation": true` (§19.6). |
 | **Effect** | An entity state transition produced by an Operation. Effects are atomic — all effects of an Operation are applied together or none are (§9). |
-| **Elaboration** | The six-pass transformation from `.tenor` source text to canonical JSON interchange: lex, parse, bundle, index, type-check, validate, serialize (§13). |
+| **Elaboration** | The six-pass transformation from `.tenor` source text to canonical JSON interchange: lex, parse, bundle, index, type-check, validate, serialize (§14). |
 | **Elaborator** | The tool that performs elaboration. The reference elaborator is `tenor-core`. |
 | **Entity** | A finite state machine representing a domain object. Declares states, an initial state, and permitted transitions (§6). |
-| **Etag** | A SHA-256 hex digest of the canonical interchange bundle bytes. Used for change detection. Changes if and only if the bundle changes (§18.2). |
-| **Executor** | A runtime system that evaluates Tenor contracts against live data. Subject to executor obligations E1-E14 (§16, §18.7). |
+| **Etag** | A SHA-256 hex digest of the canonical interchange bundle bytes. Used for change detection. Changes if and only if the bundle changes (§19.2). |
+| **Executor** | A runtime system that evaluates Tenor contracts against live data. Subject to executor obligations E1-E14 (§17, §19.7) and System obligations E-SYS-01 through E-SYS-04 (§17.3). |
 | **Fact** | A ground truth value sourced from an external system. Facts are inputs to the evaluation model — they are asserted, not derived (§5). |
 | **FactSet** | The complete set of Fact values assembled for a single evaluation. Each Fact has exactly one value (asserted or default). |
 | **Flow** | A directed acyclic graph of steps orchestrating Operations, with snapshot isolation and persona handoffs (§11). |
 | **Frozen Verdict Semantics** | The guarantee that a Flow's verdict set is computed once at initiation and never recomputed mid-Flow. All predicate evaluations within a Flow use the snapshot (§11). |
-| **Interchange Format** | The canonical JSON representation of a Tenor contract, produced by the elaborator. Defined by `docs/interchange-schema.json` (§13). |
-| **Manifest** | A JSON document (TenorManifest) that wraps an interchange bundle with an etag and spec version. Served at `/.well-known/tenor` (§18.1). |
-| **NumericModel** | The specification of arithmetic behavior: fixed-point decimal arithmetic with the bounds specified in §12.6, `MidpointNearestEven` rounding, no floating-point anywhere in the evaluation path (§12). |
+| **Interchange Format** | The canonical JSON representation of a Tenor contract, produced by the elaborator. Defined by `docs/interchange-schema.json` (§14). |
+| **Manifest** | A JSON document (TenorManifest) that wraps an interchange bundle with an etag and spec version. Served at `/.well-known/tenor` (§19.1). |
+| **NumericModel** | The specification of arithmetic behavior: fixed-point decimal arithmetic with the bounds specified in §13.6, `MidpointNearestEven` rounding, no floating-point anywhere in the evaluation path (§13). |
 | **Operation** | A persona-gated, precondition-guarded unit of work that produces entity state transitions. Declares allowed personas, preconditions, effects, outcomes, and error contracts (§9). |
 | **Outcome** | A named result label declared on an Operation. The outcome set is finite, closed, and exhaustively handled in Flow routing (§9.1). |
-| **Pass** | One stage of the six-pass elaboration pipeline. Passes are numbered 0-6: lex/parse (0), bundle (1), index (2), types (3), typecheck (4), validate (5), serialize (6) (§13). |
+| **Pass** | One stage of the six-pass elaboration pipeline. Passes are numbered 0-6: lex/parse (0), bundle (1), index (2), types (3), typecheck (4), validate (5), serialize (6) (§14). |
 | **Persona** | A declared identity token representing an actor class. Pure identity with no metadata. Operations declare which Personas may invoke them (§8). |
 | **Precondition** | A predicate expression on an Operation that must evaluate to true for the Operation to execute. Evaluated against the FactSet and frozen VerdictSet (§9). |
 | **PredicateExpression** | A quantifier-free first-order logic formula over ground terms. The expression language for preconditions, rule conditions, and branch conditions (§10). |
-| **Provenance** | The complete derivation chain for a verdict or operation result. Every verdict records which Facts and Rules produced it. Provenance is part of the evaluation relation, not a runtime feature (§14). |
-| **RCP** | [Reconciliation Protocol](https://github.com/riverline-labs/iap). Verifies consistency across multiple protocol run outputs. Part of the [Consensus](https://github.com/riverline-labs/iap) protocol suite. |
+| **Provenance** | The complete derivation chain for a verdict or operation result. Every verdict records which Facts and Rules produced it. Provenance is part of the evaluation relation, not a runtime feature (§15). |
+| **RCP** | [Reconciliation Protocol](https://github.com/riverline-labs/iap). Verifies consistency across multiple protocol run outputs. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap)  suite. |
 | **ResolvedVerdictSet** | The set of all verdicts produced by evaluating all Rules against the current FactSet. Each verdict carries its payload and provenance. |
 | **Rule** | A verdict-producing declaration with a `when` predicate and a `produce` clause. Rules are stratified — higher strata can reference verdicts from lower strata but not the same or higher (§7). |
 | **Snapshot** | The frozen state captured at Flow initiation: the FactSet and ResolvedVerdictSet at that point in time. Immutable for the duration of the Flow (§11). |
+| **System** | A top-level composition construct declared in a dedicated `.tenor` file. Declares member contracts, shared persona bindings, cross-contract flow triggers, and cross-contract entity relationships (§12). |
 | **Stratum** | The stratification level of a Rule. Rules at stratum N can only reference verdicts produced at strata < N. Guarantees termination (§7). |
-| **TenorManifest** | The JSON document format for contract discovery: `{ bundle, etag, tenor }` with keys sorted lexicographically (§18.1). |
+| **TenorManifest** | The JSON document format for contract discovery: `{ bundle, etag, tenor }` with keys sorted lexicographically (§19.1). |
 | **Transition** | A permitted state change in an Entity, expressed as a (from, to) pair (§6). |
+| **TriggerProvenance** | A runtime provenance record linking a source flow's terminal outcome to a target flow initiation via a cross-contract trigger (§12.4). Captures source/target contract and flow ids, terminal outcome, persona, target flow instance id, and status (initiated or failed). |
 | **TypeDecl** | A named type declaration (Record or TaggedUnion) that can be used as a Fact type or nested within other types (§4). |
-| **TypeEnv** | The type environment built during Pass 3 of elaboration. Maps type names to their resolved definitions (§13). |
+| **TypeEnv** | The type environment built during Pass 3 of elaboration. Maps type names to their resolved definitions (§14). |
 | **Verdict** | A derived value produced by a Rule. Verdicts have a VerdictType (label) and a typed payload. They are the outputs of the evaluation model (§7). |
 | **VerdictType** | A named category of verdict. Declared implicitly by Rule `produce` clauses. Multiple Rules may produce the same VerdictType (§7). |

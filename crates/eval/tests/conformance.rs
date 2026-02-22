@@ -461,7 +461,6 @@ fn domain_supply_chain_hold() {
     );
 }
 
-
 // ──────────────────────────────────────────────
 // Domain validation — Healthcare Prior Auth (Phase 5)
 // ──────────────────────────────────────────────
@@ -736,16 +735,13 @@ fn e13_dry_run_rule_evaluation() {
         .unwrap_or_else(|e| panic!("Failed to elaborate SaaS contract: {:?}", e));
 
     // Load facts for the activate scenario
-    let facts_str = std::fs::read_to_string(
-        domains_dir().join("saas").join("saas_activate.facts.json"),
-    )
-    .expect("Failed to read SaaS activate facts");
-    let facts: serde_json::Value =
-        serde_json::from_str(&facts_str).expect("Invalid facts JSON");
+    let facts_str =
+        std::fs::read_to_string(domains_dir().join("saas").join("saas_activate.facts.json"))
+            .expect("Failed to read SaaS activate facts");
+    let facts: serde_json::Value = serde_json::from_str(&facts_str).expect("Invalid facts JSON");
 
     // First evaluation (rules only -- no flows, no entity mutations)
-    let result1 = tenor_eval::evaluate(&bundle, &facts)
-        .expect("First evaluation failed");
+    let result1 = tenor_eval::evaluate(&bundle, &facts).expect("First evaluation failed");
 
     // Verify verdicts are produced
     assert!(
@@ -754,8 +750,7 @@ fn e13_dry_run_rule_evaluation() {
     );
 
     // Second evaluation with same inputs
-    let result2 = tenor_eval::evaluate(&bundle, &facts)
-        .expect("Second evaluation failed");
+    let result2 = tenor_eval::evaluate(&bundle, &facts).expect("Second evaluation failed");
 
     // Verify determinism: same input = same output
     assert_eq!(
@@ -796,8 +791,7 @@ fn e13_dry_run_healthcare_determinism() {
             .join("prior_auth_approve.facts.json"),
     )
     .expect("Failed to read healthcare facts");
-    let facts: serde_json::Value =
-        serde_json::from_str(&facts_str).expect("Invalid facts JSON");
+    let facts: serde_json::Value = serde_json::from_str(&facts_str).expect("Invalid facts JSON");
 
     // Evaluate three times to verify determinism
     let r1 = tenor_eval::evaluate(&bundle, &facts).expect("eval 1 failed");
@@ -808,11 +802,16 @@ fn e13_dry_run_healthcare_determinism() {
     let j2 = r2.verdicts.to_json();
     let j3 = r3.verdicts.to_json();
 
-    assert_eq!(j1, j2, "healthcare evaluation must be deterministic (run 1 vs 2)");
-    assert_eq!(j2, j3, "healthcare evaluation must be deterministic (run 2 vs 3)");
+    assert_eq!(
+        j1, j2,
+        "healthcare evaluation must be deterministic (run 1 vs 2)"
+    );
+    assert_eq!(
+        j2, j3,
+        "healthcare evaluation must be deterministic (run 2 vs 3)"
+    );
     assert!(
         !r1.verdicts.0.is_empty(),
         "healthcare contract should produce verdicts"
     );
 }
-

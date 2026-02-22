@@ -202,6 +202,33 @@ pub enum RawConstruct {
         steps: BTreeMap<String, RawStep>,
         prov: Provenance,
     },
+    System {
+        id: String,
+        /// Member contract declarations: (member_id, file_path)
+        members: Vec<(String, String)>,
+        /// Shared persona bindings: (persona_id, vec of member_ids)
+        shared_personas: Vec<(String, Vec<String>)>,
+        /// Cross-contract flow triggers
+        triggers: Vec<RawTrigger>,
+        /// Cross-contract entity relationships: (entity_id, vec of member_ids)
+        shared_entities: Vec<(String, Vec<String>)>,
+        prov: Provenance,
+    },
+}
+
+// ──────────────────────────────────────────────
+// System sub-types
+// ──────────────────────────────────────────────
+
+/// A cross-contract flow trigger declaration within a System.
+#[derive(Debug, Clone)]
+pub struct RawTrigger {
+    pub source_contract: String,
+    pub source_flow: String,
+    pub on: String,
+    pub target_contract: String,
+    pub target_flow: String,
+    pub persona: String,
 }
 
 // ──────────────────────────────────────────────

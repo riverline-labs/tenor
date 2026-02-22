@@ -34,14 +34,15 @@
   },
   "$defs": {
     "Construct": {
-      "description": "A top-level construct document. Discriminated by the 'kind' field.",
+      "description": "A top-level construct document. Discriminated by the 'kind' field. Canonical order: Facts, Entities, Personas, Rules (by stratum), Operations, Flows, Systems.",
       "oneOf": [
         { "$ref": "#/$defs/Fact" },
         { "$ref": "#/$defs/Entity" },
         { "$ref": "#/$defs/Rule" },
         { "$ref": "#/$defs/Persona" },
         { "$ref": "#/$defs/Operation" },
-        { "$ref": "#/$defs/Flow" }
+        { "$ref": "#/$defs/Flow" },
+        { "$ref": "#/$defs/System" }
       ]
     },
 
@@ -846,6 +847,102 @@
           "description": "Steps in topological order. Entry step first."
         },
         "tenor": { "type": "string" }
+      }
+    },
+
+    "SystemMember": {
+      "type": "object",
+      "required": ["id", "path"],
+      "additionalProperties": false,
+      "description": "A member contract declaration within a System. Maps a local member id to a contract file path.",
+      "properties": {
+        "id": { "type": "string", "description": "Local member identifier, unique within the System." },
+        "path": { "type": "string", "description": "File path to the member contract (.tenor file), resolved relative to the System file's directory." }
+      }
+    },
+
+    "SharedPersona": {
+      "type": "object",
+      "required": ["contracts", "persona"],
+      "additionalProperties": false,
+      "description": "A shared persona binding declaring identity equivalence of a persona across member contracts.",
+      "properties": {
+        "contracts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "description": "Member ids of contracts sharing this persona. Sorted lexicographically."
+        },
+        "persona": { "type": "string", "description": "PersonaId shared across the listed contracts." }
+      }
+    },
+
+    "SystemTrigger": {
+      "type": "object",
+      "required": ["on", "persona", "source_contract", "source_flow", "target_contract", "target_flow"],
+      "additionalProperties": false,
+      "description": "A cross-contract flow trigger declaration. When the source flow reaches the specified terminal outcome, the target flow is initiated in the target contract.",
+      "properties": {
+        "on": {
+          "type": "string",
+          "enum": ["success", "failure", "escalation"],
+          "description": "Terminal outcome of the source flow that fires this trigger."
+        },
+        "persona": { "type": "string", "description": "PersonaId for the target flow invocation." },
+        "source_contract": { "type": "string", "description": "MemberId of the source contract." },
+        "source_flow": { "type": "string", "description": "FlowId in the source contract." },
+        "target_contract": { "type": "string", "description": "MemberId of the target contract." },
+        "target_flow": { "type": "string", "description": "FlowId in the target contract." }
+      }
+    },
+
+    "SharedEntity": {
+      "type": "object",
+      "required": ["contracts", "entity"],
+      "additionalProperties": false,
+      "description": "A cross-contract entity relationship declaring that an entity is shared across member contracts with identical state sets.",
+      "properties": {
+        "contracts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "description": "Member ids of contracts sharing this entity. Sorted lexicographically."
+        },
+        "entity": { "type": "string", "description": "EntityId shared across the listed contracts." }
+      }
+    },
+
+    "System": {
+      "type": "object",
+      "required": ["id", "kind", "members", "provenance", "shared_entities", "shared_personas", "tenor", "triggers"],
+      "additionalProperties": false,
+      "description": "A multi-contract composition construct. Declares member contracts, shared persona identity, cross-contract flow triggers, and cross-contract entity relationships. Section 12 of the Tenor spec.",
+      "properties": {
+        "id": { "type": "string", "description": "System identifier." },
+        "kind": { "const": "System" },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SystemMember" },
+          "minItems": 1,
+          "description": "Member contract declarations. Sorted by member id."
+        },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "shared_entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedEntity" },
+          "description": "Cross-contract entity relationships. Sorted by entity id."
+        },
+        "shared_personas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedPersona" },
+          "description": "Shared persona bindings. Sorted by persona id."
+        },
+        "tenor": { "type": "string" },
+        "triggers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SystemTrigger" },
+          "description": "Cross-contract flow trigger declarations. Sorted by (source_contract, source_flow, target_contract, target_flow)."
+        }
       }
     }
   }

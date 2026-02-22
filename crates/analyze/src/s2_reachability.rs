@@ -41,7 +41,10 @@ pub fn analyze_reachability(bundle: &AnalysisBundle) -> S2Result {
         // Build adjacency list: from_state -> [to_states]
         let mut adjacency: HashMap<&str, Vec<&str>> = HashMap::new();
         for t in &entity.transitions {
-            adjacency.entry(t.from.as_str()).or_default().push(t.to.as_str());
+            adjacency
+                .entry(t.from.as_str())
+                .or_default()
+                .push(t.to.as_str());
         }
 
         // BFS from initial state
@@ -63,10 +66,7 @@ pub fn analyze_reachability(bundle: &AnalysisBundle) -> S2Result {
 
         // Compute unreachable states: declared - reachable
         let declared: BTreeSet<String> = entity.states.iter().cloned().collect();
-        let unreachable: BTreeSet<String> = declared
-            .difference(&visited)
-            .cloned()
-            .collect();
+        let unreachable: BTreeSet<String> = declared.difference(&visited).cloned().collect();
 
         if !unreachable.is_empty() {
             has_dead_states = true;
@@ -101,6 +101,7 @@ mod tests {
             operations: vec![],
             flows: vec![],
             personas: vec![],
+            systems: vec![],
         }
     }
 
@@ -115,8 +116,14 @@ mod tests {
             ],
             initial: "draft".to_string(),
             transitions: vec![
-                Transition { from: "draft".to_string(), to: "submitted".to_string() },
-                Transition { from: "submitted".to_string(), to: "approved".to_string() },
+                Transition {
+                    from: "draft".to_string(),
+                    to: "submitted".to_string(),
+                },
+                Transition {
+                    from: "submitted".to_string(),
+                    to: "approved".to_string(),
+                },
             ],
             parent: None,
         }]);
@@ -139,7 +146,10 @@ mod tests {
             ],
             initial: "draft".to_string(),
             transitions: vec![
-                Transition { from: "draft".to_string(), to: "submitted".to_string() },
+                Transition {
+                    from: "draft".to_string(),
+                    to: "submitted".to_string(),
+                },
                 // No path to "archived" from "draft"
             ],
             parent: None,
@@ -186,9 +196,15 @@ mod tests {
             ],
             initial: "a".to_string(),
             transitions: vec![
-                Transition { from: "a".to_string(), to: "b".to_string() },
+                Transition {
+                    from: "a".to_string(),
+                    to: "b".to_string(),
+                },
                 // d -> e is a disconnected subgraph, unreachable from a
-                Transition { from: "d".to_string(), to: "e".to_string() },
+                Transition {
+                    from: "d".to_string(),
+                    to: "e".to_string(),
+                },
             ],
             parent: None,
         }]);
@@ -207,16 +223,21 @@ mod tests {
     fn test_cycle_in_transitions() {
         let bundle = make_bundle(vec![AnalysisEntity {
             id: "Order".to_string(),
-            states: vec![
-                "a".to_string(),
-                "b".to_string(),
-                "c".to_string(),
-            ],
+            states: vec!["a".to_string(), "b".to_string(), "c".to_string()],
             initial: "a".to_string(),
             transitions: vec![
-                Transition { from: "a".to_string(), to: "b".to_string() },
-                Transition { from: "b".to_string(), to: "c".to_string() },
-                Transition { from: "c".to_string(), to: "a".to_string() }, // cycle
+                Transition {
+                    from: "a".to_string(),
+                    to: "b".to_string(),
+                },
+                Transition {
+                    from: "b".to_string(),
+                    to: "c".to_string(),
+                },
+                Transition {
+                    from: "c".to_string(),
+                    to: "a".to_string(),
+                }, // cycle
             ],
             parent: None,
         }]);
@@ -236,14 +257,20 @@ mod tests {
                 id: "Clean".to_string(),
                 states: vec!["a".to_string(), "b".to_string()],
                 initial: "a".to_string(),
-                transitions: vec![Transition { from: "a".to_string(), to: "b".to_string() }],
+                transitions: vec![Transition {
+                    from: "a".to_string(),
+                    to: "b".to_string(),
+                }],
                 parent: None,
             },
             AnalysisEntity {
                 id: "Dirty".to_string(),
                 states: vec!["x".to_string(), "y".to_string(), "z".to_string()],
                 initial: "x".to_string(),
-                transitions: vec![Transition { from: "x".to_string(), to: "y".to_string() }],
+                transitions: vec![Transition {
+                    from: "x".to_string(),
+                    to: "y".to_string(),
+                }],
                 parent: None,
             },
         ]);

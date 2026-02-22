@@ -1,4 +1,22 @@
 {
+  "flow_outcome": "suspended",
+  "steps_executed": [
+    {
+      "result": "success",
+      "step_id": "step_activate",
+      "step_type": "operation"
+    },
+    {
+      "result": "false",
+      "step_id": "step_check_payment",
+      "step_type": "branch"
+    },
+    {
+      "result": "success",
+      "step_id": "step_suspend",
+      "step_type": "operation"
+    }
+  ],
   "verdicts": [
     {
       "payload": {
@@ -45,24 +63,6 @@
         ]
       },
       "type": "suspension_required"
-    }
-  ],
-  "flow_outcome": "suspended",
-  "steps_executed": [
-    {
-      "step_id": "step_activate",
-      "step_type": "operation",
-      "result": "success"
-    },
-    {
-      "step_id": "step_check_payment",
-      "step_type": "branch",
-      "result": "false"
-    },
-    {
-      "step_id": "step_suspend",
-      "step_type": "operation",
-      "result": "success"
     }
   ]
 }

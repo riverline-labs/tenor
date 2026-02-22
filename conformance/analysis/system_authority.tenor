@@ -1,0 +1,15 @@
+// Analysis test: cross-contract authority topology (S4)
+// A System with shared personas across two member contracts.
+// Running `tenor check` should produce cross-contract authority findings.
+
+system authority_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: [
+    { persona: applicant, contracts: [contract_a, contract_b] }
+  ]
+  triggers: []
+  shared_entities: []
+}

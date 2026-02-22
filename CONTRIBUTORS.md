@@ -21,7 +21,7 @@ Tenor was designed through human-AI collaborative sessions. The following AI sys
 
 ## Method
 
-This project uses protocols from the [Consensus](https://github.com/riverline-labs/iap) protocol suite:
+This project uses protocols from the [Interpretive Adjudiciation Protocols](https://github.com/riverline-labs/iap) suite:
 
 - **[CFFP](https://github.com/riverline-labs/iap)** (Constraint-First Formalization Protocol) — invariant declaration, candidate formalisms, pressure testing via counterexamples, canonical form selection. Used for all construct additions (persona, outcome typing, shared types, migration semantics).
 - **[ADP](https://github.com/riverline-labs/iap)** (Adversarial Design Protocol) — design space mapping before formalization. Used to arrive at the §18 Contract Discovery & Agent Orientation design (Phase 3.4).

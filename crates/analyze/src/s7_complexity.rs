@@ -87,11 +87,10 @@ pub fn analyze_complexity(bundle: &AnalysisBundle, s6: &S6Result) -> S7Result {
     let mut max_flow_depth: usize = 0;
 
     for (flow_id, flow_result) in &s6.flows {
-        let has_cycles = flow_result.paths.iter().any(|p| {
-            p.terminal_outcome
-                .as_deref()
-                .map_or(false, |o| o == "cycle_detected")
-        });
+        let has_cycles = flow_result
+            .paths
+            .iter()
+            .any(|p| p.terminal_outcome.as_deref() == Some("cycle_detected"));
 
         let bound = FlowDepthBound {
             flow_id: flow_id.clone(),
@@ -130,14 +129,10 @@ fn walk_expression_tree(expr: &serde_json::Value) -> (usize, usize) {
 
         // Comparison node
         if obj.contains_key("op") && (obj.contains_key("left") || obj.contains_key("right")) {
-            let (left_count, left_depth) = obj
-                .get("left")
-                .map(|l| walk_expression_tree(l))
-                .unwrap_or((0, 0));
-            let (right_count, right_depth) = obj
-                .get("right")
-                .map(|r| walk_expression_tree(r))
-                .unwrap_or((0, 0));
+            let (left_count, left_depth) =
+                obj.get("left").map(walk_expression_tree).unwrap_or((0, 0));
+            let (right_count, right_depth) =
+                obj.get("right").map(walk_expression_tree).unwrap_or((0, 0));
             return (
                 1 + left_count + right_count,
                 1 + left_depth.max(right_depth),
@@ -183,7 +178,7 @@ fn walk_expression_tree(expr: &serde_json::Value) -> (usize, usize) {
             };
             let (count, depth) = obj
                 .get(body_key)
-                .map(|b| walk_expression_tree(b))
+                .map(walk_expression_tree)
                 .unwrap_or((0, 0));
             return (1 + count, 1 + depth);
         }
@@ -247,10 +242,14 @@ mod tests {
         S6Result {
             flows: BTreeMap::new(),
             total_paths: 0,
+            cross_contract_paths: vec![],
         }
     }
 
-    fn make_bundle_with(rules: Vec<AnalysisRule>, operations: Vec<AnalysisOperation>) -> AnalysisBundle {
+    fn make_bundle_with(
+        rules: Vec<AnalysisRule>,
+        operations: Vec<AnalysisOperation>,
+    ) -> AnalysisBundle {
         AnalysisBundle {
             entities: vec![],
             facts: vec![],
@@ -258,6 +257,7 @@ mod tests {
             operations,
             flows: vec![],
             personas: vec![],
+            systems: vec![],
         }
     }
 
@@ -336,6 +336,7 @@ mod tests {
         let s6 = S6Result {
             flows,
             total_paths: 0,
+            cross_contract_paths: vec![],
         };
 
         let bundle = make_bundle_with(vec![], vec![]);

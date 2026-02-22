@@ -56,11 +56,7 @@ pub fn explain(bundle: &serde_json::Value, format: ExplainFormat, verbose: bool)
     // Build an operation lookup by id for flow narrative
     let op_map: BTreeMap<&str, &serde_json::Value> = operations
         .iter()
-        .filter_map(|op| {
-            op.get("id")
-                .and_then(|v| v.as_str())
-                .map(|id| (id, *op))
-        })
+        .filter_map(|op| op.get("id").and_then(|v| v.as_str()).map(|id| (id, *op)))
         .collect();
 
     // Section 1: Contract Summary
@@ -91,6 +87,7 @@ pub fn explain(bundle: &serde_json::Value, format: ExplainFormat, verbose: bool)
 
 // ─── Section 1: Contract Summary ─────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn section_contract_summary(
     out: &mut String,
     format: ExplainFormat,
@@ -132,11 +129,7 @@ fn section_contract_summary(
         );
     }
 
-    emit_line(
-        out,
-        format,
-        &format!("Personas: {}", personas.len()),
-    );
+    emit_line(out, format, &format!("Personas: {}", personas.len()));
 
     // Rule summary with strata
     let strata = count_strata(rules);
@@ -151,23 +144,11 @@ fn section_contract_summary(
         ),
     );
 
-    emit_line(
-        out,
-        format,
-        &format!("Operations: {}", operations.len()),
-    );
+    emit_line(out, format, &format!("Operations: {}", operations.len()));
 
-    emit_line(
-        out,
-        format,
-        &format!("Facts: {}", facts.len()),
-    );
+    emit_line(out, format, &format!("Facts: {}", facts.len()));
 
-    emit_line(
-        out,
-        format,
-        &format!("Flows: {}", flows.len()),
-    );
+    emit_line(out, format, &format!("Flows: {}", flows.len()));
 
     if verbose {
         // Verbose: list persona names
@@ -187,10 +168,7 @@ fn section_contract_summary(
         for e in entities {
             let id = e.get("id").and_then(|v| v.as_str()).unwrap_or("?");
             if let Some(states) = e.get("states").and_then(|v| v.as_array()) {
-                let state_names: Vec<&str> = states
-                    .iter()
-                    .filter_map(|s| s.as_str())
-                    .collect();
+                let state_names: Vec<&str> = states.iter().filter_map(|s| s.as_str()).collect();
                 emit_line(
                     out,
                     format,
@@ -206,11 +184,7 @@ fn section_contract_summary(
             *strata_counts.entry(s).or_insert(0) += 1;
         }
         for (s, count) in &strata_counts {
-            emit_line(
-                out,
-                format,
-                &format!("  Stratum {}: {} rule(s)", s, count),
-            );
+            emit_line(out, format, &format!("  Stratum {}: {} rule(s)", s, count));
         }
     }
 
@@ -253,11 +227,7 @@ fn section_flow_narrative(
             format,
             &format!("Flow: {}", styled_name(format, flow_id)),
         );
-        emit_line(
-            out,
-            format,
-            &format!("  Entry point: {}", entry),
-        );
+        emit_line(out, format, &format!("  Entry point: {}", entry));
         out.push('\n');
 
         // Build step index for ordered walk
@@ -274,12 +244,22 @@ fn section_flow_narrative(
 
         // Walk from entry
         let mut visited = std::collections::HashSet::new();
-        walk_steps(out, format, entry, &step_map, op_map, verbose, &mut visited, 1);
+        walk_steps(
+            out,
+            format,
+            entry,
+            &step_map,
+            op_map,
+            verbose,
+            &mut visited,
+            1,
+        );
 
         out.push('\n');
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn walk_steps(
     out: &mut String,
     format: ExplainFormat,
@@ -321,7 +301,9 @@ fn walk_steps(
             if let Some(outcomes) = step.get("outcomes").and_then(|v| v.as_object()) {
                 for (_outcome_name, target) in outcomes {
                     if let Some(next_id) = resolve_step_target(target) {
-                        walk_steps(out, format, &next_id, step_map, op_map, verbose, visited, depth);
+                        walk_steps(
+                            out, format, &next_id, step_map, op_map, verbose, visited, depth,
+                        );
                     }
                 }
             }
@@ -334,7 +316,16 @@ fn walk_steps(
 
             if let Some(target) = if_true {
                 if let Some(next_id) = resolve_step_target(target) {
-                    walk_steps(out, format, &next_id, step_map, op_map, verbose, visited, depth + 1);
+                    walk_steps(
+                        out,
+                        format,
+                        &next_id,
+                        step_map,
+                        op_map,
+                        verbose,
+                        visited,
+                        depth + 1,
+                    );
                 }
             }
             if let Some(target) = if_false {
@@ -342,7 +333,14 @@ fn walk_steps(
                     // Create a new visited set for the else branch so both paths can walk independently
                     let mut else_visited = visited.clone();
                     walk_steps(
-                        out, format, &next_id, step_map, op_map, verbose, &mut else_visited, depth + 1,
+                        out,
+                        format,
+                        &next_id,
+                        step_map,
+                        op_map,
+                        verbose,
+                        &mut else_visited,
+                        depth + 1,
                     );
                     // Merge else_visited back
                     visited.extend(else_visited);
@@ -352,7 +350,9 @@ fn walk_steps(
         "HandoffStep" => {
             describe_handoff_step(out, format, step, depth);
             if let Some(next_id) = step.get("next").and_then(|v| v.as_str()) {
-                walk_steps(out, format, next_id, step_map, op_map, verbose, visited, depth);
+                walk_steps(
+                    out, format, next_id, step_map, op_map, verbose, visited, depth,
+                );
             }
         }
         "SubFlowStep" => {
@@ -360,7 +360,9 @@ fn walk_steps(
             // on_success may route to another step
             if let Some(target) = step.get("on_success") {
                 if let Some(next_id) = resolve_step_target(target) {
-                    walk_steps(out, format, &next_id, step_map, op_map, verbose, visited, depth);
+                    walk_steps(
+                        out, format, &next_id, step_map, op_map, verbose, visited, depth,
+                    );
                 }
             }
         }
@@ -369,7 +371,9 @@ fn walk_steps(
             // Follow join on_all_success
             if let Some(join) = step.get("join") {
                 if let Some(next_id) = join.get("on_all_success").and_then(|v| v.as_str()) {
-                    walk_steps(out, format, next_id, step_map, op_map, verbose, visited, depth);
+                    walk_steps(
+                        out, format, next_id, step_map, op_map, verbose, visited, depth,
+                    );
                 }
             }
         }
@@ -493,10 +497,8 @@ fn describe_operation_step(
         for (outcome_name, target) in outcomes {
             if let Some(obj) = target.as_object() {
                 if obj.get("kind").and_then(|v| v.as_str()) == Some("Terminal") {
-                    let terminal_outcome = obj
-                        .get("outcome")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("?");
+                    let terminal_outcome =
+                        obj.get("outcome").and_then(|v| v.as_str()).unwrap_or("?");
                     emit_line(
                         out,
                         format,
@@ -522,7 +524,7 @@ fn describe_branch_step(
 ) {
     let condition = step.get("condition");
     let cond_str = condition
-        .map(|c| describe_condition(c))
+        .map(describe_condition)
         .unwrap_or_else(|| "?".to_string());
 
     emit_line(
@@ -590,10 +592,7 @@ fn describe_subflow_step(
     step: &serde_json::Value,
     depth: usize,
 ) {
-    let sub_flow_id = step
-        .get("flow")
-        .and_then(|v| v.as_str())
-        .unwrap_or("?");
+    let sub_flow_id = step.get("flow").and_then(|v| v.as_str()).unwrap_or("?");
 
     emit_line(
         out,
@@ -632,22 +631,12 @@ fn describe_parallel_step(
     _verbose: bool,
     depth: usize,
 ) {
-    emit_line(
-        out,
-        format,
-        &format!("{}Concurrently:", indent(depth)),
-    );
+    emit_line(out, format, &format!("{}Concurrently:", indent(depth)));
 
     if let Some(branches) = step.get("branches").and_then(|v| v.as_array()) {
         for branch in branches {
-            let branch_id = branch
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
-            let entry = branch
-                .get("entry")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
+            let branch_id = branch.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+            let entry = branch.get("entry").and_then(|v| v.as_str()).unwrap_or("?");
             emit_line(
                 out,
                 format,
@@ -695,17 +684,17 @@ fn describe_condition(cond: &serde_json::Value) -> String {
                 // Unary not: uses "operand" field
                 let operand = cond.get("operand");
                 let operand_str = operand
-                    .map(|o| describe_condition(o))
+                    .map(describe_condition)
                     .unwrap_or_else(|| "?".to_string());
                 return format!("not ({})", operand_str);
             }
             "and" | "or" => {
                 // Logical operators: recurse into both sides as conditions
                 let left_str = left
-                    .map(|l| describe_condition(l))
+                    .map(describe_condition)
                     .unwrap_or_else(|| "?".to_string());
                 let right_str = right
-                    .map(|r| describe_condition(r))
+                    .map(describe_condition)
                     .unwrap_or_else(|| "?".to_string());
                 return format!("({} {} {})", left_str, op, right_str);
             }
@@ -764,23 +753,14 @@ fn describe_inline_target(target: &serde_json::Value) -> String {
         return format!("continue to {}", s);
     }
     if let Some(obj) = target.as_object() {
-        let kind = obj
-            .get("kind")
-            .and_then(|v| v.as_str())
-            .unwrap_or("?");
+        let kind = obj.get("kind").and_then(|v| v.as_str()).unwrap_or("?");
         match kind {
             "Terminal" => {
-                let outcome = obj
-                    .get("outcome")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("?");
+                let outcome = obj.get("outcome").and_then(|v| v.as_str()).unwrap_or("?");
                 return format!("process completes ({})", humanize_id(outcome));
             }
             "Terminate" => {
-                let outcome = obj
-                    .get("outcome")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("?");
+                let outcome = obj.get("outcome").and_then(|v| v.as_str()).unwrap_or("?");
                 return format!("process ends ({})", humanize_id(outcome));
             }
             _ => return format!("{}", target),
@@ -816,7 +796,7 @@ fn section_fact_inventory(
         ExplainFormat::Markdown => {
             out.push_str("| Fact | Type | Source | Default |\n");
             out.push_str("|------|------|--------|---------|\n");
-            for (_category, group_facts) in &grouped {
+            for group_facts in grouped.values() {
                 for fact in group_facts {
                     let id = fact.get("id").and_then(|v| v.as_str()).unwrap_or("?");
                     let type_str = describe_fact_type(fact, verbose);
@@ -987,14 +967,8 @@ fn describe_source(fact: &serde_json::Value) -> String {
     match fact.get("source") {
         None => "-".to_string(),
         Some(source) => {
-            let system = source
-                .get("system")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
-            let field = source
-                .get("field")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
+            let system = source.get("system").and_then(|v| v.as_str()).unwrap_or("?");
+            let field = source.get("field").and_then(|v| v.as_str()).unwrap_or("?");
             format!("{}.{}", system, field)
         }
     }
@@ -1035,11 +1009,7 @@ fn section_risk_coverage(
     let report = match tenor_analyze::analyze(bundle) {
         Ok(r) => r,
         Err(e) => {
-            emit_line(
-                out,
-                format,
-                &format!("Analysis error: {}", e),
-            );
+            emit_line(out, format, &format!("Analysis error: {}", e));
             return;
         }
     };
@@ -1066,19 +1036,12 @@ fn section_risk_coverage(
                 .values()
                 .map(|e| e.unreachable_states.len())
                 .sum();
-            emit_warning(
-                out,
-                format,
-                &format!("{} dead state(s) found", dead_count),
-            );
+            emit_warning(out, format, &format!("{} dead state(s) found", dead_count));
         } else {
             emit_checkmark(
                 out,
                 format,
-                &format!(
-                    "All {} entities fully reachable",
-                    s2.entities.len(),
-                ),
+                &format!("All {} entities fully reachable", s2.entities.len(),),
             );
         }
     }

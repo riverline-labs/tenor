@@ -1,0 +1,22 @@
+// Analysis test: cross-contract flow triggers (S6)
+// A System with cross-contract flow triggers.
+// Running `tenor check` should produce cross-contract flow path findings.
+
+system trigger_analysis_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: [
+    { persona: applicant, contracts: [contract_a, contract_b] }
+  ]
+  triggers: [
+    {
+      source: contract_a.application_flow,
+      on: success,
+      target: contract_b.review_flow,
+      persona: applicant
+    }
+  ]
+  shared_entities: []
+}

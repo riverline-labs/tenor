@@ -69,6 +69,7 @@ mod tests {
             operations: vec![],
             flows: vec![],
             personas: vec![],
+            systems: vec![],
         }
     }
 
@@ -104,7 +105,10 @@ mod tests {
         assert_eq!(order.initial_state, "draft");
         assert_eq!(order.state_count, 3);
         assert_eq!(order.transitions.len(), 2);
-        assert_eq!(order.transitions[0], ("draft".to_string(), "submitted".to_string()));
+        assert_eq!(
+            order.transitions[0],
+            ("draft".to_string(), "submitted".to_string())
+        );
     }
 
     #[test]

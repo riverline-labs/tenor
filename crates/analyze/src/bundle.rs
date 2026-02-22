@@ -13,10 +13,7 @@ pub enum AnalysisError {
     /// The bundle JSON is invalid or missing required fields.
     InvalidBundle(String),
     /// A construct is missing a required field.
-    MissingField {
-        construct: String,
-        field: String,
-    },
+    MissingField { construct: String, field: String },
 }
 
 impl fmt::Display for AnalysisError {
@@ -107,6 +104,48 @@ pub struct AnalysisPersona {
     pub id: String,
 }
 
+/// A member contract declaration within a System.
+#[derive(Debug, Clone, Serialize)]
+pub struct SystemMember {
+    pub id: String,
+    pub path: String,
+}
+
+/// A shared persona binding within a System.
+#[derive(Debug, Clone, Serialize)]
+pub struct SharedPersona {
+    pub persona: String,
+    pub contracts: Vec<String>,
+}
+
+/// A cross-contract flow trigger within a System.
+#[derive(Debug, Clone, Serialize)]
+pub struct FlowTrigger {
+    pub source_contract: String,
+    pub source_flow: String,
+    pub on: String,
+    pub target_contract: String,
+    pub target_flow: String,
+    pub persona: String,
+}
+
+/// A shared entity binding within a System.
+#[derive(Debug, Clone, Serialize)]
+pub struct SharedEntity {
+    pub entity: String,
+    pub contracts: Vec<String>,
+}
+
+/// A System construct extracted from interchange JSON.
+#[derive(Debug, Clone, Serialize)]
+pub struct AnalysisSystem {
+    pub id: String,
+    pub members: Vec<SystemMember>,
+    pub shared_personas: Vec<SharedPersona>,
+    pub flow_triggers: Vec<FlowTrigger>,
+    pub shared_entities: Vec<SharedEntity>,
+}
+
 /// All constructs extracted from an interchange bundle, ready for analysis.
 #[derive(Debug, Clone, Serialize)]
 pub struct AnalysisBundle {
@@ -116,6 +155,7 @@ pub struct AnalysisBundle {
     pub operations: Vec<AnalysisOperation>,
     pub flows: Vec<AnalysisFlow>,
     pub personas: Vec<AnalysisPersona>,
+    pub systems: Vec<AnalysisSystem>,
 }
 
 impl AnalysisBundle {
@@ -138,12 +178,10 @@ impl AnalysisBundle {
         let mut operations = Vec::new();
         let mut flows = Vec::new();
         let mut personas = Vec::new();
+        let mut systems = Vec::new();
 
         for construct in constructs {
-            let kind = construct
-                .get("kind")
-                .and_then(|k| k.as_str())
-                .unwrap_or("");
+            let kind = construct.get("kind").and_then(|k| k.as_str()).unwrap_or("");
 
             match kind {
                 "Entity" => entities.push(parse_entity(construct)?),
@@ -152,6 +190,7 @@ impl AnalysisBundle {
                 "Operation" => operations.push(parse_operation(construct)?),
                 "Flow" => flows.push(parse_flow(construct)?),
                 "Persona" => personas.push(parse_persona(construct)?),
+                "System" => systems.push(parse_system(construct)?),
                 _ => {} // Skip unknown kinds for forward compatibility
             }
         }
@@ -187,9 +226,7 @@ impl AnalysisBundle {
                     }
                     if let Some(to) = step.get("to_persona").and_then(|p| p.as_str()) {
                         if seen.insert(to.to_string()) {
-                            personas.push(AnalysisPersona {
-                                id: to.to_string(),
-                            });
+                            personas.push(AnalysisPersona { id: to.to_string() });
                         }
                     }
                 }
@@ -203,12 +240,17 @@ impl AnalysisBundle {
             operations,
             flows,
             personas,
+            systems,
         })
     }
 }
 
 /// Extract a required string field from a JSON object.
-fn required_str(obj: &serde_json::Value, field: &str, construct_id: &str) -> Result<String, AnalysisError> {
+fn required_str(
+    obj: &serde_json::Value,
+    field: &str,
+    construct_id: &str,
+) -> Result<String, AnalysisError> {
     obj.get(field)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
@@ -219,7 +261,11 @@ fn required_str(obj: &serde_json::Value, field: &str, construct_id: &str) -> Res
 }
 
 /// Extract a required u64 field from a JSON object.
-fn required_u64(obj: &serde_json::Value, field: &str, construct_id: &str) -> Result<u64, AnalysisError> {
+fn required_u64(
+    obj: &serde_json::Value,
+    field: &str,
+    construct_id: &str,
+) -> Result<u64, AnalysisError> {
     obj.get(field)
         .and_then(|v| v.as_u64())
         .ok_or_else(|| AnalysisError::MissingField {
@@ -260,7 +306,10 @@ fn parse_entity(obj: &serde_json::Value) -> Result<AnalysisEntity, AnalysisError
         })
         .unwrap_or_default();
 
-    let parent = obj.get("parent").and_then(|p| p.as_str()).map(|s| s.to_string());
+    let parent = obj
+        .get("parent")
+        .and_then(|p| p.as_str())
+        .map(|s| s.to_string());
 
     Ok(AnalysisEntity {
         id,
@@ -273,10 +322,7 @@ fn parse_entity(obj: &serde_json::Value) -> Result<AnalysisEntity, AnalysisError
 
 fn parse_fact(obj: &serde_json::Value) -> Result<AnalysisFact, AnalysisError> {
     let id = required_str(obj, "id", "Fact")?;
-    let fact_type = obj
-        .get("type")
-        .cloned()
-        .unwrap_or(serde_json::Value::Null);
+    let fact_type = obj.get("type").cloned().unwrap_or(serde_json::Value::Null);
 
     Ok(AnalysisFact { id, fact_type })
 }
@@ -290,15 +336,14 @@ fn parse_rule(obj: &serde_json::Value) -> Result<AnalysisRule, AnalysisError> {
         field: "body".to_string(),
     })?;
 
-    let when = body
-        .get("when")
-        .cloned()
-        .unwrap_or(serde_json::Value::Null);
+    let when = body.get("when").cloned().unwrap_or(serde_json::Value::Null);
 
-    let produce = body.get("produce").ok_or_else(|| AnalysisError::MissingField {
-        construct: id.clone(),
-        field: "body.produce".to_string(),
-    })?;
+    let produce = body
+        .get("produce")
+        .ok_or_else(|| AnalysisError::MissingField {
+            construct: id.clone(),
+            field: "body.produce".to_string(),
+        })?;
 
     let produce_verdict_type = produce
         .get("verdict_type")
@@ -337,9 +382,9 @@ fn parse_operation(obj: &serde_json::Value) -> Result<AnalysisOperation, Analysi
         .unwrap_or_default();
 
     // precondition can be null or a predicate expression object
-    let precondition = obj
-        .get("precondition")
-        .and_then(|p| if p.is_null() { None } else { Some(p.clone()) });
+    let precondition =
+        obj.get("precondition")
+            .and_then(|p| if p.is_null() { None } else { Some(p.clone()) });
 
     let effects = obj
         .get("effects")
@@ -350,7 +395,10 @@ fn parse_operation(obj: &serde_json::Value) -> Result<AnalysisOperation, Analysi
                     let entity_id = e.get("entity_id")?.as_str()?.to_string();
                     let from_state = e.get("from")?.as_str()?.to_string();
                     let to_state = e.get("to")?.as_str()?.to_string();
-                    let outcome = e.get("outcome").and_then(|o| o.as_str()).map(|s| s.to_string());
+                    let outcome = e
+                        .get("outcome")
+                        .and_then(|o| o.as_str())
+                        .map(|s| s.to_string());
                     Some(Effect {
                         entity_id,
                         from_state,
@@ -373,9 +421,9 @@ fn parse_operation(obj: &serde_json::Value) -> Result<AnalysisOperation, Analysi
         })
         .unwrap_or_default();
 
-    let error_contract = obj
-        .get("error_contract")
-        .and_then(|e| if e.is_null() { None } else { Some(e.clone()) });
+    let error_contract =
+        obj.get("error_contract")
+            .and_then(|e| if e.is_null() { None } else { Some(e.clone()) });
 
     Ok(AnalysisOperation {
         id,
@@ -394,7 +442,7 @@ fn parse_flow(obj: &serde_json::Value) -> Result<AnalysisFlow, AnalysisError> {
     let steps = obj
         .get("steps")
         .and_then(|s| s.as_array())
-        .map(|arr| arr.clone())
+        .cloned()
         .unwrap_or_default();
 
     let snapshot = obj
@@ -414,6 +462,95 @@ fn parse_flow(obj: &serde_json::Value) -> Result<AnalysisFlow, AnalysisError> {
 fn parse_persona(obj: &serde_json::Value) -> Result<AnalysisPersona, AnalysisError> {
     let id = required_str(obj, "id", "Persona")?;
     Ok(AnalysisPersona { id })
+}
+
+fn parse_system(obj: &serde_json::Value) -> Result<AnalysisSystem, AnalysisError> {
+    let id = required_str(obj, "id", "System")?;
+
+    let members = obj
+        .get("members")
+        .and_then(|m| m.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| {
+                    let mid = m.get("id")?.as_str()?.to_string();
+                    let path = m.get("path")?.as_str()?.to_string();
+                    Some(SystemMember { id: mid, path })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let shared_personas = obj
+        .get("shared_personas")
+        .and_then(|sp| sp.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|sp| {
+                    let persona = sp.get("persona")?.as_str()?.to_string();
+                    let contracts = sp
+                        .get("contracts")?
+                        .as_array()?
+                        .iter()
+                        .filter_map(|c| c.as_str().map(|s| s.to_string()))
+                        .collect();
+                    Some(SharedPersona { persona, contracts })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let flow_triggers = obj
+        .get("triggers")
+        .and_then(|t| t.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| {
+                    let source_contract = t.get("source_contract")?.as_str()?.to_string();
+                    let source_flow = t.get("source_flow")?.as_str()?.to_string();
+                    let on = t.get("on")?.as_str()?.to_string();
+                    let target_contract = t.get("target_contract")?.as_str()?.to_string();
+                    let target_flow = t.get("target_flow")?.as_str()?.to_string();
+                    let persona = t.get("persona")?.as_str()?.to_string();
+                    Some(FlowTrigger {
+                        source_contract,
+                        source_flow,
+                        on,
+                        target_contract,
+                        target_flow,
+                        persona,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let shared_entities = obj
+        .get("shared_entities")
+        .and_then(|se| se.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|se| {
+                    let entity = se.get("entity")?.as_str()?.to_string();
+                    let contracts = se
+                        .get("contracts")?
+                        .as_array()?
+                        .iter()
+                        .filter_map(|c| c.as_str().map(|s| s.to_string()))
+                        .collect();
+                    Some(SharedEntity { entity, contracts })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Ok(AnalysisSystem {
+        id,
+        members,
+        shared_personas,
+        flow_triggers,
+        shared_entities,
+    })
 }
 
 #[cfg(test)]
@@ -449,7 +586,10 @@ mod tests {
         let result = AnalysisBundle::from_interchange(&bundle).unwrap();
         assert_eq!(result.entities.len(), 1);
         assert_eq!(result.entities[0].id, "Order");
-        assert_eq!(result.entities[0].states, vec!["draft", "submitted", "approved"]);
+        assert_eq!(
+            result.entities[0].states,
+            vec!["draft", "submitted", "approved"]
+        );
         assert_eq!(result.entities[0].initial, "draft");
         assert_eq!(result.entities[0].transitions.len(), 2);
         assert_eq!(result.entities[0].transitions[0].from, "draft");
@@ -607,7 +747,10 @@ mod tests {
         let bundle = json!({"id": "test", "kind": "Bundle"});
         let result = AnalysisBundle::from_interchange(&bundle);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AnalysisError::InvalidBundle(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            AnalysisError::InvalidBundle(_)
+        ));
     }
 
     #[test]

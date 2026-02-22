@@ -69,7 +69,10 @@ fn test_s2_all_reachable() {
     let report = elaborate_and_analyze("conformance/positive/entity_basic.tenor");
     let s2 = report.s2_reachability.expect("S2 should be populated");
 
-    assert!(!s2.has_dead_states, "entity_basic should have no dead states");
+    assert!(
+        !s2.has_dead_states,
+        "entity_basic should have no dead states"
+    );
     for (_, result) in &s2.entities {
         assert!(
             result.unreachable_states.is_empty(),
@@ -84,7 +87,10 @@ fn test_s2_dead_states() {
     let report = elaborate_and_analyze("conformance/analysis/dead_states.tenor");
     let s2 = report.s2_reachability.expect("S2 should be populated");
 
-    assert!(s2.has_dead_states, "dead_states fixture should detect dead states");
+    assert!(
+        s2.has_dead_states,
+        "dead_states fixture should detect dead states"
+    );
     let order = &s2.entities["order"];
     assert!(
         order.unreachable_states.contains("archived"),
@@ -191,10 +197,7 @@ fn test_s6_escrow_flow() {
     let report = elaborate_and_analyze("conformance/positive/integration_escrow.tenor");
     let s6 = report.s6_flow_paths.expect("S6 should be populated");
 
-    assert!(
-        s6.total_paths > 0,
-        "escrow should have flow paths"
-    );
+    assert!(s6.total_paths > 0, "escrow should have flow paths");
 }
 
 // ──────────────────────────────────────────────
