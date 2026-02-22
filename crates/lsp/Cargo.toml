@@ -1,0 +1,8 @@
+[package]
+name = "tenor-lsp"
+version.workspace = true
+edition.workspace = true
+description = "Tenor Language Server Protocol implementation"
+
+[dependencies]
+tenor-core = { path = "../core" }

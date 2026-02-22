@@ -1,0 +1,57 @@
+// Positive test: Multiple persona declarations
+// Covers: multiple persona constructs, different Operations referencing different personas,
+// Flow with OperationStep persona and outcome routing
+// Expected: elaborates without error, produces persona_multiple.expected.json
+
+persona reviewer
+persona approver
+
+fact amount {
+  type:   Money(currency: "USD")
+  source: "request.amount"
+}
+
+entity Request {
+  states:  [pending, reviewed, approved]
+  initial: pending
+  transitions: [(pending, reviewed), (reviewed, approved)]
+}
+
+operation review_request {
+  allowed_personas: [reviewer]
+  precondition:     amount > Money { amount: "0.00", currency: "USD" }
+  effects:          [(Request, pending, reviewed)]
+  error_contract:   [precondition_failed]
+}
+
+operation approve_request {
+  allowed_personas: [approver]
+  precondition:     amount > Money { amount: "0.00", currency: "USD" }
+  effects:          [(Request, reviewed, approved)]
+  error_contract:   [precondition_failed]
+}
+
+flow approval {
+  snapshot: at_initiation
+  entry:    step_review
+
+  steps: {
+    step_review: OperationStep {
+      op:      review_request
+      persona: reviewer
+      outcomes: {
+        success: step_approve
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_approve: OperationStep {
+      op:      approve_request
+      persona: approver
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

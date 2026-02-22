@@ -351,6 +351,7 @@
         { "$ref": "#/$defs/OrExpr" },
         { "$ref": "#/$defs/NotExpr" },
         { "$ref": "#/$defs/ForallExpr" },
+        { "$ref": "#/$defs/ExistsExpr" },
         { "$ref": "#/$defs/VerdictPresentExpr" }
       ]
     },
@@ -367,7 +368,8 @@
         { "$ref": "#/$defs/AndExpr" },
         { "$ref": "#/$defs/OrExpr" },
         { "$ref": "#/$defs/NotExpr" },
-        { "$ref": "#/$defs/ForallExpr" }
+        { "$ref": "#/$defs/ForallExpr" },
+        { "$ref": "#/$defs/ExistsExpr" }
       ]
     },
 
@@ -484,6 +486,20 @@
         "body": { "$ref": "#/$defs/PredicateExpression" },
         "domain": { "$ref": "#/$defs/FactRefOperand" },
         "quantifier": { "const": "forall" },
+        "variable": { "type": "string", "description": "Bound variable name." },
+        "variable_type": { "$ref": "#/$defs/BaseType", "description": "Type of the bound variable (element type of the domain List)." }
+      }
+    },
+
+    "ExistsExpr": {
+      "type": "object",
+      "required": ["body", "domain", "quantifier", "variable", "variable_type"],
+      "additionalProperties": false,
+      "description": "Bounded existential quantification over a List-typed domain.",
+      "properties": {
+        "body": { "$ref": "#/$defs/PredicateExpression" },
+        "domain": { "$ref": "#/$defs/FactRefOperand" },
+        "quantifier": { "const": "exists" },
         "variable": { "type": "string", "description": "Bound variable name." },
         "variable_type": { "$ref": "#/$defs/BaseType", "description": "Type of the bound variable (element type of the domain List)." }
       }

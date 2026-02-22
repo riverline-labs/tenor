@@ -1,0 +1,23 @@
+// Negative test: Outcome name collides with error_contract
+// Expected: pass 5 error for outcomes/error_contract disjointness violation
+
+persona agent
+
+fact x {
+  type:   Bool
+  source: "sys.x"
+}
+
+entity E {
+  states:  [a, b]
+  initial: a
+  transitions: [(a, b)]
+}
+
+operation op {
+  allowed_personas: [agent]
+  precondition:     x = true
+  outcomes:         [success, precondition_failed]
+  effects:          [(E, a, b, success)]
+  error_contract:   [precondition_failed]
+}

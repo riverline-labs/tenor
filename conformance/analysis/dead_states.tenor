@@ -1,0 +1,31 @@
+// Analysis test: dead state detection (S2)
+// Entity "order" has an "archived" state that is unreachable from "pending"
+
+entity order {
+  states:  [pending, confirmed, shipped, delivered, cancelled, archived]
+  initial: pending
+  transitions: [
+    (pending, confirmed),
+    (confirmed, shipped),
+    (shipped, delivered),
+    (pending, cancelled)
+  ]
+}
+
+fact order_total {
+  type:   Int
+  source: "order_service.total"
+}
+
+rule order_check {
+  stratum: 0
+  when:    order_total > 0
+  produce: verdict order_valid { payload: Bool = true }
+}
+
+operation confirm_order {
+  allowed_personas: [admin]
+  precondition:     verdict_present(order_valid)
+  effects:          [(order, pending, confirmed)]
+  error_contract:   [precondition_failed]
+}

@@ -1,0 +1,8 @@
+[package]
+name = "tenor-codegen"
+version.workspace = true
+edition.workspace = true
+description = "Tenor code generator"
+
+[dependencies]
+tenor-core = { path = "../core" }

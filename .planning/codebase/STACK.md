@@ -5,91 +5,75 @@
 ## Languages
 
 **Primary:**
-- Rust 2021 edition - All core elaborator implementation
+- Rust (stable, 1.93.1 in dev) - All crates: core library, CLI binary, eval, analyze, codegen, lsp
+
+**Secondary:**
+- JSON - Interchange format, conformance fixtures, JSON Schema definition at `docs/interchange-schema.json`
 
 ## Runtime
 
 **Environment:**
-- Rust 1.56+ (via Cargo.toml edition = "2021")
+- Rust native binary (`tenor` CLI), no VM or interpreter
 
-**Build System:**
-- Cargo (Rust package manager)
-- Lockfile: Present (`elaborator/Cargo.lock`)
+**Package Manager:**
+- Cargo 1.93.1
+- Lockfile: `Cargo.lock` present and committed
 
 ## Frameworks
 
 **Core:**
-- None - This is a standalone CLI tool, not a framework-dependent application
+- No application framework — pure library and CLI crates
+
+**CLI Argument Parsing:**
+- `clap` 4.5.60 (derive feature) - CLI subcommand dispatch in `crates/cli/src/main.rs`
 
 **Testing:**
-- TAP (Test Anything Protocol) - Custom TAP output implementation in `elaborator/src/tap.rs` for conformance suite reporting
-- Manual conformance fixture testing via test runner in `elaborator/src/runner.rs`
+- Built-in Rust test harness (`cargo test`) - unit tests within each crate
+- Custom TAP v14 conformance runner at `crates/cli/src/runner.rs` and `crates/cli/src/tap.rs`
+- `assert_cmd` 2.1.2 - CLI integration testing (dev dependency in `crates/cli`)
+- `predicates` 3.1.4 - Assertion helpers for `assert_cmd` tests
+- `tempfile` 3.25.0 - Temporary file management in tests
+- `jsonschema` 0.42.1 - JSON Schema validation used both in tests (`crates/core` dev-dep) and production CLI (`crates/cli`)
 
 **Build/Dev:**
-- Cargo - Build configuration and dependency management
+- `cargo fmt` - Code formatting (enforced in CI)
+- `cargo clippy` - Linting (enforced in CI with `-D warnings`)
+- `Swatinem/rust-cache@v2` - GitHub Actions CI build caching
 
 ## Key Dependencies
 
 **Critical:**
-- `serde` 1.0.228 - Serialization/deserialization framework with derive macros
-  - `serde_derive` 1.0.228 - Procedural macros for `#[derive(Serialize, Deserialize)]`
-  - `serde_core` 1.0.228 - Core serialization traits
+- `serde` 1.0.228 (derive feature) - Serialization/deserialization framework; used in every crate
+- `serde_json` 1.0.149 - JSON parsing and serialization; central to interchange format output
+- `rust_decimal` 1.40.0 (serde-with-str feature) - Arbitrary-precision decimal arithmetic for Money and Decimal types; used in `crates/core` and `crates/eval`
 
-- `serde_json` 1.0.149 - JSON serialization and interchange format
-  - Used for: Elaborate output (interchange JSON), test fixture comparison, error JSON serialization
-  - Depends on: `itoa` 1.0.17 (integer to ASCII), `memchr` 2.8.0 (string parsing), `zmij` 1.0.21 (JSON number handling)
-
-**Macro Infrastructure:**
-- `proc-macro2` 1.0.106 - Procedural macro utilities
-- `quote` 1.0.44 - Code generation for macros
-- `syn` 2.0.117 - Rust syntax parsing and AST manipulation
-- `unicode-ident` 1.0.24 - Unicode identifier validation
+**Infrastructure:**
+- `ureq` 3.2.0 (json feature) - Synchronous HTTP client; used exclusively in `crates/cli/src/ambiguity/api.rs` for Anthropic API calls
+- `jsonschema` 0.42.1 - JSON Schema validation; used in `crates/cli` for the `validate` subcommand and in `crates/core` dev-tests
 
 ## Configuration
 
-**Build Configuration:**
-- `Cargo.toml`: `elaborator/Cargo.toml` defines package, dependencies, and edition
-- No external config files (YAML, TOML, environment-based) for the elaborator itself
-- Test fixtures are plain `.tenor` source files (DSL) paired with `.expected.json` or `.expected-error.json` fixture files
-
 **Environment:**
-- No `.env` files or environment variable configuration
-- CLI arguments parsed directly in `main()` in `elaborator/src/main.rs`
-- Paths passed as command-line arguments
+- `ANTHROPIC_API_KEY` - Required for `tenor ambiguity` subcommand; read at runtime via `std::env::var`
+- No `.env` files or environment loading libraries; env vars read directly
+
+**Build:**
+- `Cargo.toml` (workspace root) - Workspace members and shared dependency versions
+- `crates/*/Cargo.toml` - Per-crate dependencies
+- `Cargo.lock` - Pinned dependency tree
+
+**Embedded Assets:**
+- `docs/interchange-schema.json` is embedded at compile time via `include_str!` in `crates/cli/src/main.rs` (used by `validate` subcommand)
 
 ## Platform Requirements
 
 **Development:**
-- Rust toolchain (1.56+ for edition 2021)
-- Cargo for building and running
+- Rust stable toolchain (no `rust-toolchain.toml` pinning; CI uses `dtolnay/rust-toolchain@stable`)
+- Cargo
 
 **Production:**
-- Compiled binary runs on any platform with native x86_64 or ARM64 support
-- No runtime dependencies beyond Rust std library
-- Single stateless binary
-
-## Build Commands
-
-```bash
-cd elaborator && cargo build                # Debug build
-cd elaborator && cargo build --release      # Optimized binary
-cd elaborator && cargo run -- elaborate <file.tenor>  # Single file elaboration
-cd elaborator && cargo run -- run ../conformance     # Run test suite
-```
-
-## No External Integrations
-
-This is a language elaborator and reference implementation. It has:
-- No network I/O
-- No database dependencies
-- No external API calls
-- No authentication/authorization framework dependencies
-- No cloud platform SDKs
-- No logging frameworks (uses `eprintln!` for errors)
-
-Input/output is:
-- **File I/O only**: Read `.tenor` DSL files, write JSON to stdout, errors to stderr
-- **Self-contained**: All validation, parsing, type checking, and elaboration is local computation
+- Single compiled binary `tenor` (cross-platform; CI tests on `ubuntu-latest`)
+- No database, no server, no runtime dependencies beyond the binary itself
 
 ---
 

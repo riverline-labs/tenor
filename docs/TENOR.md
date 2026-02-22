@@ -1,17 +1,21 @@
 # Tenor
 
-## Formal Specification v0.3
+## Tenor Language Specification v0.9
 
-**Status:** Pre-alpha. Core constructs canonicalized. Syntax defined (Tenor v1.0). Elaborator conformance suite: 47/47 passing.
-**Method:** Human-AI collaborative design.
-**Models consulted:** Claude (Anthropic), GPT (OpenAI), DeepSeek, Gemini (Google)
-**Changelog:** v0.2 — name established (Tenor); frozen verdict snapshot semantics explicit; Operation effects bound to EntityId; S3 split; TaggedUnion negation specified.
-**Changelog:** v0.3 — Duration type; cross-currency pattern (P4 resolved, no new construct); variable×variable multiplication (Rule layer only); ParallelStep; ElaboratorSpec; pending work list updated; AL updated.
+**Status:** v0.9 — Spec frozen. Core constructs canonicalized via [CFFP](https://github.com/riverline-labs/iap) (Constraint-First Formalization Protocol).
+**Method:** Human-AI collaborative design. See [`CONTRIBUTORS.md`](../CONTRIBUTORS.md).
+**Creator:** Brandon W. Bush
 
-> **Stability: Pre-release (v0.3)**  
-> This specification is under active development. Breaking changes may occur  
-> without notice. Conformance claims against pre-1.0 versions are not  
-> recognized by the project. Do not build production systems against this version.
+> **Stability: Frozen (v0.9)**
+> This specification is frozen. No breaking changes to existing construct
+> semantics will occur without a new CFFP run. Additive changes (new analysis
+> results, new interchange metadata) are permitted.
+>
+> v1.0 requires the System construct — a composition layer for multi-contract
+> systems (shared persona identity, cross-contract flow triggers, cross-contract
+> entity relationships). System requires a dedicated CFFP run.
+>
+> **Freeze date:** 2026-02-21
 
 ---
 
@@ -33,10 +37,24 @@
 14. Complete Evaluation Model
 15. Static Analysis Obligations
 16. Executor Obligations
-17. Pending Work
-18. Appendix A — Acknowledged Limitations
-19. Appendix B — Model Convergence Record
+17. Versioning & Migration
+    - 17.1 The Migration Problem
+    - 17.2 Breaking Change Taxonomy
+    - 17.3 Executor Migration Obligations
+    - 17.4 In-Flight Flow Migration Policy
+    - 17.5 Migration Contract Representation
+    - 17.6 Flow Migration Compatibility
+18. Contract Discovery & Agent Orientation
+    - 18.1 The Contract Manifest
+    - 18.2 Etag Semantics
+    - 18.3 Discovery Endpoint
+    - 18.4 Cold-Start Protocol
+    - 18.5 Change Detection
+    - 18.6 Dry-Run Evaluation
+    - 18.7 Executor Obligation Summary (E10-E14)
+19. Appendix A — Acknowledged Limitations
 20. Appendix C — Worked Example: Escrow Release Contract
+21. Appendix D — Glossary
 
 ---
 
@@ -188,9 +206,7 @@ Duration promotion rules (cross-unit arithmetic promotes to the smaller unit):
 
 ### 4.2.1 Text Comparison Is Exact Only
 
-Text values support only exact equality (`=`) and inequality (`≠`). Pattern matching operations — regex, substring, prefix/suffix, glob, wildcard — are not supported in any context: not in PredicateExpressions, not in Rule bodies, not in type constraints.
-
-**Why:** Pattern matching, particularly regex, introduces unbounded computation and can express non-regular languages. More fundamentally, classification based on text patterns is a business logic decision that should be explicit and statically analyzable. If a contract needs to distinguish values based on content patterns, that classification must be pre-computed into a Bool or Enum Fact by the executor, or modeled as an Enum Fact where each value carries its classification explicitly.
+Text values support only exact equality (`=`) and inequality (`≠`). Pattern matching operations — regex, substring, prefix/suffix, glob, wildcard — are not supported in any context. Pattern-based classification must be pre-computed into a Bool or Enum Fact by the executor.
 
 Incorrect:
 
@@ -230,8 +246,8 @@ type_check(v, Int(min, max))         = v ∈ ℤ ∧ min ≤ v ≤ max
 type_check(v, Decimal(p, s))         = v representable in fixed-point(p, s)
 type_check(v, Text(n))               = |v| ≤ n ∧ v is valid UTF-8
 type_check(v, Enum(vals))            = v ∈ vals
-type_check(v, Date)                  = v is valid ISO 8601 date
-type_check(v, DateTime)              = v is valid ISO 8601 datetime, UTC-normalized
+type_check(v, Date)                  = v is valid RFC 3339 full-date (YYYY-MM-DD)
+type_check(v, DateTime)              = v is valid RFC 3339 date-time, UTC-normalized
 type_check(v, Money(c))              = type_check(v.amount, Decimal) ∧ v.currency = c
 type_check(v, Record(fields))        = ∀ (name, type) ∈ fields: type_check(v[name], type)
 type_check(v, TaggedUnion(vars))     = v.tag ∈ vars ∧ type_check(v.payload, vars[v.tag])
@@ -428,9 +444,7 @@ Facts do not carry derivation provenance — they are the root. When a default i
 
 ### 5.5 No Aggregate Computation
 
-A common incorrect assumption is that aggregate functions (`sum`, `count`, `average`, `min`, `max`) can be computed over List-typed Facts within Rule bodies or PredicateExpressions. This is not permitted.
-
-**Why:** Rules produce verdicts from Facts and lower-stratum verdicts. A verdict is a logical conclusion — a statement about the state of the world that the contract derives. A sum over line items is not a verdict; it is a derived value of the same kind as the Facts themselves. Tenor has no construct for producing intermediate computed values that are not verdicts. The total belongs as a Fact because it is a statement about the world that the contract takes as given, not a logical consequence the contract derives. If a contract needs a total, it must arrive as a Fact from an external system.
+A common incorrect assumption is that aggregate functions (`sum`, `count`, `average`, `min`, `max`) can be computed over List-typed Facts within Rule bodies or PredicateExpressions. This is not permitted. Aggregates are derived values, not verdicts — they must arrive as Facts from external systems.
 
 Incorrect:
 
@@ -509,13 +523,12 @@ Rule bodies may contain variable × variable multiplication of Int-typed Facts. 
 
 ### 7.2 Verdict Definition
 
-Verdicts form a finite tagged set. Each verdict type has a name, a payload schema, and a declared precedence class.
+Verdicts form a finite tagged set. Each verdict type has a name and a payload schema.
 
 ```
 VerdictType = (
   name:             string,
-  payload_schema:   BaseType,
-  precedence_class: string
+  payload_schema:   BaseType
 )
 
 VerdictInstance = (
@@ -559,7 +572,9 @@ This fold terminates because the number of strata is finite and each stratum is 
 
 ### 7.5 Verdict Resolution
 
-The resolution function `resolve : Set<VerdictInstance> → ResolvedVerdictSet` is total, deterministic, explicitly specified in the contract, and provenance-preserving. Resolution does not implicitly merge incompatible verdict types. Any precedence or dominance relations must be explicitly declared and statically analyzable.
+The resolution function `resolve : Set<VerdictInstance> → ResolvedVerdictSet` is the identity on sets — it returns the accumulated verdict set produced by `eval_strata`. Resolution is total and deterministic because same-VerdictType conflicts are prohibited by static analysis (S8, §15). Each VerdictType in a conforming contract is produced by exactly one rule. The ResolvedVerdictSet therefore contains at most one VerdictInstance per VerdictType, and `verdict_present(X)` unambiguously identifies at most one instance with a well-defined payload.
+
+User-defined verdict precedence and resolution strategies are deferred to a future version (AL50).
 
 ### 7.6 Cross-Currency Conversion Pattern
 
@@ -590,7 +605,7 @@ rule eur_within_threshold {
 }
 ```
 
-Rate staleness is an executor obligation (E1). Multi-hop conversions require chained Rules across strata. Each conversion step is separately provenance-tracked.
+Rate staleness is an executor concern — E1 (§16.2) requires facts to come from genuinely external sources, but does not mandate freshness guarantees. Executors should document their staleness policies for time-sensitive facts such as exchange rates. Multi-hop conversions require chained Rules across strata. Each conversion step is separately provenance-tracked.
 
 ---
 
@@ -658,7 +673,7 @@ Persona constructs appear as items in the interchange `constructs` array with `"
     "file": "escrow.tenor",
     "line": 4
   },
-  "tenor": "0.3"
+  "tenor": "1.0"
 }
 ```
 
@@ -753,13 +768,11 @@ The execution sequence is fixed and invariant: (1) persona check, (2) preconditi
 - Operations do not produce verdict instances. Verdict production belongs exclusively to Rules.
 - Atomicity is an executor obligation. Either all declared state transitions for the produced outcome occur, or none do.
 - The executor must validate that the current entity state matches the transition source for each declared effect. This is an executor obligation not encoded in the Operation formalism.
-- Outcome exhaustiveness is a contract authoring obligation. The elaborator validates that Flow routing handles all declared outcomes (see §11.5), but cannot verify that the declared outcome set is exhaustive of all possible executor success-path behaviors. This parallels AL11 (source-state validation is an executor obligation).
+- Outcome exhaustiveness is a contract authoring obligation. The elaborator validates that Flow routing handles all declared outcomes (see §11.5), but cannot verify that the declared outcome set is exhaustive of all possible executor success-path behaviors. This parallels source-state validation (E2, §16.2).
 
 ### 9.4.1 No Wildcard Transitions
 
-Every effect must name an explicit source state and an explicit target state. Wildcard notation (e.g., `* -> approved`) is not permitted.
-
-**Why:** The executor has an explicit obligation (§16, E2) to validate that the current entity state matches the transition source for each declared effect before applying it. A wildcard would make this validation impossible — the executor would not know which source state to expect. If an operation should be invocable from multiple source states, the contract must either declare multiple operations each with a single explicit source state, or declare multiple effects in the same operation each with a different explicit source state. Multiple effects in one operation are applied atomically; the executor validates the current state against each declared source and applies the matching transition.
+Every effect must name an explicit source state and an explicit target state. Wildcard notation (e.g., `* -> approved`) is not permitted. Wildcards would prevent E2 source-state validation (§16). Operations invocable from multiple source states must declare multiple explicit effects.
 
 Incorrect:
 
@@ -821,7 +834,7 @@ Single-outcome Operation:
   "outcomes": ["approved"],
   "precondition": { "verdict_present": "account_active" },
   "provenance": { "file": "order.tenor", "line": 33 },
-  "tenor": "0.3"
+  "tenor": "1.0"
 }
 ```
 
@@ -840,7 +853,7 @@ Multi-outcome Operation with effect-to-outcome associations:
   "outcomes": ["approved", "rejected"],
   "precondition": { "verdict_present": "claim_eligible" },
   "provenance": { "file": "claims.tenor", "line": 15 },
-  "tenor": "0.3"
+  "tenor": "1.0"
 }
 ```
 
@@ -930,9 +943,7 @@ Scalar predicate evaluation is O(|expression tree|). Quantified predicate evalua
 
 ### 10.6 Entity State Is Not a Predicate Term
 
-A common incorrect assumption is that the current state of an Entity can be tested in a precondition using expressions like `Requisition.state = "draft"`. This is not permitted.
-
-**Why:** The term grammar in §10.2 defines the only legal atoms in PredicateExpressions: fact references, literals, verdict presence tests, and arithmetic expressions. Entity state is not in this grammar. Facts and verdicts are the only inputs to predicate evaluation. State is an output of Operations, not an input to Rules. If an operation should only be available in certain states, that constraint is enforced through the operation's effect declarations — the executor validates that the current state matches the source state of each declared transition before applying any effect.
+A common incorrect assumption is that the current state of an Entity can be tested in a precondition using expressions like `Requisition.state = "draft"`. This is not permitted. Entity state is not in the term grammar (§10.2) — state constraints are enforced through effect declarations and E2 source-state validation.
 
 Incorrect:
 
@@ -1145,6 +1156,24 @@ Where a Decimal result has more fractional digits than the declared scale, round
 
 Integer literals are typed as Int(n, n). Decimal literals are typed as Decimal(total_digits, fractional_digits) derived from the literal's written form.
 
+### 12.6 Implementation Bounds
+
+All conforming implementations must satisfy these bounds, regardless of language or numeric library used:
+
+| Property | Requirement |
+|----------|-------------|
+| Maximum significant digits | 28 |
+| Scale range | 0–28 (fractional digits) |
+| Maximum value | (2^96 − 1) × 10^−28 |
+| Minimum value | −(2^96 − 1) × 10^−28 |
+| Infinity | Not representable. Any operation producing infinity aborts with overflow error. |
+| NaN | Not representable. No operation produces NaN. |
+| Signed zero | Not representable. Zero has no sign. |
+| Rounding mode | Round half to even (IEEE 754 roundTiesToEven) — see §12.4 |
+| Overflow behavior | Abort with typed overflow error — see §12.3 |
+
+These bounds are derived from the reference implementation's numeric library but are stated here as language-level requirements. An implementation that satisfies these bounds is conforming regardless of which numeric library it uses internally. An implementation that delegates to native floating-point arithmetic is not conforming even if its results happen to match within these bounds for common inputs — the requirement is structural, not empirical.
+
 ---
 
 ## 13. ElaboratorSpec
@@ -1205,7 +1234,7 @@ Input: Typed ASTs, construct index, type environment. Output: Validation report.
 
 - Entity: initial ∈ states; transition endpoints ∈ states; hierarchy acyclic.
 - Operation: allowed_personas non-empty; all allowed_personas entries resolve to declared Persona constructs; effect entity_ids resolve; effect transitions exist in entity; effects ⊆ entity.transitions; outcomes non-empty; outcome labels unique within Operation; outcomes ∩ error_contract = ∅; for multi-outcome Operations, every effect has an outcome association referencing a declared outcome.
-- Rule: stratum ≥ 0; all refs resolve; verdict_refs reference strata < this rule's stratum; produce clauses reference declared VerdictType ids (unresolved VerdictType references are Pass 5 errors).
+- Rule: stratum ≥ 0; all refs resolve; verdict_refs reference strata < this rule's stratum; produce clauses reference declared VerdictType ids (unresolved VerdictType references are Pass 5 errors); no two Rules may produce the same VerdictType name (S8 — verdict uniqueness).
 - Flow: entry exists; all step refs resolve; all step persona fields resolve to declared Persona constructs; step graph acyclic; flow reference graph acyclic; all OperationSteps and SubFlowSteps declare FailureHandlers; all OperationStep outcome map keys are members of the referenced Operation's declared outcomes; OperationStep outcome handling is exhaustive (map keys = Operation's declared outcomes).
 - Parallel: branch sub-DAGs acyclic; no overlapping entity effect sets across branches (transitively resolved).
 - **Error attribution:** errors are reported at the source line of the specific field or sub-expression responsible for the violation (e.g., the `initial:` field line, not the `Entity` keyword line; the `verdict_present(...)` call line, not the enclosing `Rule` keyword line). This requires AST nodes at all levels — RawExpr variants, RawStep variants, construct sub-field lines — to carry their own source line, set by the parser at token consumption time and treated as immutable by all elaboration passes.
@@ -1213,7 +1242,7 @@ Input: Typed ASTs, construct index, type environment. Output: Validation report.
 **Pass 6 — Interchange serialization**
 Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON bundle.
 
-- Canonical construct order: Personas (alphabetical), VerdictTypes, Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical).
+- Canonical construct order: Personas (alphabetical), VerdictTypes, Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical). "Alphabetical" means lexicographic ordering of UTF-8 encoded byte sequences.
 - Serialize Operation `outcomes` as an array of strings preserving declaration order. For multi-outcome Operations, serialize each effect with an `"outcome"` field associating it with the declared outcome label.
 - Serialize Flow steps as an array. Entry step is first; remaining steps follow in topological order of the step DAG.
 - Sort all JSON object keys lexicographically within each construct document.
@@ -1238,7 +1267,7 @@ Every TenorInterchange bundle includes a `tenor_version` field at the top level.
   "id": "my_contract",
   "kind": "Bundle",
   "tenor": "1.0",
-  "tenor_version": "1.0.0"
+  "tenor_version": "1.1.0"
 }
 ```
 
@@ -1267,6 +1296,8 @@ The v0.3 to v1.0 transition is a major version bump. v1.0 interchange is not bac
 - Per-construct `tenor` field updated from `"0.3"` to `"1.0"`.
 - Bundle-level `tenor_version` field added (required, not present in v0.3).
 
+> **Note:** This section covers interchange **format** versioning (JSON structure changes). For contract **content** versioning (breaking changes to Facts, Entities, Rules, etc.), see §17 (Versioning & Migration).
+
 ### 13.3 Error Reporting Obligation
 
 Every elaboration error must identify: construct kind, construct id (if determinable), field name, source file, source line, and a human-readable description of the violation. Errors referencing internal elaborator state or elaborator-internal terminology are not conforming.
@@ -1282,6 +1313,7 @@ A conforming elaborator must pass all tests in the Tenor Elaborator Conformance 
 - **Shorthand expansion tests:** All shorthand forms must produce interchange identical to their fully explicit equivalents.
 - **Cross-file reference tests:** Multi-file bundles with cross-file refs that must resolve correctly.
 - **Parallel entity conflict tests:** Parallel blocks with overlapping entity effects that must be rejected.
+- **Verdict uniqueness tests:** Contracts with multiple rules producing the same VerdictType that must be rejected (S8).
 
 _Note: The Tenor Elaborator Conformance Suite is at `conformance/`. It is a prerequisite for any implementation to be declared conforming._
 
@@ -1374,11 +1406,7 @@ Every chain terminates at Facts. Facts are the provenance roots. No derivation p
 
 ### 14.5 No Built-in Functions
 
-Tenor provides no built-in functions. There is no `now()`, no `length()`, no `abs()`, no `sqrt()`, no string functions, no date arithmetic functions. All values that vary at runtime must enter the evaluation model through Facts.
-
-**Why:** Built-in functions would break closed-world semantics and introduce implicit dependencies on the execution environment. `now()` is not a fact about the contract — it is a fact about the moment of evaluation, and must be provided as a Fact by the executor. Time-relative reasoning (e.g., "is this delegation currently valid?") is expressed by comparing DateTime Facts, not by invoking runtime functions.
-
-Note: `len(list)` defined in §4.2 is an operator on a ground term — it returns a value derived from a Fact already in the FactSet. It is not a built-in function that queries external state.
+Tenor provides no built-in functions. There is no `now()`, no `length()`, no `abs()`, no `sqrt()`, no string functions, no date arithmetic functions. All values that vary at runtime must enter the evaluation model through Facts. (`len(list)` in §4.2 is an operator on a ground term, not a built-in function.)
 
 Incorrect:
 
@@ -1431,21 +1459,17 @@ A stronger version of S3a: for each Entity state and each persona, determine whe
 
 **S7 — Evaluation complexity bounds.** For each PredicateExpression, the evaluation complexity bound is statically derivable. For each Flow, the maximum execution depth is statically derivable.
 
+**S8 — Verdict uniqueness.** For each VerdictType name, at most one Rule in the contract may declare a `produce` clause for that VerdictType. If two or more Rules (at any stratum) produce the same VerdictType name, the contract is statically rejected. This is a structural check — it does not require predicate satisfiability analysis or reachability reasoning. S8 is enforced during Pass 5.
+
+> **Design note:** Contracts that require conditional production of the same logical verdict from different rules should use distinct VerdictType names for each condition and, if needed, a higher-stratum aggregation rule. This preserves explicit provenance and avoids the need for a runtime resolution strategy.
+
 ---
 
 ## 16. Executor Obligations
 
 ### 16.1 The Conformance Gap
 
-Tenor provides formal guarantees **conditional on executor conformance**. This conditionality is not a minor caveat — it is a structural property of the language that must be understood before building on it.
-
-The language describes a closed world. Its evaluation model is fully specified, deterministic, and statically analyzable. But the foundations of that closed world — the actual values that populate Facts, the actual atomicity of state transitions, the actual isolation of Flow snapshots — depend on an open world: the executor, the storage substrate, and the runtime environment.
-
-Where executor obligations are not met, the provenance chain is **corrupt**, not merely incomplete. A corrupt provenance chain is indistinguishable from a valid one at the language level. Tenor cannot detect non-conformance internally. The formal guarantees — determinism, closed-world semantics, provenance-as-theorem — hold only within the boundary of a conforming executor. Outside that boundary, they do not hold, and the language provides no mechanism to detect the violation.
-
-This is not a temporary limitation to be resolved in a future version. It is the same gap that exists in every formal contract language that relies on external state. The appropriate response is to build attestation and verification mechanisms in the executor layer — not to expect the language to close the gap from within.
-
-Implementers building on Tenor should treat E1, E3, and E4 in particular as **trust boundaries**, not implementation details.
+Tenor's formal guarantees hold **conditional on executor conformance**. The language describes a closed world, but its foundations — Fact values, transition atomicity, snapshot isolation — depend on the executor and runtime environment. Where executor obligations are not met, the provenance chain is **corrupt**, not merely incomplete, and Tenor cannot detect non-conformance internally. Implementers should treat E1, E3, and E4 in particular as **trust boundaries**, not implementation details.
 
 ### 16.2 Obligation Definitions
 
@@ -1473,176 +1497,682 @@ All arithmetic must use fixed-point decimal arithmetic per the NumericModel. Flo
 **E8 — Branch isolation** _(trust boundary)_  
 Parallel branches execute under the parent Flow's snapshot. No branch sees entity state changes produced by another branch during execution. Branch execution order is implementation-defined. The executor must enforce branch isolation — the language cannot detect violations of this obligation.
 
-**E9 — Join evaluation after full branch completion.**  
+**E9 — Join evaluation after full branch completion.**
 The join step evaluates after all branches have reached a terminal state. The join condition is evaluated against the set of branch terminal outcomes. Order of branch completion does not affect join outcome.
 
----
-
-## 17. Pending Work
-
-**Resolved in v0.3:**
-
-**P1 — Syntax definition.** Tenor v1.0 defined. See construct sections for DSL syntax; Appendix C for a complete worked example.
-
-**P2 — Parallel execution semantics.** Resolved via ParallelStep (§11.2).
-
-**P3 — Duration type.** Resolved via Duration BaseType (§4).
-
-**P4 — Cross-currency Money operations.** Resolved via Rule-layer conversion pattern (§7.6).
-
-**P6 — Variable × variable multiplication.** Resolved; restricted to Rule produce clauses with range containment check (§7).
-
-**Resolved in v1.0:**
-
-**P8 — Persona declaration.** Persona is now a first-class declared construct (§8). Previously, persona identifiers were bare strings in Operation `allowed_personas` and Flow step `persona` fields with no declaration requirement. In v1.0, all persona references must resolve to declared Persona constructs. Formalized via CFFP (see `docs/cffp/persona.json`).
-
-**P7 — Operation outcome typing.** Operations now declare named outcome types (§9.1). The outcome set is a non-empty, finite, closed set of outcome labels per Operation. Flow OperationStep routing references declared outcomes with exhaustive handling required (§11.5). The previous ad-hoc outcome classification (AL13) is superseded. Formalized via CFFP (see `docs/cffp/p7-outcome-typing.json`).
-
-**P5 — Shared type library.** Record and TaggedUnion types can be declared in shared type library files and imported by contracts (§4.6). Type libraries are self-contained leaf files in the import graph (no imports within type libraries). Type identity is structural — imported types are fully inlined during elaboration and do not appear in interchange. Formalized via CFFP (see `docs/cffp/p5-shared-types.json`). Scoped-down canonical form: module federation, generic type parameters, type library composition, namespace prefixing, and selective imports are deferred to v2.
-
-**Deferred to v2:**
+> **Migration obligations:** When deploying updated contract versions, executors have additional obligations beyond E1-E9. See §17.3 for migration-specific obligations M1-M8, including breaking change detection, migration policy declaration, and entity state migration.
 
 ---
 
-## Appendix A — Acknowledged Limitations
+## 17. Versioning & Migration
+
+### 17.1 The Migration Problem
+
+Tenor's closed-world semantics (C5) mean that any change to a contract's content is visible and classifiable. This section defines **what** constitutes a breaking change and **what** obligations executors have when deploying a new version. It does not prescribe **how** to implement migration. This section covers **business logic content** versioning (Facts, Entities, Rules, etc.), not interchange **format** versioning (§13.2.1).
+
+### 17.2 Breaking Change Taxonomy
+
+Changes between two contract versions are classified into three categories:
+
+- **BREAKING**: The change may invalidate existing executor behavior, entity state, or in-flight flows. Executors deploying a contract version with BREAKING changes must declare a migration policy (§17.4).
+- **NON_BREAKING**: The change is safe — no existing executor behavior is affected. Executors may deploy the new version without a migration policy declaration.
+- **REQUIRES_ANALYSIS**: The change's impact depends on value-level analysis (typically predicate strength comparison) that cannot be resolved by structural inspection alone. Changes classified as REQUIRES_ANALYSIS must be treated as BREAKING unless static analysis (S1-S7 per §15) proves them non-breaking for the specific contract pair.
+
+For each change, the taxonomy separately assesses: impact on **new flow initiations** (flows started under the new contract version) versus impact on **in-flight flows** (flows initiated under the old contract version that have not yet reached a terminal state). Frozen verdict semantics (§14) provide natural isolation at the verdict layer — in-flight flow snapshot verdicts are immutable, so Rule and Fact changes do not affect in-flight flow verdicts. However, Operation execution against live entity state IS affected by Entity state changes and Operation definition changes.
+
+The taxonomy is exhaustive: every (construct_kind, field, change_type) triple that is representable in the interchange schema has a classification (MI4). The classification function is decidable: given a diff entry, the classification is a static lookup — no runtime information is needed (MI3).
+
+#### 17.2.1 Fact Changes
+
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| id | NON_BREAKING: No existing construct references a new Fact. | BREAKING: Rules and Operations may reference this Fact via `fact_ref`; in-flight flows with frozen snapshots referencing this Fact lose their data source. | N/A (id is identity) |
+| type | N/A (part of add) | N/A (part of remove) | **Widen** (larger range, more Enum values): NON_BREAKING — all existing values remain valid. **Narrow** (smaller range, fewer Enum values): BREAKING — existing values may be invalid. **Base type change**: BREAKING — expression type-checking changes. In-flight: verdict-layer isolated (frozen snapshot), but new flow initiations affected. |
+| source | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Source is executor metadata (§5.2), not evaluation semantics. Changing `source.system` or `source.field` does not affect `eval_pred` or `eval_strata`. |
+| default | N/A (part of add) | N/A (part of remove) | **Add default**: NON_BREAKING — provides fallback where none existed. **Remove default**: BREAKING — Facts without values now fail assembly. **Change default value**: REQUIRES_ANALYSIS — may change evaluation outcomes depending on whether the default is exercised. |
+| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Provenance is debugging metadata, not evaluation semantics. |
+| kind | N/A | N/A | N/A (discriminator constant, cannot change within same construct type). |
+| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation, not evaluation semantics. |
+
+#### 17.2.2 Entity Changes
+
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| id | NON_BREAKING: No existing construct references a new Entity. | BREAKING: Operations with effects on this Entity are invalid; Flows with steps transitioning this Entity break; in-flight flows with active entity state lose their target. | N/A (id is identity) |
+| states | N/A (part of add) | N/A (part of remove) | **Add state**: NON_BREAKING — existing transitions unaffected, new paths available. **Remove state**: BREAKING — entities in the removed state are orphaned, Operations with transitions from/to the removed state are invalid, in-flight flows in the removed state cannot continue. |
+| initial | N/A (part of add) | N/A (part of remove) | BREAKING: New entity instances start in a different state. Existing instances are unaffected, but Flow logic expecting a specific initial state may break. |
+| transitions | N/A (part of add) | N/A (part of remove) | **Add transition**: NON_BREAKING — new paths available, existing paths unchanged. **Remove transition**: BREAKING — Operations using this transition are invalid, in-flight flows needing this transition cannot proceed. |
+| parent | N/A (part of add) | N/A (part of remove) | **Add parent**: REQUIRES_ANALYSIS — depends on propagation semantics, may introduce new state dependencies. **Remove parent**: REQUIRES_ANALYSIS — removes propagation chain, may orphan dependent behavior. **Change parent**: BREAKING — DAG structure and propagation changes, in-flight entity state hierarchies disrupted. |
+| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata. |
+| kind | N/A | N/A | N/A (discriminator constant). |
+| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation. |
+
+#### 17.2.3 Rule Changes
+
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| id | REQUIRES_ANALYSIS: Adding a Rule at stratum 0 is NON_BREAKING (no cross-stratum impact on new verdicts). Adding at higher strata may shadow or conflict with existing Rules' verdict production. In-flight: frozen snapshot means existing verdicts unaffected; new flow initiations may see different verdict sets. | BREAKING: Verdicts this Rule produced are no longer available. Operations and Rules referencing `verdict_present()` for this Rule's verdict types may never fire. Cascading impact on all downstream consumers. | N/A (id is identity) |
+| stratum | N/A (part of add) | N/A (part of remove) | BREAKING: Evaluation order changes. Rules at higher strata depend on verdicts from lower strata. Reordering strata can change which verdicts are available when a Rule evaluates, producing different verdict sets. |
+| body.when | N/A (part of add) | N/A (part of remove) | REQUIRES_ANALYSIS: Predicate change may widen (more verdicts produced — NON_BREAKING for downstream consumers) or narrow (fewer verdicts — BREAKING for downstream consumers expecting them). Static comparison of predicate strength is undecidable in general. Conservative classification. |
+| body.produce.verdict_type | N/A (part of add) | N/A (part of remove) | BREAKING: Downstream Rules and Operations referencing this verdict type via `verdict_present()` are affected. Changing the verdict type breaks all consumers of the original verdict. |
+| body.produce.payload.type | N/A (part of add) | N/A (part of remove) | BREAKING: Consumers of this verdict expect a specific payload type. Changing the type breaks payload extraction. |
+| body.produce.payload.value | N/A (part of add) | N/A (part of remove) | BREAKING: Different verdict values may cause different downstream behavior (threshold comparisons, routing decisions). |
+| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata. |
+| kind | N/A | N/A | N/A (discriminator constant). |
+| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation. |
+
+#### 17.2.4 Persona Changes
+
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| id | NON_BREAKING: No existing construct references a new Persona. | BREAKING: Operations and Flows referencing this Persona in `allowed_personas`, step `persona` fields, and HandoffStep `from_persona`/`to_persona` are invalid. | N/A (id is identity) |
+| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata. |
+| kind | N/A | N/A | N/A (discriminator constant). |
+| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation. |
+
+#### 17.2.5 Operation Changes
+
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| id | NON_BREAKING: No existing Flow references a new Operation. | BREAKING: Flows with OperationSteps referencing this Operation are invalid; in-flight flows at steps invoking this Operation cannot proceed. | N/A (id is identity) |
+| allowed_personas | N/A (part of add) | N/A (part of remove) | **Add persona**: NON_BREAKING — widens authority, all previously authorized Personas remain authorized. **Remove persona**: BREAKING — narrows authority, existing Flows using the removed Persona at this Operation's steps will fail authorization. |
+| precondition | N/A (part of add) | N/A (part of remove) | REQUIRES_ANALYSIS: **Weaken** (more permissive) is NON_BREAKING — all previously valid invocations still valid. **Strengthen** (more restrictive) is BREAKING — previously valid invocations may now fail. Static determination of weaken vs. strengthen is undecidable for arbitrary predicate expressions. |
+| effects | N/A (part of add) | N/A (part of remove) | **Add effect** (new entity): NON_BREAKING — does not invalidate existing effects. **Remove effect**: BREAKING — entity state transitions no longer occur, in-flight flows expecting these transitions will have incorrect entity states. **Change effect** (different from/to): BREAKING — different state transition behavior, in-flight flows at this Operation step will transition entities to unexpected states. |
+| outcomes | N/A (part of add) | N/A (part of remove) | **Add outcome**: BREAKING — exhaustive handling in Flows (§11.5) means all OperationSteps referencing this Operation must handle the new outcome. Existing Flows that do not handle the new outcome are invalid. **Remove outcome**: BREAKING — Flows handling this outcome have dead routing paths. |
+| error_contract | N/A (part of add) | N/A (part of remove) | **Add error type**: NON_BREAKING — new failure modes, existing handling unaffected. **Remove error type**: REQUIRES_ANALYSIS — if failure handlers reference specific errors, removing an error type may leave dead handler code. |
+| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata. |
+| kind | N/A | N/A | N/A (discriminator constant). |
+| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation. |
+
+#### 17.2.6 Flow Changes
+
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| id | NON_BREAKING: No existing construct references a new Flow (unless SubFlowStep). | BREAKING: SubFlowSteps referencing this Flow are invalid; in-flight instances of this Flow are orphaned by the contract. | N/A (id is identity) |
+| entry | N/A (part of add) | N/A (part of remove) | BREAKING: Different execution path for new flow initiations. In-flight flows are unaffected (they already passed entry). |
+| steps | N/A (part of add) | N/A (part of remove) | **Add step**: REQUIRES_ANALYSIS — depends on whether existing routing paths are modified. If the new step is reachable only via new routing, NON_BREAKING. If inserted into existing paths, BREAKING. **Remove step**: BREAKING — references to the removed step from other steps' outcome routing or branch targets are invalid. In-flight flows currently at or routing through the removed step cannot proceed. **Change step** (routing, persona, operation): BREAKING — different execution paths, authority, or Operation invocation for Flows reaching this step. |
+| snapshot | N/A (part of add) | N/A (part of remove) | BREAKING: Changes when verdicts are frozen. Currently always `at_initiation` in v1.0, so any change violates the v1.0 spec. |
+| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata. |
+| kind | N/A | N/A | N/A (discriminator constant). |
+| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation. |
+
+### 17.3 Executor Migration Obligations
+
+The following obligations parallel E1-E9 in §16.2 but are specific to contract version transitions. An executor that supports deploying updated contract versions must satisfy these obligations.
+
+- **M1 — Breaking change detection.** An executor MUST be able to determine whether a contract version transition contains breaking changes by applying the taxonomy from §17.2 to the structural diff between two interchange bundles. The diff compares every field of every construct in both bundles, keyed by `(kind, id)` — not by array position (MI1, MI2).
+
+- **M2 — Migration policy declaration.** An executor deploying a new contract version with any BREAKING changes (as classified by §17.2) MUST declare an in-flight flow migration policy per §17.4 (MI5).
+
+- **M3 — No silent breaking deployment.** An executor MUST NOT silently deploy a contract version with BREAKING changes without migration policy declaration. Deployment of a breaking change without a declared policy is a conformance violation (MI5).
+
+- **M4 — Entity state migration.** An executor MUST validate that all entities in states removed by the new contract version have been migrated before completing the transition. Entities in removed states are orphaned — no Operation in the new contract can transition them, and no Flow step can reference them.
+
+- **M5 — In-flight flow coverage.** An executor MUST validate that all in-flight flows referencing removed or changed constructs are handled per the declared migration policy. No in-flight flow may be silently abandoned or left in an inconsistent state (MI7).
+
+- **M6 — Conservative REQUIRES_ANALYSIS handling.** Changes classified as REQUIRES_ANALYSIS MUST be treated as BREAKING unless static analysis (S1-S7 per §15) proves them non-breaking for the specific contract pair. An executor that cannot perform S1-S7 analysis must treat all REQUIRES_ANALYSIS classifications as BREAKING (MI3).
+
+- **M7 — Diff noise field exclusion.** The structural diff used for breaking change detection MUST exclude `provenance` and `line` fields from comparison. These fields are debugging metadata and do not affect evaluation semantics. Changes to provenance or line numbers alone do not constitute a contract change.
+
+- **M8 — Set-semantic comparison for primitive arrays.** Fields that represent unordered sets (`states`, `allowed_personas`) MUST be compared as sets, not as ordered arrays. Reordering elements within these fields is not a change.
+
+### 17.4 In-Flight Flow Migration Policy
+
+When a contract version transition contains BREAKING changes (per §17.2, classified by M1), the executor MUST declare one of three migration policies before the new version becomes active:
+
+**1. Blue-Green.** New flow initiations use the new contract version. In-flight flows (initiated under the old version) complete execution under the old version. No in-flight flow is affected by the breaking changes. The executor must maintain both contract versions simultaneously until all in-flight flows under the old version reach terminal states. This policy provides the strongest isolation but requires the highest resource overhead (two concurrent contract version environments).
+
+**2. Force-Migrate.** All in-flight flows transition to the new contract version. The executor MUST handle the consequences of breaking changes: entities in removed states must be migrated to valid states, Operations with changed effects must be re-evaluated, Flows at removed steps must be routed to valid steps. The executor bears full responsibility for data consistency during the transition. This is the most complex policy and places the highest burden on the executor. See §17.6 for the formal conditions under which force-migration is safe for a specific flow instance.
+
+**3. Abort.** In-flight flows that traverse any construct affected by a breaking change are terminated with a `migration_aborted` failure outcome. Flows that do not traverse affected constructs continue under the new version. The executor must identify affected flows and terminate them gracefully. This is the simplest policy but may lose in-progress work.
+
+**Policy constraints:**
+
+- The policy is a **deployment concern**, not a contract concern. It does not appear in `.tenor` source files or interchange JSON. It does not affect evaluation semantics, verdict resolution, or any contract-level behavior (MI6). The policy is consumed by the executor's deployment infrastructure, not by the evaluation model.
+- The policy must address **all** in-flight flows, not a subset. Per-flow-type policies are permitted (e.g., abort Flow type A, blue-green Flow type B) but every active flow type must have a declared policy (MI7).
+- The spec does not prescribe which policy to use — only that one MUST be declared when BREAKING changes exist (MI5).
+- Frozen verdict semantics (§14) provide natural isolation at the verdict layer: in-flight flow snapshot verdicts are immutable, so Rule and Fact changes do NOT affect in-flight flow verdicts. However, Operation execution against live entity state IS affected by Entity state changes and Operation definition changes. The Blue-Green policy leverages verdict isolation fully; the Force-Migrate and Abort policies must account for entity state and Operation definition changes.
+
+### 17.5 Migration Contract Representation
+
+The migration output between two contract versions is expressed as a hybrid representation (selected via CFFP, Candidate C — see `docs/cffp/migration-semantics.json`):
+
+**Primary output — DiffEntry JSON** (`tenor diff`): The authoritative diff output is structured JSON. Each change is a `DiffEntry` keyed by `(construct_kind, construct_id)` with field-level before/after values. The DiffEntry format is produced by `tenor diff` and is always complete, deterministic, and correct (MI1, MI2). The breaking change classification is a pure function applied to each DiffEntry field: `classify(kind, field, change_type)` returns the taxonomy classification from §17.2.
+
+**Secondary output — Tenor migration contract** (`tenor diff --migration`): An optional supplementary output generates a valid Tenor contract from the diff. The migration contract uses existing v1.0 constructs with conventionalized naming:
+
+- **Facts** encode diff data — each changed construct becomes a set of typed Facts (construct_kind, construct_id, change_type, field before/after values) with conventionalized source bindings (`system: "tenor-diff"`).
+- **Rules** encode taxonomy classifications — each taxonomy entry becomes a Rule that matches on the appropriate `(construct_kind, field, change_type)` pattern and produces a classification verdict.
+
+The migration contract is **classification-only** in v1.0. Migration orchestration (Operations that execute migration actions, Flows that sequence multi-step migrations) would require meta-level constructs not present in the v1.0 spec and is deferred to v2.
+
+**Authoritative relationship:** The DiffEntry JSON is always authoritative. The migration contract is derived from the DiffEntry output (one-way dependency) and is supplementary. Both representations produce equivalent breaking change classifications; when the DiffEntry JSON and migration contract disagree, the DiffEntry JSON is canonical.
+
+**Acknowledged limitations of migration contracts:**
+
+- Cannot express arbitrary type changes involving complex types (Record, TaggedUnion, nested List). Only simple type parameter changes (Int min/max, Decimal precision/scale, Enum value addition/removal) are faithfully representable as Tenor Facts.
+- Cannot perform predicate strength comparison. All precondition and predicate expression changes are conservatively classified as REQUIRES_ANALYSIS.
+- Are self-contained — they do not import the contracts they migrate. All diff data is encoded as internal Facts with conventionalized source bindings (MI1 completeness via self-containedness rather than cross-contract referencing).
+- Are not composable in v1.0. Transitive migration (v1-to-v3 via v1-to-v2 + v2-to-v3) requires direct diffing of endpoint versions. This is a v1.0 implementation constraint, not a fundamental design limitation: classification-only contracts do not carry enough state information to compose. Once migration contracts gain orchestration capabilities in v2 (Operations executing migration actions, Flows sequencing steps), composition becomes tractable — a completed v1-to-v2 migration produces a known state, which can be diffed against v3 to yield v2-to-v3. The composition model is sequential execution, not algebraic contract combination. See AL40.
+- Generation must follow canonical ordering rules (alphabetical Fact ids, deterministic Rule ids, canonical construct ordering) to ensure deterministic output across different generators (MI2).
+
+### 17.6 Flow Migration Compatibility
+
+Flows are long-lived stateful processes that may outlive deployment cycles. A flow initiated under contract v1 may still be executing when contract v2 is deployed. When an executor uses the Force-Migrate policy (§17.4), it must determine per-flow-instance whether migration is safe. This section defines the formal conditions.
+
+#### 17.6.1 Position and Reachable Paths
+
+A flow instance's **position** is the step where it is currently waiting:
+
+```
+Position(flow_instance) = step_id
+```
+
+The **reachable paths** from a position are all execution paths from that step to a terminal state, computed using v2's step graph:
+
+```
+ReachablePaths(v2_flow, position) = { path | path is a sequence of steps
+    from position to Terminal(success) or Terminal(failure)
+    following v2's routing edges }
+```
+
+Reachable paths are computed per S6 (§15). The v1 step graph determines the current position; all forward analysis uses v2's definitions, since the migrated flow executes under v2.
+
+For each step type, the path computation branches as follows:
+- **OperationStep:** one successor per declared outcome in v2's operation definition.
+- **BranchStep:** two successors (if_true, if_false).
+- **SubFlowStep:** success path + failure handler path. The referenced sub-flow's reachable paths are computed recursively.
+- **ParallelStep:** Cartesian product of branch paths, plus the join step.
+
+#### 17.6.2 Step Equivalence
+
+A v1 step at the current position has a v2 equivalent if and only if:
+
+1. v2 contains a step with the same step id.
+2. The v2 step references the same operation (by operation id).
+3. The v2 step's persona is authorized for the operation under v2's definitions (the persona exists in v2's persona declarations and is in the operation's `allowed_personas` in v2).
+
+Routing is NOT part of step equivalence. The migrated flow uses v2's routing definitions at and after the current position.
+
+#### 17.6.3 Compatibility Conditions
+
+A flow instance at position p in contract v1 is **force-migratable** to contract v2 if and only if ALL three conditions hold:
+
+**Condition 1 — Forward Path Existence (FMC1).** For every step in ReachablePaths(v2, p), there exists a step in v2 with equivalent semantics per §17.6.2. This ensures the flow can reach a terminal state under v2. Note that reachable paths are computed from the current position using **v2's** step graph, not v1's (§17.6.1). Routing changes at or after the current position are evaluated under v2's semantics — a step removed in v2 is not reachable; a step added in v2 may introduce new dependencies checked by FMC2.
+
+**Condition 2 — Data Dependency Satisfaction (FMC2).** For every step s in ReachablePaths(v2, p), all data dependencies of s's operation under v2 are satisfiable from the execution context established by v1's partial execution:
+
+- **(a) Fact dependencies:** Every `fact_ref` in the operation's precondition must have a value in the frozen snapshot (taken at v1 flow initiation per §14), or the fact must have a declared default in v2.
+- **(b) Verdict dependencies:** Satisfied by construction. The frozen verdict snapshot is immutable (§14). Changes to Rule definitions, Fact types affecting verdict production, or Rule removal in v2 do not affect verdicts already frozen in the snapshot. Verdict-layer changes are categorically safe for in-flight flows (see §17.6.5).
+- **(c) Entity state dependencies:** The entity state required as a transition source by the operation's effects must be the current state of the entity (as established by v1 execution) or reachable from the current state via v2's declared transitions. Checked by Layer 2 (§17.6.6).
+- **(d) Persona authorization:** The step's persona must be in the operation's `allowed_personas` under v2's definitions.
+
+**Condition 3 — Entity State Equivalence (FMC3).** For every entity e referenced by any step in ReachablePaths(v2, p):
+
+- The current state of e (as established by v1 operations executed before position p) must be a member of v2's entity declaration for e.
+- All entity states that are transition targets of v2 operations in the reachable path must be declared in v2's entity definition.
+- Transitions from the current state to those targets must exist in v2's transition declarations.
+
+#### 17.6.4 Directional Asymmetry (FMC4)
+
+The compatibility function must account for a structural asymmetry between v1's executed path and v2's expected path. When v2 introduces new steps between existing steps, or changes existing steps to have stronger preconditions, the new data dependencies may reference state (facts, verdicts, entity states) that v1's execution path never established because v1 never executed the steps that would produce them.
+
+Forward path existence (FMC1) alone is insufficient. A path may exist structurally in v2 but be unexecutable because its data dependencies assume a v2-specific execution history that the v1 flow does not have. FMC2 captures this: the data dependency check evaluates v2's dependencies against v1's actual execution context (frozen snapshot plus current entity states), not against v2's assumed execution context.
+
+**Example:** v1 flow: step_confirm -> step_check_threshold -> step_auto_release -> Terminal(success). v2 inserts step_compliance_check between step_confirm and step_check_threshold, and step_auto_release in v2 now requires `verdict_present(compliance_cleared)`. A v1 flow at step_check_threshold has a compatible forward path (step_check_threshold and step_auto_release exist in v2). However, FMC2 fails: the compliance_cleared verdict was never produced because the v1 flow never executed step_compliance_check. The directional asymmetry makes FMC2 the hardest condition to verify — it requires analyzing what WOULD have been produced by steps the flow has already passed.
+
+#### 17.6.5 Frozen Verdict Layer Isolation
+
+The frozen verdict snapshot (§14) provides natural isolation at the verdict layer. Changes to Rules and Facts do NOT affect the frozen snapshot of an in-flight flow — verdicts were computed at initiation time and are immutable. This means Rule/Fact changes never cause FMC2 failures for verdict dependencies.
+
+However, entity state changes (live) and operation definition changes (evaluated at step execution time) ARE affected and must be checked. This insight means the compatibility analysis can skip the verdict layer entirely.
+
+#### 17.6.6 Three-Layer Analysis Model
+
+The compatibility check decomposes into three analysis layers corresponding to Tenor's isolation properties:
+
+**Layer 1 — Verdict isolation.** ALWAYS PASSES for in-flight flows. The frozen verdict snapshot (§14) is immutable. Changes to Rule definitions, Fact types, or Rule removal in v2 do not affect verdicts already in the snapshot. This is a theorem of Tenor's evaluation model, not an assumption.
+
+**Layer 2 — Entity state equivalence.** Checks FMC3. Entity states are live (mutable by operations), not frozen. For each entity e referenced in ReachablePaths(v2, p):
+
+- Verify `current_state(e)` is in `v2.entities[e].states`.
+- Verify all transition targets needed by v2 operations in the reachable path are declared in `v2.entities[e].transitions`.
+- Verify transitions from `current_state(e)` to required target states exist in v2.
+
+If any check fails: return `incompatible(layer=2, entity=e, reason)`.
+
+**Layer 3 — Operation/flow structure.** Checks FMC1 + FMC2 (minus verdict dependencies, which are handled by Layer 1). For each step s in ReachablePaths(v2, p):
+
+- **Step equivalence:** v2 has step s with the same operation id. `s.persona` is in v2's `operation.allowed_personas`.
+- **Fact dependencies:** Every `fact_ref` in v2's operation precondition is present in `frozen_snapshot.facts` OR has a declared default in v2.
+- **Persona authorization:** `s.persona` exists in v2's persona declarations.
+- **SubFlowStep:** Recursively check the referenced sub-flow at its entry point.
+- **ParallelStep:** Check all branches independently; all must pass.
+
+If any check fails: return `incompatible(layer=3, step=s, reason)`.
+
+Evaluation order: Layer 1 (trivial — no computation), Layer 2 (entity state — set membership checks), Layer 3 (structure and dependencies — graph traversal). Short-circuit on first failure.
+
+#### 17.6.7 Position Sensitivity (FMC5)
+
+Flow compatibility is a function of:
+
+```
+compatible(v1_flow, v2_flow, position, entity_states, snapshot)
+    -> Compatible | Incompatible(layer, location, reasons)
+```
+
+It is NOT a static property of two flow definitions. A flow may be compatible at one position and incompatible at another. Compatibility analysis must be performed per-flow-instance, not per-flow-type, because each instance has a specific position and entity state context.
+
+**Example:** v2 removes entity state `cancelled` from an Order entity. A flow instance at step_submit_order (Order in state `draft`, no future path transitions to `cancelled`) is compatible. A flow instance at step_cancel_order (which transitions Order to `cancelled`) is incompatible. Same flow definition pair, different results.
+
+#### 17.6.8 Recursive Sub-Flow Compatibility (FMC6)
+
+If the reachable path from position p includes a SubFlowStep referencing sub-flow F, then F must be compatibility-checked at its entry point under the same conditions (same frozen snapshot, same entity state context). Compatibility checking is transitive through the flow reference DAG. The DAG is acyclic (Tenor spec constraint, §11.5), so the transitive check terminates.
+
+#### 17.6.9 Semantic Non-Interference (FMC7)
+
+The compatibility analysis is a deployment-time static check with no side effects. It does not modify flow execution semantics, entity states, snapshots, or verdicts under either v1 or v2. A flow that passes the compatibility check executes under v2 semantics exactly as if it had been initiated under v2. A flow that fails the compatibility check continues under v1 semantics (or is aborted, depending on executor policy) with no change to its evaluation model.
+
+#### 17.6.10 Flow-Level Refinement of Breaking Changes
+
+Flow-level compatibility refines the construct-level breaking change taxonomy (§17.2). A construct-level BREAKING change (e.g., a new operation outcome per §17.2.5) may be flow-level COMPATIBLE if v2's flow definition already handles the change. The construct-level taxonomy provides the initial signal; the flow-level check provides per-instance refinement.
+
+#### 17.6.11 Conservative and Aggressive Analysis
+
+**Conservative analysis (REQUIRED):** Data dependency satisfaction considers only the frozen snapshot and current entity states. Dependencies not present in these sources fail the check. This may reject migrations that are actually safe (false negatives).
+
+**Aggressive analysis (OPTIONAL):** Additionally considers dependencies satisfiable from v2 steps that MUST execute before the dependent step (path dominance analysis). If step A always executes before step B on every path from the current position, and step A produces a verdict that step B requires, the dependency is satisfied by intra-path production. Aggressive analysis reduces false negatives at the cost of implementation complexity.
+
+#### 17.6.12 Coexistence Layer Pattern
+
+When an executor declares Force-Migrate policy and some flow instances fail the compatibility check, the executor MAY implement a coexistence layer (informally called v1.5):
+
+- New flow initiations execute under v2.
+- Compatible in-flight flow instances are force-migrated to v2.
+- Incompatible in-flight flow instances continue executing under v1.
+- When a v1-retained flow reaches a terminal state, its results are translated to v2's output format if needed.
+
+The coexistence layer is an **executor implementation strategy**, not a spec-level obligation. The spec defines the compatibility conditions; how the executor handles incompatible instances is an executor choice (blue-green, abort, coexistence, or other strategies). The coexistence pattern generalizes blue-green (all on v1) and force-migrate (all on v2) by allowing mixed assignment based on per-instance compatibility analysis.
+
+---
+
+## 18. Contract Discovery & Agent Orientation
+
+This section specifies how executors expose contracts to agents and how agents
+orient themselves against a running executor. These are executor obligations and
+interchange metadata additions — no new language constructs are introduced and
+no existing construct semantics are modified.
+
+The design constraint driving this section: the preamble's core semantic
+requirement ("any agent that can read this specification can fully understand a
+system described in it, without reading any implementation code") implies the
+agent must first be able to *find* the interchange bundle. Without a prescribed
+discovery mechanism, every executor invents its own, and agents cannot
+generalize across executors. This section closes that gap.
+
+---
+
+### 18.1 The Contract Manifest
+
+The contract manifest is a JSON document that exposes a Tenor interchange bundle
+at a well-known location. It is the entry point for agent cold-start and the
+source of truth for change detection.
+
+```
+TenorManifest = {
+  tenor:          string,               // manifest schema version, e.g. "1.1"
+  etag:           string,               // SHA-256 hex digest of canonical bundle bytes
+  bundle:         TenorInterchange,     // the full interchange bundle, inlined
+  capabilities?:  ExecutorCapabilities  // optional executor capability advertisement
+}
+
+ExecutorCapabilities = {
+  migration_analysis_mode: "conservative" | "aggressive"
+}
+```
+
+The `capabilities` field is optional. Static file servers and pre-v1.1 manifests
+omit it. Dynamic executors that evaluate Operations, execute Flows, and apply
+entity state transitions include it. The `ExecutorCapabilities` object is
+explicitly extensible — future executor capability signals land here.
+
+The `capabilities` field is excluded from etag computation (§18.2). Capability
+changes do not constitute contract changes and do not invalidate cached bundles.
+
+**Manifest schema version:** The manifest's `tenor` field tracks the manifest
+schema version, not the interchange format version and not the Tenor language
+spec version. These are three independent version axes:
+
+- `tenor` on the manifest: manifest schema version (`"1.0"` = original, `"1.1"` = with capabilities)
+- `tenor` on each construct: per-construct interchange format version (`"1.0"`)
+- `tenor_version` on the bundle: interchange format semver (`"1.1.0"`)
+
+The manifest is a static artifact. It requires no live server to serve. A
+conforming executor may serve it from a CDN, object storage, or a local file
+system. Dynamic executors may generate it on request, but must produce output
+identical to what a static file would contain for the same bundle.
+
+**Canonical form:** The manifest is serialized as JSON with all top-level keys
+sorted lexicographically: `bundle`, `capabilities` (if present), `etag`,
+`tenor`. The `bundle` field contains the interchange bundle exactly as produced
+by the elaborator — no fields added, no fields removed. The `etag` field is
+computed after the bundle is serialized to its canonical form.
+
+**Elaborator integration:** `tenor elaborate --manifest <file.tenor>` produces
+the manifest with the interchange bundle inlined. The manifest is a
+transformation of the elaborator output, not a separate pipeline. The elaborator
+computes the etag as part of manifest generation.
+
+**JSON Schema:** The manifest validates against `docs/manifest-schema.json`,
+a separate schema from the interchange schema (`docs/interchange-schema.json`).
+The interchange schema is embedded in the manifest schema as the type of the
+`bundle` field.
+
+---
+
+### 18.2 Etag Semantics
+
+The etag is a SHA-256 hex digest of the canonical interchange bundle bytes.
+
+```
+etag(bundle) = lowercase_hex(SHA-256(canonical_json_bytes(bundle)))
+```
+
+Where `canonical_json_bytes` is the deterministic JSON serialization produced
+by the elaborator's Pass 6. The elaborator is already required to be
+deterministic (§13.1): identical DSL input produces byte-for-byte identical
+interchange output. The etag inherits this determinism — identical contracts
+produce identical etags across all conforming elaborators.
+
+**Change detection:** An etag changes if and only if the interchange bundle
+changes. An etag does not change when deployment metadata, timestamps, or
+other non-bundle state changes. This is a structural guarantee, not a
+convention — the etag is a pure function of bundle content.
+
+**HTTP integration:** Executors that serve the manifest over HTTP MUST set the
+`ETag` response header to the value of the manifest's `etag` field. This
+enables standard HTTP conditional GET (`If-None-Match`) for efficient change
+detection. An agent that has previously fetched the manifest may send
+`If-None-Match: <etag>` and receive `304 Not Modified` if the contract has not
+changed, without re-fetching the full bundle.
+
+The `capabilities` field (§18.1) is excluded from etag computation. Executor
+capability changes do not constitute contract changes and do not invalidate
+cached bundles.
+
+---
+
+### 18.3 Discovery Endpoint
+
+A conforming executor MUST serve the contract manifest at:
+
+```
+/.well-known/tenor
+```
+
+The resource MUST be served with `Content-Type: application/json`. No
+file extension is appended to the path. This path is prescribed exactly —
+executors MUST NOT serve the manifest only at implementation-specific paths.
+Executors MAY additionally serve the manifest at other paths.
+
+For static file deployments, the manifest file is placed at the path
+`/.well-known/tenor` relative to the document root. For dynamic deployments,
+the endpoint is a route handler that returns the manifest.
+
+**Executor obligation E10:** A conforming executor MUST serve a valid
+TenorManifest at `/.well-known/tenor` with `Content-Type: application/json`
+and an `ETag` response header matching the manifest's `etag` field value.
+
+---
+
+### 18.4 Cold-Start Protocol
+
+Agent cold-start is the sequence an agent follows from a bare URL to a complete
+understanding of the system. The protocol requires at most one network fetch.
+
+```
+cold_start(base_url) =
+  manifest = GET base_url + "/.well-known/tenor"
+  bundle   = manifest.bundle
+  // Agent now has the complete interchange bundle.
+  // All contract semantics are derivable from bundle alone.
+  return (bundle, manifest.etag)
+```
+
+The bundle is inlined in the manifest, so no second fetch is required. An agent
+that has completed cold-start has:
+
+- The complete set of declared Facts, Entities, Rules, Personas, Operations,
+  and Flows
+- The complete state space and all reachable states (via S1 analysis)
+- The complete authority topology — which Personas can invoke which Operations
+  in which states (via S4 analysis)
+- The complete set of possible verdicts and their derivation conditions
+- The etag for subsequent change detection
+
+Persona resolution is not part of cold-start. An agent learns its effective
+Persona when it first invokes an Operation — the executor returns
+`persona_rejected` (§9.2) if the presented credential does not map to a
+declared Persona. The set of declared Personas is statically enumerable from
+the bundle (§8.3), so an agent may reason about the authority model before
+any execution.
+
+**Executor obligation E11:** A conforming executor MUST ensure that an agent
+which has fetched the manifest at `/.well-known/tenor` has all information
+necessary to understand the contract without any additional out-of-band
+documentation. The manifest's inlined bundle MUST be complete — no required
+fields may be omitted, no construct references may be unresolved.
+
+---
+
+### 18.5 Change Detection
+
+An agent that has previously fetched the manifest detects contract changes by
+comparing the current etag to its cached etag.
+
+```
+check_for_changes(base_url, cached_etag) =
+  response = GET base_url + "/.well-known/tenor"
+             with header If-None-Match: cached_etag
+  if response.status == 304:
+    return no_change
+  if response.status == 200:
+    new_manifest = response.body
+    if new_manifest.etag != cached_etag:
+      return changed(new_manifest)
+    else:
+      return no_change  // defensive: etag matched despite 200
+```
+
+A contract change requires the agent to re-run cold-start against the new
+manifest. The agent MUST NOT apply partial updates — a changed etag means the
+full bundle has changed and must be re-fetched and re-processed.
+
+**Executor obligation E12:** A conforming executor MUST update the manifest's
+`etag` field whenever the interchange bundle changes, and MUST NOT change the
+`etag` field when the bundle has not changed. The etag MUST be a pure function
+of bundle content as specified in §18.2.
+
+---
+
+### 18.6 Dry-Run Evaluation
+
+A dry-run is a read-only evaluation of an Operation against the current
+ResolvedVerdictSet. It executes the full evaluation sequence up to but not
+including effect application. It is used by agents to preflight operations
+before committing side effects.
+
+```
+dry_run : Operation × PersonaId × ResolvedVerdictSet × EntityState
+        → (SimulatedOutcome | SimulatedError)
+
+dry_run(op, persona, verdict_set, entity_state) =
+  if persona ∉ op.allowed_personas:
+    return SimulatedError("persona_rejected", simulation: true)
+  if ¬eval_pred(op.precondition, FactSet, verdict_set):
+    return SimulatedError("precondition_failed", simulation: true)
+  outcome = determine_outcome(op, entity_state)
+  emit_simulated_provenance(op, persona, verdict_set, entity_state, outcome)
+  return SimulatedOutcome(outcome, simulation: true)
+```
+
+Steps (1), (2), and (3) of the execution sequence (§9.3) are performed.
+Step (4) — atomic effect application — is not performed. Step (5) — provenance
+emission — emits a SimulatedProvenance record, not a real provenance record.
+
+**Simulation flag:** Every dry-run response MUST carry `"simulation": true` at
+the top level of the response body. This flag is not optional metadata — it is
+a required field that distinguishes simulated results from real execution
+results. An agent MUST check this flag before treating a response as authoritative.
+
+**SimulatedProvenance:** Structurally identical to a real provenance record
+(§9.5) with one additional field: `simulation: true`. SimulatedProvenance
+records carry the same derivation information as real provenance records —
+facts used, verdicts used, state before, would-be outcome — but are tagged
+as simulations.
+
+**Audit log exclusion:** SimulatedProvenance records MUST NOT be written to
+the authoritative audit log. A dry-run produces no durable state change of any
+kind. An executor that writes SimulatedProvenance to the audit log is
+non-conforming.
+
+**HTTP integration:** Dry-run requests are distinguished by the request, not
+the response status code. The executor uses the same status codes for dry-run
+as for real execution — a dry-run that would succeed returns 200, a dry-run
+that would fail precondition returns the same error status as a real failure.
+Agents use the same response handling code for both paths. The `simulation: true`
+field in the response body is the sole distinguishing signal.
+
+**Executor obligation E13:** A conforming executor MUST support dry-run
+evaluation for all Operations. Dry-run requests MUST execute steps (1)-(3) of
+the execution sequence (§9.3) and MUST NOT execute step (4). Dry-run responses
+MUST carry `"simulation": true`. SimulatedProvenance records MUST NOT be written
+to the authoritative audit log.
+
+---
+
+### 18.7 Executor Obligation Summary (E10-E14)
+
+| Obligation | Description |
+|------------|-------------|
+| **E10** | Serve a valid TenorManifest at `/.well-known/tenor` with `Content-Type: application/json` and an `ETag` response header matching the manifest's `etag` field. |
+| **E11** | Ensure the manifest's inlined bundle is complete — no required fields omitted, no construct references unresolved. The manifest alone must be sufficient for agent cold-start. |
+| **E12** | Update the manifest etag when and only when the interchange bundle changes. The etag is a pure function of bundle content: `lowercase_hex(SHA-256(canonical_json_bytes(bundle)))`. |
+| **E13** | Support dry-run evaluation for all Operations. Execute steps (1)-(3) of §9.3. Do not execute step (4). Carry `"simulation": true` in all dry-run responses. Never write SimulatedProvenance to the authoritative audit log. |
+| **E14** | **Capability advertisement.** A dynamic executor (one that evaluates Operations, executes Flows, and applies entity state transitions) MUST include a `capabilities` object in the manifest it serves at `/.well-known/tenor`. The `capabilities` object MUST accurately reflect the executor's actual analysis behavior. Static file deployments (serving the manifest from a CDN, object storage, or file system with no live executor) are exempt from E14. A manifest served without a `capabilities` field is interpreted as a static deployment or a pre-v1.1 executor; agents MUST assume conservative defaults for all capability dimensions. |
+
+---
+
+## 19. Appendix A — Acknowledged Limitations
 
 These are conscious design decisions, not oversights.
 
-**AL1 — Fact ground property boundary** _(Fact 1.0, CE1)_  
+**AL1 — Fact ground property boundary** _(Fact 1.0)_
 Facts are ground within the evaluation model. Whether the source populating them is itself derived is outside the language's enforcement scope. Conforming executors must not populate Facts from internal evaluations.
 
-**AL2 — Default assertion source** _(Fact 1.0, CE3)_  
-When a default is used, the value is contract-asserted. Visible in provenance via `assertion_source: "contract"`.
+**AL5 — TaggedUnion absence semantics** _(BaseType)_
+Mismatched tag access produces a typed absence value, which evaluates to false in predicate context. Contract authors must account for this: a negated predicate over a TaggedUnion field evaluates to true for all non-matching variants (§4.4).
 
-**AL3 — DateTime timezone loss** _(BaseType, CE3)_  
-DateTime values are normalized to UTC at assembly. Timezone-aware reasoning must be handled by adapters before Fact assertion.
-
-**AL4 — Record and TaggedUnion acyclicity** _(BaseType, CE1)_  
-Type declarations must form an acyclic graph. Self-referential types are prohibited.
-
-**AL5 — TaggedUnion absence semantics** _(BaseType, CE2)_  
-Mismatched tag access produces a typed absence value, which evaluates to false in predicate context.
-
-**AL6 — Decimal promotion rules** _(BaseType, CF1)_  
-Cross-precision Decimal arithmetic uses specified promotion rules. Conforming implementations must implement these exactly.
-
-**AL7 — No nested lists** _(Fact extension, CE2)_  
-List element types must be ScalarBaseType. Nested lists are not permitted.
-
-**AL8 — List max is a conservative static bound** _(Fact extension)_  
+**AL8 — List max is a conservative static bound** _(Fact extension)_
 Runtime lists may be smaller. Static complexity analysis uses the declared max.
 
-**AL9 — Arithmetic determinism requires numeric model** _(PredicateExpression, CE2)_  
-Arithmetic is only determinate given the mandated NumericModel.
-
-**AL10 — Bounded quantification domain restriction** _(PredicateExpression extension, CE1)_  
-Bounded quantification requires facts with declared max bounds. Unbounded collections may not be used as quantification domains.
-
-**AL11 — Operation source-state validation is executor obligation** _(Operation, CE3)_  
-The Operation construct does not encode source-state validation internally.
-
-**AL12 — Operation atomicity is executor obligation** _(Operation)_  
-The language defines what atomicity means but cannot enforce it internally.
-
-**AL13 — ~~Flow typed outcomes are Flow-side only~~ Superseded by P7** _(Flow, CE1; resolved in v1.0)_
-~~Typed outcome routing is Flow-side classification of Operation results. The Operation canonical form is unchanged.~~ Superseded: Operations now declare named outcomes (§9.1). Flow OperationStep routing references Operation-declared outcomes with exhaustive handling (§11.5). Outcome routing is grounded in Operation declarations, not Flow-side classification. See `docs/cffp/p7-outcome-typing.json` for the CFFP record.
-
-**AL14 — Sub-flow snapshot inheritance** _(Flow, CE2)_  
-Sub-flows inherit the invoking Flow's snapshot and do not take independent snapshots.
-
-**AL15 — Parallel execution via ParallelStep** _(Flow)_  
-Parallel execution is supported via ParallelStep with fork/join semantics. Sequential Flows remain the default. See AL21–AL22 for ParallelStep-specific limitations.
-
-**AL16 — Compensation nesting prohibition** _(Flow, CE4)_  
-Compensation failure handlers are Terminal only. No nested compensation.
-
-**AL17 — Branch decision provenance** _(Flow)_  
+**AL17 — Branch decision provenance** _(Flow)_
 Branch decisions are recorded in Flow provenance but not in the Operation provenance chain.
 
-**AL18 — Duration calendar independence** _(Duration)_  
+**AL18 — Duration calendar independence** _(Duration)_
 Duration "day" means exactly 86,400 seconds. DST transitions, leap seconds, and calendar month/year spans are not representable as Duration values. Adapters must handle calendar-to-Duration conversion before Fact assertion.
 
-**AL19 — Cross-currency via Rule layer** _(P4 resolution)_  
-Cross-currency arithmetic is not a language primitive. It is expressed as a Fact (conversion rate) plus a Rule (multiplication). Multi-hop conversions require chained Rules. Bid/ask spread modeling requires two rate Facts.
-
-**AL20 — Variable × variable restricted to Rule bodies** _(P6 resolution)_  
-Variable × variable multiplication is available only in Rule bodies, not in PredicateExpression. The verdict payload type declaration serves as the result constraint. Decimal × Decimal variable multiplication is prohibited everywhere.
-
-**AL21 — Parallel first_success not supported** _(ParallelStep)_  
-All parallel branches run to completion before the join evaluates. Branch cancellation semantics are not defined.
-
-**AL22 — Post-parallel verdict re-evaluation requires new Flow** _(ParallelStep)_  
+**AL22 — Post-parallel verdict re-evaluation requires new Flow** _(ParallelStep)_
 Frozen verdict semantics apply within parallel blocks. If parallel branch results must feed into verdict evaluation, a new Flow must be initiated after the parallel block completes.
 
-**AL23 — Elaborator Conformance Suite** _(ElaboratorSpec)_
-The Tenor Elaborator Conformance Suite is at `conformance/`. 47/47 tests passing as of v0.3.
-
-**AL24 — Persona declaration is mandatory in v1.0** _(Persona, CFFP CE4)_
+**AL24 — Persona declaration is mandatory in v1.0** _(Persona)_
 Contracts written against v0.3 that use bare persona strings in Operation `allowed_personas` and Flow step `persona` fields must add explicit `persona` declarations when migrating to v1.0. This is a breaking change covered by the v0.3 to v1.0 major version bump.
 
-**AL25 — Persona carries no metadata** _(Persona, CFFP Phase 4)_
-Persona is a pure identity token with no description, display name, role, or other metadata fields. Documentation-level information about personas must be provided via DSL comments or external documentation. Metadata with no formal semantics does not belong in the construct definition.
+**AL28 — Outcome labels carry no typed payload** _(Operation)_
+Outcome labels are bare strings with no associated payload data. If outcome-specific data is needed, it must be conveyed through entity state changes or separate Facts. Typed outcome payloads were rejected because payload values have no derivation chain within the closed-world evaluation model, violating C7 (provenance as semantics).
 
-**AL26 — Unreferenced Persona declarations are not errors** _(Persona)_
-A Persona declared but never referenced in any Operation or Flow is valid. Static analysis tooling may optionally warn about unreferenced Personas, but this is not an elaboration obligation.
+**AL30 — Operation outcome declarations are mandatory in v1.0** _(Operation)_
+Contracts written against v0.3 that use ad-hoc outcome labels in Flow OperationSteps must add corresponding `outcomes` declarations to their Operations when migrating to v1.0. The migration path is additive: existing outcome labels become the declared outcome set on the referenced Operation.
 
-**AL27 — Outcome exhaustiveness is a contract authoring obligation** _(Operation, P7 CFFP CE3)_
-The elaborator validates that Flow OperationStep outcome routing handles all declared outcomes and that outcome labels are members of the referenced Operation's declared set. However, the elaborator cannot verify that the declared outcome set is exhaustive of all possible executor success-path behaviors. A contract author who omits a possible outcome from the declaration has a contract authoring error that cannot be detected statically. This parallels AL11 (source-state validation is an executor obligation).
+**AL31 — Module federation deferred to v2** _(P5 Shared Type Library)_
+Inter-organization type sharing (type registries, versioned type packages, cross-repository type distribution) is explicitly out of scope for v1.0. The shared type library mechanism supports only direct file import within a single project.
 
-**AL28 — Outcome labels carry no typed payload** _(Operation, P7 CFFP Phase 4)_
-Outcome labels are bare strings with no associated payload data. An outcome `"approved"` cannot carry the approval amount, the approving persona, or other context. If outcome-specific data is needed, it must be conveyed through entity state changes or separate Facts. Typed outcome payloads were considered during the CFFP run (Candidate B) and rejected because payload values have no derivation chain within the contract's closed-world evaluation model, violating C7 (provenance as semantics).
+**AL32 — Generic type parameters deferred to v2** _(P5 Shared Type Library)_
+Shared type libraries cannot define parameterized types (e.g., `GenericList<T>`). Each concrete type variant must be declared separately.
 
-**AL29 — Multi-outcome effect-to-outcome mapping is explicit** _(Operation, P7 CFFP CE7)_
-When an Operation declares multiple outcomes and multiple effects, the contract must explicitly declare which effects belong to which outcome. The executor does not determine this mapping. This ensures cross-executor determinism: two conforming executors given the same inputs will produce the same outcome. The DSL syntax and interchange format encode the effect-to-outcome association directly.
+**AL33 — Type library files may not import other files** _(P5 Shared Type Library)_
+Type library files are self-contained leaf files in the import graph. This restriction prevents transitive type propagation and eliminates the need for a module visibility system.
 
-**AL30 — Operation outcome declarations are mandatory in v1.0** _(Operation, P7)_
-Contracts written against v0.3 that use ad-hoc outcome labels in Flow OperationSteps (e.g., `outcomes: {success: next_step}`) must add corresponding `outcomes` declarations to their Operations when migrating to v1.0 (e.g., `outcomes: [success]`). This is a breaking change covered by the v0.3 to v1.0 major version bump. The migration path is additive: existing outcome labels used in Flows become the declared outcome set on the referenced Operation.
+**AL34 — TypeDecl flat namespace across imports** _(P5 Shared Type Library)_
+TypeDecl names occupy a flat namespace. Two imported type libraries that declare the same TypeDecl id cause an elaboration error. Namespace prefixing, aliasing, or selective imports are not supported in v1.0.
 
-**AL31 — Module federation deferred to v2** _(P5 Shared Type Library, CFFP)_
-Inter-organization type sharing (type registries, versioned type packages, cross-repository type distribution) is explicitly out of scope for v1.0. The shared type library mechanism supports only direct file import within a single project. Module federation requires infrastructure (package registries, version resolution, dependency management) that exceeds the language specification's scope. See SPEC-06.
-
-**AL32 — Generic type parameters deferred to v2** _(P5 Shared Type Library, CFFP)_
-Shared type libraries cannot define parameterized types (e.g., `GenericList<T>`). Each concrete type variant must be declared separately. Generic type parameters for Records and TaggedUnions are a v2 requirement (SPEC-07).
-
-**AL33 — Type library files may not import other files** _(P5 Shared Type Library, CFFP Phase 4)_
-Type library files are self-contained leaf files in the import graph. A type library cannot reference types from another type library. Complex type hierarchies that span multiple files must be flattened into a single type library file. This restriction prevents transitive type propagation (implicit cross-file type visibility) and eliminates the need for a module visibility system. It may be relaxed in v2 if a visibility/module system is introduced.
-
-**AL34 — TypeDecl flat namespace across imports** _(P5 Shared Type Library, CFFP CE6)_
-TypeDecl names occupy a flat namespace. Two imported type libraries that declare the same TypeDecl id cause an elaboration error, even if the type definitions are structurally identical. Namespace prefixing, aliasing, or selective imports are not supported in v1.0. Contracts importing multiple libraries must ensure no TypeDecl id conflicts.
-
-**AL35 — No type extension or inheritance across libraries** _(P5 Shared Type Library, CFFP CE5)_
-A contract cannot import a type from a library and extend it (add fields). To create a variant of a library type, the contract must declare a new TypeDecl with a different name containing the desired fields. Type extension and inheritance are not supported in v1.0.
+**AL35 — No type extension or inheritance across libraries** _(P5 Shared Type Library)_
+A contract cannot import a type from a library and extend it (add fields). Type extension and inheritance are not supported in v1.0.
 
 **AL36 — No selective type import** _(P5 Shared Type Library)_
-Importing a type library file loads all its TypeDecl definitions into the type environment, even if the contract uses only a subset. Unused imported types do not appear in interchange output and do not affect evaluation. This is a namespace concern, not a correctness issue.
+Importing a type library file loads all its TypeDecl definitions into the type environment, even if the contract uses only a subset.
+
+**AL37 — Migration contracts cannot express complex type changes** _(Migration)_
+Migration contracts (§17.5) cannot represent arbitrary type changes involving complex types (Record, TaggedUnion, nested List). Only simple type parameter changes are faithfully representable as Tenor Facts.
+
+**AL38 — Migration contracts cannot compare predicate strength** _(Migration)_
+All precondition and predicate expression changes are conservatively classified as REQUIRES_ANALYSIS. Refinement requires S3a/S3b static analysis tooling (§15).
+
+**AL39 — Migration contracts are self-contained** _(Migration)_
+Migration contracts do not import the contracts they migrate. All diff data is encoded as internal Facts with conventionalized source bindings (`system: "tenor-diff"`). This restriction is due to Pass 1 import resolution merging all constructs into a single namespace, which would cause id collisions.
+
+**AL40 — Migration contracts are not composable in v1.0** _(Migration)_
+Transitive migration requires directly diffing the endpoint versions' interchange bundles. Classification-only contracts encode what changed but not the resulting state, so they lack the information needed for composition. See §17.5.
+
+**AL41 — Migration contracts are classification-only in v1.0** _(Migration)_
+Migration contracts express diff classification but NOT migration orchestration. Migration orchestration (Operations + Flows for multi-step migrations) requires meta-level constructs deferred to v2. See §17.5.
+
+**AL42 — Migration contract source bindings are conventionalized** _(Migration)_
+Migration contract Facts use conventionalized source bindings (`system: "tenor-diff"`) that do not correspond to real external systems.
+
+**AL43 — Migration contract determinism requires canonical ordering** _(Migration)_
+Migration contract generation must follow canonical ordering rules to ensure deterministic output across different generators.
+
+**AL44 — Flow compatibility does not model time-based constraints** _(Flow Migration, §17.6)_
+The compatibility analysis does not account for timeout changes between contract versions. If v2 changes step-level or flow-level timeout values, the analysis treats timeouts as executor-level concerns outside the formal compatibility conditions.
+
+**AL45 — Recursive sub-flow compatibility depth is unbounded** _(Flow Migration, §17.6)_
+The formal definition permits arbitrary recursion depth through SubFlowStep references. Implementations may impose a practical depth limit. The flow reference DAG is acyclic (§11.5), so recursion terminates, but deeply nested sub-flow chains may be expensive to analyze.
+
+**AL46 — ParallelStep compatibility requires all branches compatible** _(Flow Migration, §17.6)_
+A ParallelStep is compatible only if ALL branches pass the compatibility check independently. Partial migration of parallel branches (some branches on v2, some on v1) is not supported. If any branch fails compatibility, the entire ParallelStep is incompatible.
+
+**AL47 — Conservative data dependency analysis may produce false negatives** _(Flow Migration, §17.6)_
+The required conservative analysis considers only the frozen snapshot and current entity states. It does not account for verdicts or state that v2 steps would produce during execution before the dependent step. This may reject migrations that are actually safe. Aggressive analysis with path dominance (§17.6.11) is optional and reduces false negatives at the cost of implementation complexity.
+
+**AL48 — Entity parent changes require transitive analysis** _(Flow Migration, §17.6)_
+Entity parent field changes are detected through Layer 2 (entity state) and Layer 3 (operation effects), but the full impact of a parent change on state propagation chains may require transitive analysis not specified in v1.0. Parent changes are conservatively treated as compatibility failures.
+
+**AL49 — Reachable path computation uses v2's step graph** _(Flow Migration, §17.6)_
+The compatibility analysis computes reachable paths from the current position using v2's step graph, not v1's. The v1 step graph is only used to identify the current position. This means routing changes at or after the current position are evaluated under v2's semantics. A step removed in v2 is simply not reachable; a step added in v2 may introduce new dependencies.
+
+**AL50 — User-defined verdict precedence deferred to v2** _(Rule, §7)_
+v1 contracts must use distinct VerdictType names for each verdict-producing rule (S8). User-defined verdict precedence, dominance relations, and contract-specified resolution strategies — which would allow multiple rules to produce the same VerdictType with an explicit conflict resolution mechanism — are deferred to a future version. Contracts requiring conditional same-verdict production should use distinct VerdictType names and a higher-stratum aggregation rule.
+
+**AL51 — Single contract per discovery endpoint** _(Contract Discovery, §18)_
+The `/.well-known/tenor` endpoint serves a single TenorManifest. Hosts exposing multiple independent contracts must use separate subdomains or path-scoped endpoints (served via the MAY clause in §18.3). A registry mechanism for multi-contract discovery is deferred to a future version.
+
+**AL52 — Concurrent Operation isolation unspecified** _(Executor, §16)_
+E3 requires atomicity for a single Operation's effect set but does not specify isolation semantics for concurrent invocation of multiple Operations against the same entity. Two Operations that concurrently read the same entity state, compute valid transitions, and write may produce conflicting final states. Executors must document their concurrency model. Serializable isolation is recommended but not required by v1.
+
+**AL53 — Text equality uses byte-exact comparison** _(BaseType, §4)_
+Text equality (`=`, `≠`) compares UTF-8 byte sequences exactly. Two strings that are canonically equivalent under Unicode normalization (e.g., NFC vs. NFD) but differ in byte representation compare as unequal. Contract authors are responsible for ensuring consistent normalization of Text fact values before FactSet assembly.
+
+**AL54 — Sub-flow cross-version invocation unspecified** _(Flow Migration, §17.6)_
+§17.6 covers in-flight flow migration for flows within a single contract version transition. The case where a sub-flow is defined in a different contract version than its parent flow — for example, a v1 parent flow invoking a sub-flow that has been independently updated to v2 — is not addressed. Sub-flow compatibility analysis assumes parent and sub-flow are migrated together as part of the same version transition.
+
+**AL55 — Per-flow-type capability advertisement not supported in v1.1** _(Contract Discovery, §18)_
+The `migration_analysis_mode` field in `ExecutorCapabilities` is per-executor. An executor uses one analysis mode for all flow migration decisions. Per-flow-type capability granularity (e.g., aggressive analysis for some flows, conservative for others) is deferred to v2.
 
 ---
 
-## Appendix B — Model Convergence Record
-
-The following properties were independently arrived at by Claude (Anthropic), GPT (OpenAI), and DeepSeek without cross-contamination between sessions.
-
-**Epistemological caveat:** LLM convergence is not the same as convergence between independent formal verification approaches. All models consulted share training data, common formal reasoning conventions, and exposure to prior art in formal methods and type theory. Independent convergence across LLM architectures does not constitute proof of soundness, and should not be treated as such for anything load-bearing. What it does constitute: suggestive evidence that the design choices are consistent with established formal reasoning conventions, and that no model found a trivial counterexample to the core commitments in independent sessions. The actual soundness argument rests on the design pressure record — the specific counterexamples raised, the rebuttals accepted or rejected, and the scope narrowings recorded. Those are the artifacts that carry evidential weight. The convergence record is context, not proof.
-
-**Converged without divergence:**
-
-- Provenance is part of the evaluation relation, not a runtime feature. `eval_rules` returns `Set<V × Provenance>`, not `Set<V>`.
-- Strict stratification — no same-stratum rule references — is the correct termination guarantee. The re-expression theorem holds.
-- Entity hierarchy carries no implicit authority semantics. All propagation must be explicitly declared.
-- Verdict resolution is a declared, total, deterministic function. No implicit lattice join or meet.
-- Spec completeness: an agent that can read this spec can fully understand a system described in it without reading implementation code.
-- The behavioral contract calculus framing is correct. This is not a configuration format, policy DSL, or workflow engine — it is a distinct category.
-- The spec must precede the implementation. Formal semantics precede syntax.
-
-**Diverged and resolved under pressure:**
-
-- **Entity authority inheritance (GPT vs. consensus).** GPT initially proposed that the entity partial order should carry implicit authority semantics with lattice joins for permission combination. Rejected under pressure — implicit join semantics introduce non-determinism in conflict resolution. Explicit declaration won. Authority propagation is declared, not inherited.
-- **Entity hierarchy as permission backbone (DeepSeek vs. consensus).** DeepSeek proposed the partial order should be the primary backbone of permission propagation. Refined to: the partial order exists but carries no implicit semantics. Propagation is a separate explicit declaration over the DAG.
-- **Same-stratum rule references (GPT initially dissenting).** GPT initially defended acyclic same-stratum references with cycle detection. The re-expression theorem argument resolved this — acyclic same-stratum graphs add zero expressive power and the structural termination guarantee is strictly stronger without them. GPT accepted after the formal argument was made.
-
----
-
-## Appendix C — Worked Example: Escrow Release Contract
+## 20. Appendix C — Worked Example: Escrow Release Contract
 
 This appendix demonstrates a non-trivial Tenor contract covering two entities, monetary threshold rules, multi-persona authority, bounded quantification over line items, and a compensation flow. It is intended as a reference for:
 
@@ -1684,6 +2214,17 @@ type LineItemRecord {
 }
 
 List(element_type: LineItemRecord, max: 100)
+```
+
+---
+
+### D.2.1 Persona Declarations
+
+```
+persona buyer
+persona seller
+persona compliance_officer
+persona escrow_agent
 ```
 
 ---
@@ -1822,6 +2363,7 @@ operation release_escrow {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(release_approved)
   effects:          [(EscrowAccount, held, released)]
+  outcomes:         [released]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
@@ -1829,6 +2371,7 @@ operation release_escrow_with_compliance {
   allowed_personas: [compliance_officer]
   precondition:     verdict_present(compliance_review_required)
   effects:          [(EscrowAccount, held, released)]
+  outcomes:         [released]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
@@ -1836,6 +2379,7 @@ operation refund_escrow {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(refund_approved)
   effects:          [(EscrowAccount, held, refunded)]
+  outcomes:         [refunded]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
@@ -1844,6 +2388,7 @@ operation flag_dispute {
   precondition:     verdict_present(delivery_confirmed)
                   ∨ verdict_present(delivery_failed)
   effects:          [(EscrowAccount, held, disputed)]
+  outcomes:         [disputed]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
@@ -1851,6 +2396,7 @@ operation confirm_delivery {
   allowed_personas: [seller]
   precondition:     ∀ item ∈ line_items . item.valid = true
   effects:          [(DeliveryRecord, pending, confirmed)]
+  outcomes:         [confirmed]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
@@ -1858,6 +2404,7 @@ operation record_delivery_failure {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(delivery_failed)
   effects:          [(DeliveryRecord, pending, failed)]
+  outcomes:         [failed]
   error_contract:   [precondition_failed, persona_rejected]
 }
 
@@ -1866,6 +2413,7 @@ operation revert_delivery_confirmation {
   allowed_personas: [escrow_agent]
   precondition:     verdict_present(delivery_confirmed)
   effects:          [(DeliveryRecord, confirmed, pending)]
+  outcomes:         [reverted]
   error_contract:   [precondition_failed, persona_rejected]
 }
 ```
@@ -1886,7 +2434,7 @@ flow standard_release {
       op:      confirm_delivery
       persona: seller
       outcomes: {
-        success: step_check_threshold
+        confirmed: step_check_threshold
       }
       on_failure: Terminate(outcome: failure)
     }
@@ -1902,7 +2450,7 @@ flow standard_release {
       op:      release_escrow
       persona: escrow_agent
       outcomes: {
-        success: Terminal(success)
+        released: Terminal(success)
       }
       on_failure: Compensate(
         steps: [{
@@ -1924,7 +2472,7 @@ flow standard_release {
       op:      release_escrow_with_compliance
       persona: compliance_officer
       outcomes: {
-        success: Terminal(success)
+        released: Terminal(success)
       }
       on_failure: Compensate(
         steps: [{
@@ -1951,7 +2499,7 @@ flow refund_flow {
       op:      refund_escrow
       persona: escrow_agent
       outcomes: {
-        success: Terminal(success)
+        refunded: Terminal(success)
       }
       on_failure: Terminal(failure)
     }
@@ -2001,10 +2549,10 @@ A: No. buyer's only admissible operation is flag_dispute, which transitions to d
 **S6 — Flow paths for standard_release:**
 
 ```
-Path 1: confirm_delivery (success) → within_threshold (true) → release_escrow (success) → Terminal(success)
-Path 2: confirm_delivery (success) → within_threshold (false) → handoff → release_escrow_with_compliance (success) → Terminal(success)
-Path 3: confirm_delivery (success) → within_threshold (true) → release_escrow (failure) → revert_delivery_confirmation → Terminal(failure)
-Path 4: confirm_delivery (success) → within_threshold (false) → handoff → release_escrow_with_compliance (failure) → revert_delivery_confirmation → Terminal(failure)
+Path 1: confirm_delivery (confirmed) → within_threshold (true) → release_escrow (released) → Terminal(success)
+Path 2: confirm_delivery (confirmed) → within_threshold (false) → handoff → release_escrow_with_compliance (released) → Terminal(success)
+Path 3: confirm_delivery (confirmed) → within_threshold (true) → release_escrow (failure) → revert_delivery_confirmation → Terminal(failure)
+Path 4: confirm_delivery (confirmed) → within_threshold (false) → handoff → release_escrow_with_compliance (failure) → revert_delivery_confirmation → Terminal(failure)
 Path 5: confirm_delivery (failure) → Terminal(failure)
 ```
 
@@ -2079,7 +2627,7 @@ step_confirm:
   persona seller ∈ confirm_delivery.allowed_personas → pass
   precondition: ∀ item ∈ line_items . item.valid = true → true (from FactSet)
   effects: (DeliveryRecord, pending, confirmed) — executor validates pending matches current state → apply
-  outcome: success → step_check_threshold
+  outcome: confirmed → step_check_threshold
 
 step_check_threshold:
   NOTE: verdict_present(within_threshold) evaluated against FROZEN snapshot verdict set
@@ -2091,7 +2639,7 @@ step_auto_release:
   persona escrow_agent ∈ release_escrow.allowed_personas → pass
   precondition: verdict_present(release_approved) → true (frozen verdict set)
   effects: (EscrowAccount, held, released) — executor validates held matches current state → apply
-  outcome: success → Terminal(success)
+  outcome: released → Terminal(success)
 ```
 
 **FlowOutcome:** success
@@ -2121,3 +2669,51 @@ Every chain terminates at Facts. Provenance is complete.
 In the trace above, `step_check_threshold` evaluates `verdict_present(within_threshold)` against the **frozen snapshot** verdict set — not a recomputed one. After `confirm_delivery` executed and transitioned `DeliveryRecord` to `confirmed`, the verdict set was not recomputed. If it had been, `delivery_confirmed` would still be present (delivery_status Fact unchanged), but the point is structural: **the verdict set used at step_check_threshold is identical to the one computed at Flow initiation.** A Rule that depended on `DeliveryRecord.confirmed` entity state (if such a Rule existed) would not reflect the mid-Flow transition.
 
 This is the frozen verdict semantic commitment in concrete form.
+
+---
+
+## 21. Appendix D — Glossary
+
+| Term | Definition |
+|------|------------|
+| **ADP** | [Adversarial Design Protocol](https://github.com/riverline-labs/iap). Design space mapping method used when the solution space is unknown and must be explored before formalization. Part of the [Consensus](https://github.com/riverline-labs/iap) protocol suite. |
+| **Agent** | Any software component that reads a Tenor contract to understand a system's behavior. Agents discover contracts via the manifest (§18) and reason about the contract without reading implementation code. |
+| **BaseType** | One of twelve primitive types in Tenor's type system: Bool, Int, Decimal, Money, Text, Date, DateTime, Duration, Enum, List, Record, TaggedUnion (§4). |
+| **Bundle** | The top-level interchange document produced by the elaborator. Contains all constructs from a contract and its imports, serialized as canonical JSON (§13). |
+| **CFFP** | [Constraint-First Formalization Protocol](https://github.com/riverline-labs/iap). The design method used for all Tenor construct additions: invariant declaration, candidate formalisms, pressure testing via counterexamples, canonical form selection. Part of the [Consensus](https://github.com/riverline-labs/iap) protocol suite. |
+| **Cold-Start** | The sequence an agent follows from a bare URL to complete understanding of a system. Requires one fetch of the manifest at `/.well-known/tenor` (§18.4). |
+| **Conformance Suite** | The set of test fixtures (`conformance/`) that validate elaborator behavior. Positive tests verify correct output; negative tests verify correct error reporting. |
+| **Construct** | A top-level declaration in Tenor: Fact, Entity, Rule, Persona, Operation, or Flow (§3). |
+| **Contract** | A complete Tenor specification of a system's behavior, comprising one or more `.tenor` source files that elaborate into a single interchange bundle. |
+| **Dry-Run** | A read-only evaluation of an Operation that executes steps (1)-(3) of the execution sequence without applying effects. Responses carry `"simulation": true` (§18.6). |
+| **Effect** | An entity state transition produced by an Operation. Effects are atomic — all effects of an Operation are applied together or none are (§9). |
+| **Elaboration** | The six-pass transformation from `.tenor` source text to canonical JSON interchange: lex, parse, bundle, index, type-check, validate, serialize (§13). |
+| **Elaborator** | The tool that performs elaboration. The reference elaborator is `tenor-core`. |
+| **Entity** | A finite state machine representing a domain object. Declares states, an initial state, and permitted transitions (§6). |
+| **Etag** | A SHA-256 hex digest of the canonical interchange bundle bytes. Used for change detection. Changes if and only if the bundle changes (§18.2). |
+| **Executor** | A runtime system that evaluates Tenor contracts against live data. Subject to executor obligations E1-E14 (§16, §18.7). |
+| **Fact** | A ground truth value sourced from an external system. Facts are inputs to the evaluation model — they are asserted, not derived (§5). |
+| **FactSet** | The complete set of Fact values assembled for a single evaluation. Each Fact has exactly one value (asserted or default). |
+| **Flow** | A directed acyclic graph of steps orchestrating Operations, with snapshot isolation and persona handoffs (§11). |
+| **Frozen Verdict Semantics** | The guarantee that a Flow's verdict set is computed once at initiation and never recomputed mid-Flow. All predicate evaluations within a Flow use the snapshot (§11). |
+| **Interchange Format** | The canonical JSON representation of a Tenor contract, produced by the elaborator. Defined by `docs/interchange-schema.json` (§13). |
+| **Manifest** | A JSON document (TenorManifest) that wraps an interchange bundle with an etag and spec version. Served at `/.well-known/tenor` (§18.1). |
+| **NumericModel** | The specification of arithmetic behavior: fixed-point decimal arithmetic with the bounds specified in §12.6, `MidpointNearestEven` rounding, no floating-point anywhere in the evaluation path (§12). |
+| **Operation** | A persona-gated, precondition-guarded unit of work that produces entity state transitions. Declares allowed personas, preconditions, effects, outcomes, and error contracts (§9). |
+| **Outcome** | A named result label declared on an Operation. The outcome set is finite, closed, and exhaustively handled in Flow routing (§9.1). |
+| **Pass** | One stage of the six-pass elaboration pipeline. Passes are numbered 0-6: lex/parse (0), bundle (1), index (2), types (3), typecheck (4), validate (5), serialize (6) (§13). |
+| **Persona** | A declared identity token representing an actor class. Pure identity with no metadata. Operations declare which Personas may invoke them (§8). |
+| **Precondition** | A predicate expression on an Operation that must evaluate to true for the Operation to execute. Evaluated against the FactSet and frozen VerdictSet (§9). |
+| **PredicateExpression** | A quantifier-free first-order logic formula over ground terms. The expression language for preconditions, rule conditions, and branch conditions (§10). |
+| **Provenance** | The complete derivation chain for a verdict or operation result. Every verdict records which Facts and Rules produced it. Provenance is part of the evaluation relation, not a runtime feature (§14). |
+| **RCP** | [Reconciliation Protocol](https://github.com/riverline-labs/iap). Verifies consistency across multiple protocol run outputs. Part of the [Consensus](https://github.com/riverline-labs/iap) protocol suite. |
+| **ResolvedVerdictSet** | The set of all verdicts produced by evaluating all Rules against the current FactSet. Each verdict carries its payload and provenance. |
+| **Rule** | A verdict-producing declaration with a `when` predicate and a `produce` clause. Rules are stratified — higher strata can reference verdicts from lower strata but not the same or higher (§7). |
+| **Snapshot** | The frozen state captured at Flow initiation: the FactSet and ResolvedVerdictSet at that point in time. Immutable for the duration of the Flow (§11). |
+| **Stratum** | The stratification level of a Rule. Rules at stratum N can only reference verdicts produced at strata < N. Guarantees termination (§7). |
+| **TenorManifest** | The JSON document format for contract discovery: `{ bundle, etag, tenor }` with keys sorted lexicographically (§18.1). |
+| **Transition** | A permitted state change in an Entity, expressed as a (from, to) pair (§6). |
+| **TypeDecl** | A named type declaration (Record or TaggedUnion) that can be used as a Fact type or nested within other types (§4). |
+| **TypeEnv** | The type environment built during Pass 3 of elaboration. Maps type names to their resolved definitions (§13). |
+| **Verdict** | A derived value produced by a Rule. Verdicts have a VerdictType (label) and a typed payload. They are the outputs of the evaluation model (§7). |
+| **VerdictType** | A named category of verdict. Declared implicitly by Rule `produce` clauses. Multiple Rules may produce the same VerdictType (§7). |

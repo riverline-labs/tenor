@@ -1,0 +1,37 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_ready"
+        ],
+        "rule": "check_ready",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "system_ready"
+    }
+  ],
+  "flow_outcome": "completed",
+  "steps_executed": [
+    {
+      "step_id": "par_step",
+      "step_type": "parallel",
+      "result": "branch_fulfill:fulfilled, branch_payment:captured"
+    },
+    {
+      "step_id": "step_fulfill",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_payment",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

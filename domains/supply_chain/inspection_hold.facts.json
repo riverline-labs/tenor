@@ -1,0 +1,12 @@
+{
+  "inspection_type": "enhanced",
+  "defect_count": 5,
+  "inspection_items": [
+    {"item_id": "CARGO-101", "description": "Chemical drums", "compliant": true, "weight_kg": 3000},
+    {"item_id": "CARGO-102", "description": "Pipe fittings", "compliant": true, "weight_kg": 2500}
+  ],
+  "defect_threshold": 3,
+  "quality_report": {"inspector_id": "QI-2024-009", "pass": true, "defect_count": 5, "notes": "Multiple surface defects found on chemical drums"},
+  "compliance_report": {"inspector_id": "CO-2024-022", "pass": true, "defect_count": 0, "notes": "Hazmat documentation verified"},
+  "cargo_weight_kg": 5500
+}

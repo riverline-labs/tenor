@@ -1,0 +1,465 @@
+// Healthcare Prior Authorization Contract
+// Domain: Healthcare payer — prior authorization lifecycle from submission
+// through clinical review, peer review escalation, denial with appeal rights,
+// and appeal adjudication.
+//
+// This is the "wow" showcase contract demonstrating Tenor's ability to express
+// genuinely complex, real-world business logic. Exercises the widest set of
+// spec features: deep flows with SubFlowStep, Escalate handlers, multi-stratum
+// rules, 6 personas, Record types, bounded quantification, and handoff steps.
+//
+// The prior auth lifecycle:
+//   1. Requesting physician submits authorization request
+//   2. System routes by urgency (emergent/urgent/routine)
+//   3. Clinical reviewer evaluates medical necessity
+//   4. If criteria not met, escalation to peer reviewer
+//   5. Medical director makes final authorization decision
+//   6. Denial triggers appeal rights with deadline
+//   7. Appeals board reviews and may overturn denial
+
+// ── Named Types ──────────────────────────────────────────────────────────────
+
+type PolicyCriteria {
+  diagnosis_covered:           Bool
+  treatment_in_formulary:      Bool
+  provider_in_network:         Bool
+  step_therapy_completed:      Bool
+  prior_treatments_documented: Bool
+}
+
+type ReviewRecord {
+  reviewer_id:   Text(max_length: 128)
+  decision:      Text(max_length: 64)
+  clinical_note: Text(max_length: 2048)
+  review_date:   Date
+}
+
+type MedicalRecord {
+  record_id:     Text(max_length: 64)
+  record_type:   Text(max_length: 128)
+  is_relevant:   Bool
+  is_complete:   Bool
+}
+
+// ── Personas ─────────────────────────────────────────────────────────────────
+
+persona requesting_physician
+persona clinical_reviewer
+persona peer_reviewer
+persona medical_director
+persona appeals_board
+persona patient_advocate
+
+// ── Facts ────────────────────────────────────────────────────────────────────
+
+fact auth_status {
+  type:   Enum(values: ["submitted", "under_review", "approved", "denied", "appealed", "appeal_approved", "appeal_denied"])
+  source: "auth_service.current_status"
+}
+
+fact medical_records {
+  type:   List(element_type: MedicalRecord, max: 50)
+  source: "ehr_service.patient_records"
+}
+
+fact policy_criteria {
+  type:   PolicyCriteria
+  source: "policy_engine.criteria_evaluation"
+}
+
+fact diagnosis_code {
+  type:   Text(max_length: 16)
+  source: "clinical_service.icd10_code"
+}
+
+fact treatment_code {
+  type:   Text(max_length: 16)
+  source: "clinical_service.cpt_code"
+}
+
+fact urgency_level {
+  type:   Enum(values: ["routine", "urgent", "emergent"])
+  source: "clinical_service.urgency"
+}
+
+fact clinical_criteria_met {
+  type:    Bool
+  source:  "review_service.criteria_met"
+  default: false
+}
+
+fact appeal_deadline {
+  type:   Date
+  source: "auth_service.appeal_deadline"
+}
+
+fact denial_reason {
+  type:   Enum(values: ["medical_necessity", "experimental_treatment", "out_of_network", "documentation_insufficient"])
+  source: "auth_service.denial_reason"
+}
+
+fact peer_review_requested {
+  type:    Bool
+  source:  "review_service.peer_review_flag"
+  default: false
+}
+
+fact appeal_filed {
+  type:    Bool
+  source:  "appeals_service.appeal_filed"
+  default: false
+}
+
+fact appeal_merit_score {
+  type:   Int(min: 0, max: 100)
+  source: "appeals_service.merit_score"
+}
+
+fact new_evidence_submitted {
+  type:    Bool
+  source:  "appeals_service.new_evidence"
+  default: false
+}
+
+// ── Entities ─────────────────────────────────────────────────────────────────
+
+entity PriorAuth {
+  states:  [submitted, under_review, approved, denied, appealed, appeal_approved, appeal_denied]
+  initial: submitted
+  transitions: [
+    (submitted, under_review),
+    (under_review, approved),
+    (under_review, denied),
+    (denied, appealed),
+    (appealed, appeal_approved),
+    (appealed, appeal_denied)
+  ]
+}
+
+entity AppealCase {
+  states:  [filed, review, decided]
+  initial: filed
+  transitions: [
+    (filed, review),
+    (review, decided)
+  ]
+}
+
+// ── Rules — Stratum 0 (clinical criteria checks) ────────────────────────────
+
+rule all_records_complete {
+  stratum: 0
+  when:    ∀ record ∈ medical_records . record.is_complete = true
+  produce: verdict records_complete { payload: Bool = true }
+}
+
+rule all_records_relevant {
+  stratum: 0
+  when:    ∀ record ∈ medical_records . record.is_relevant = true
+  produce: verdict records_relevant { payload: Bool = true }
+}
+
+rule diagnosis_covered {
+  stratum: 0
+  when:    policy_criteria.diagnosis_covered = true
+  produce: verdict diagnosis_is_covered { payload: Bool = true }
+}
+
+rule treatment_in_formulary {
+  stratum: 0
+  when:    policy_criteria.treatment_in_formulary = true
+  produce: verdict treatment_is_formulary { payload: Bool = true }
+}
+
+rule provider_network_check {
+  stratum: 0
+  when:    policy_criteria.provider_in_network = true
+  produce: verdict provider_in_network { payload: Bool = true }
+}
+
+rule step_therapy_check {
+  stratum: 0
+  when:    policy_criteria.step_therapy_completed = true
+  produce: verdict step_therapy_done { payload: Bool = true }
+}
+
+rule clinical_criteria_check {
+  stratum: 0
+  when:    clinical_criteria_met = true
+  produce: verdict clinical_criteria_passed { payload: Bool = true }
+}
+
+rule is_emergent {
+  stratum: 0
+  when:    urgency_level = "emergent"
+  produce: verdict emergent_case { payload: Bool = true }
+}
+
+rule is_urgent {
+  stratum: 0
+  when:    urgency_level = "urgent"
+  produce: verdict urgent_case { payload: Bool = true }
+}
+
+// ── Rules — Stratum 1 (eligibility determination) ───────────────────────────
+
+rule documentation_sufficient {
+  stratum: 1
+  when:    verdict_present(records_complete)
+         ∧ verdict_present(records_relevant)
+  produce: verdict documentation_ok { payload: Bool = true }
+}
+
+rule policy_criteria_satisfied {
+  stratum: 1
+  when:    verdict_present(diagnosis_is_covered)
+         ∧ verdict_present(treatment_is_formulary)
+         ∧ verdict_present(provider_in_network)
+         ∧ verdict_present(step_therapy_done)
+  produce: verdict policy_satisfied { payload: Bool = true }
+}
+
+rule emergent_fast_track {
+  stratum: 1
+  when:    verdict_present(emergent_case)
+         ∧ verdict_present(records_complete)
+         ∧ verdict_present(records_relevant)
+  produce: verdict fast_track_eligible { payload: Bool = true }
+}
+
+// ── Rules — Stratum 2 (final authorization decision) ────────────────────────
+
+rule can_approve {
+  stratum: 2
+  when:    verdict_present(documentation_ok)
+         ∧ verdict_present(policy_satisfied)
+         ∧ verdict_present(clinical_criteria_passed)
+  produce: verdict authorization_approved { payload: Bool = true }
+}
+
+rule should_deny {
+  stratum: 2
+  when:    verdict_present(documentation_ok)
+         ∧ ¬verdict_present(clinical_criteria_passed)
+  produce: verdict authorization_denied { payload: Bool = true }
+}
+
+rule appeal_has_merit {
+  stratum: 2
+  when:    appeal_merit_score >= 50
+  produce: verdict appeal_meritorious { payload: Bool = true }
+}
+
+rule appeal_with_new_evidence {
+  stratum: 2
+  when:    new_evidence_submitted = true
+  produce: verdict new_evidence_available { payload: Bool = true }
+}
+
+// ── Rules — Stratum 3 (appeal outcome) ──────────────────────────────────────
+
+rule can_overturn_denial {
+  stratum: 3
+  when:    verdict_present(appeal_meritorious)
+         ∨ verdict_present(new_evidence_available)
+  produce: verdict overturn_recommended { payload: Bool = true }
+}
+
+// ── Operations ──────────────────────────────────────────────────────────────
+
+operation submit_auth {
+  allowed_personas: [requesting_physician]
+  precondition:     verdict_present(documentation_ok)
+  effects:          [(PriorAuth, submitted, under_review)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation approve_auth {
+  allowed_personas: [clinical_reviewer, medical_director]
+  precondition:     verdict_present(authorization_approved)
+  effects:          [(PriorAuth, under_review, approved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation deny_auth {
+  allowed_personas: [clinical_reviewer, medical_director]
+  precondition:     verdict_present(authorization_denied)
+  effects:          [(PriorAuth, under_review, denied)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation file_appeal {
+  allowed_personas: [requesting_physician, patient_advocate]
+  precondition:     appeal_filed = true
+  effects:          [(PriorAuth, denied, appealed), (AppealCase, filed, review)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation review_appeal {
+  allowed_personas: [appeals_board]
+  precondition:     verdict_present(appeal_meritorious) ∨ verdict_present(new_evidence_available)
+  effects:          [(AppealCase, review, decided)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation overturn_denial {
+  allowed_personas: [appeals_board, medical_director]
+  precondition:     verdict_present(overturn_recommended)
+  effects:          [(PriorAuth, appealed, appeal_approved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation uphold_denial {
+  allowed_personas: [appeals_board]
+  precondition:     ¬verdict_present(overturn_recommended)
+  effects:          [(PriorAuth, appealed, appeal_denied)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation escalate_to_peer {
+  allowed_personas: [clinical_reviewer]
+  precondition:     peer_review_requested = true
+  effects:          [(PriorAuth, under_review, denied)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+// ── Flows ───────────────────────────────────────────────────────────────────
+
+flow auth_review_flow {
+  snapshot: at_initiation
+  entry:    step_submit
+
+  steps: {
+    step_submit: OperationStep {
+      op:      submit_auth
+      persona: requesting_physician
+      outcomes: {
+        success: step_urgency_triage
+      }
+      on_failure: Terminate(outcome: submission_failed)
+    }
+
+    step_urgency_triage: BranchStep {
+      condition: verdict_present(fast_track_eligible)
+      persona:   clinical_reviewer
+      if_true:   step_fast_track_approve
+      if_false:  step_clinical_review
+    }
+
+    step_fast_track_approve: OperationStep {
+      op:      approve_auth
+      persona: medical_director
+      outcomes: {
+        success: Terminal(approved_fast_track)
+      }
+      on_failure: Terminate(outcome: fast_track_failed)
+    }
+
+    step_clinical_review: BranchStep {
+      condition: verdict_present(authorization_approved)
+      persona:   clinical_reviewer
+      if_true:   step_approve
+      if_false:  step_deny
+    }
+
+    step_approve: OperationStep {
+      op:      approve_auth
+      persona: clinical_reviewer
+      outcomes: {
+        success: Terminal(approved)
+      }
+      on_failure: Terminate(outcome: approval_processing_failed)
+    }
+
+    step_deny: OperationStep {
+      op:      deny_auth
+      persona: clinical_reviewer
+      outcomes: {
+        success: step_appeal_subflow
+      }
+      on_failure: Escalate(
+        to: medical_director
+        next: step_director_review
+      )
+    }
+
+    step_director_review: BranchStep {
+      condition: verdict_present(authorization_approved)
+      persona:   medical_director
+      if_true:   step_director_approve
+      if_false:  step_director_deny
+    }
+
+    step_director_approve: OperationStep {
+      op:      approve_auth
+      persona: medical_director
+      outcomes: {
+        success: Terminal(approved_by_director)
+      }
+      on_failure: Terminate(outcome: director_approval_failed)
+    }
+
+    step_director_deny: OperationStep {
+      op:      deny_auth
+      persona: medical_director
+      outcomes: {
+        success: step_appeal_subflow
+      }
+      on_failure: Terminate(outcome: director_denial_failed)
+    }
+
+    step_appeal_subflow: SubFlowStep {
+      flow:       appeal_flow
+      persona:    requesting_physician
+      on_success: Terminal(appeal_resolved)
+      on_failure: Terminate(outcome: appeal_process_failed)
+    }
+  }
+}
+
+flow appeal_flow {
+  snapshot: at_initiation
+  entry:    step_file_appeal
+
+  steps: {
+    step_file_appeal: OperationStep {
+      op:      file_appeal
+      persona: requesting_physician
+      outcomes: {
+        success: step_handoff_to_board
+      }
+      on_failure: Terminate(outcome: appeal_filing_failed)
+    }
+
+    step_handoff_to_board: HandoffStep {
+      from_persona: requesting_physician
+      to_persona:   appeals_board
+      next:         step_review_merit
+    }
+
+    step_review_merit: BranchStep {
+      condition: verdict_present(overturn_recommended)
+      persona:   appeals_board
+      if_true:   step_overturn
+      if_false:  step_uphold
+    }
+
+    step_overturn: OperationStep {
+      op:      overturn_denial
+      persona: appeals_board
+      outcomes: {
+        success: Terminal(appeal_granted)
+      }
+      on_failure: Terminate(outcome: overturn_failed)
+    }
+
+    step_uphold: OperationStep {
+      op:      uphold_denial
+      persona: appeals_board
+      outcomes: {
+        success: Terminal(appeal_denied)
+      }
+      on_failure: Terminate(outcome: uphold_failed)
+    }
+  }
+}

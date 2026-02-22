@@ -4,58 +4,66 @@
 
 ## APIs & External Services
 
-**None.**
-
-This codebase is a standalone DSL elaborator. It has no external service integrations.
+**AI / LLM:**
+- Anthropic Messages API - Used by the `ambiguity` CLI subcommand to test whether an LLM can unambiguously evaluate Tenor contracts against fact sets and produce correct verdicts
+  - SDK/Client: `ureq` 3.2.0 (synchronous HTTP, no official Anthropic Rust SDK used)
+  - Endpoint: `https://api.anthropic.com/v1/messages`
+  - API Version header: `anthropic-version: 2023-06-01`
+  - Auth: `ANTHROPIC_API_KEY` environment variable
+  - Default model: `claude-sonnet-4-5-20250514` (overridable via `--model` CLI flag)
+  - Implementation: `crates/cli/src/ambiguity/api.rs`
+  - Retry logic: exponential backoff (3 retries, starting 1000ms) on 429, 500, 503 responses
 
 ## Data Storage
 
 **Databases:**
-- None - Not used
+- None — no database used anywhere in the codebase
 
 **File Storage:**
-- Local filesystem only
-- Input: Reads `.tenor` DSL source files from the filesystem
-- Output: Writes JSON interchange format to stdout, errors to stderr
+- Local filesystem only — contracts read from `.tenor` files, interchange JSON written to stdout or read from disk
+- Conformance suite fixtures stored as files under `conformance/`
 
 **Caching:**
-- None - Not implemented
+- None
 
 ## Authentication & Identity
 
-**None.**
-
-The elaborator is a stateless, single-invocation CLI tool with no authentication requirements.
+**Auth Provider:**
+- None — the tool is a local CLI; no user authentication
+- The only auth is the `ANTHROPIC_API_KEY` env var for the AI ambiguity testing subcommand (see above)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None - Errors are formatted as structured JSON (matching `ElabError` schema in `elaborator/src/error.rs`) and written to stderr
+- None — errors are printed to stderr and exit codes signal failure
 
 **Logs:**
-- Custom error output via `eprintln!()` in `elaborator/src/main.rs`
-- TAP (Test Anything Protocol) output for test suite runs via `elaborator/src/tap.rs`
-- No structured logging framework
+- `eprintln!` to stderr for errors and informational messages; no structured logging library
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- None required - Compiled binary runs locally
-- No deployment platform integration
+- Not deployed as a service; distributed as a compiled binary
 
 **CI Pipeline:**
-- Not present in this repository
+- GitHub Actions — `.github/workflows/ci.yml`
+- Triggers: push and PR to `main` and `v1` branches
+- Runner: `ubuntu-latest`
+- Steps:
+  1. `cargo build --workspace`
+  2. `cargo run -p tenor-cli -- test conformance` (conformance suite, 55 tests)
+  3. `cargo test --workspace` (schema validation + unit tests)
+  4. `cargo fmt --all -- --check`
+  5. `cargo clippy --workspace -- -D warnings`
+- Build caching: `Swatinem/rust-cache@v2`
 
 ## Environment Configuration
 
-**Required environment variables:**
-- None
+**Required env vars:**
+- `ANTHROPIC_API_KEY` - Only required for `tenor ambiguity` subcommand; the command skips gracefully (exits 0 with message) if not set
 
-**Required configuration files:**
-- None
-
-**Secrets:**
-- None required
+**Secrets location:**
+- No secrets files committed; API key sourced from environment only
 
 ## Webhooks & Callbacks
 
@@ -63,22 +71,7 @@ The elaborator is a stateless, single-invocation CLI tool with no authentication
 - None
 
 **Outgoing:**
-- None
-
-## Interchange Format
-
-The only "external" concern is the output format:
-
-**JSON Interchange (Tenor Interchange Format):**
-- Produced by `elaborate()` in `elaborator/src/elaborate.rs`
-- Serialized via `serde_json` in Pass 6 (serialization)
-- Used by: Test fixtures (`.expected.json` files for conformance testing)
-- Schema: Structured JSON with:
-  - Constructs (fact, entity, rule, operation, flow, type declarations)
-  - Typed expressions with precedence and type information
-  - Numeric values with precision metadata
-  - Sorted keys (lexicographic ordering within objects)
-  - See `docs/TENOR.md` for full interchange specification (v0.3)
+- None — the only outbound HTTP is the Anthropic API call in `crates/cli/src/ambiguity/api.rs`, which is user-initiated via CLI command
 
 ---
 

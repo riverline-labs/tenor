@@ -1,0 +1,37 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_active"
+        ],
+        "rule": "check_active",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "system_active"
+    }
+  ],
+  "flow_outcome": "rolled_back",
+  "steps_executed": [
+    {
+      "step_id": "step_activate",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_finalize",
+      "step_type": "operation",
+      "result": "error: entity 'Account' in state 'active', expected 'pending'"
+    },
+    {
+      "step_id": "comp:rollback_account",
+      "step_type": "compensation",
+      "result": "success"
+    }
+  ]
+}

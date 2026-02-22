@@ -1,0 +1,20 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "computed_amount",
+          "expected_amount"
+        ],
+        "rule": "amounts_match",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "decimal_amounts_equal"
+    }
+  ]
+}

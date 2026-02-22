@@ -1,0 +1,10 @@
+{
+  "escrow_amount": {"amount": "8500.00", "currency": "USD"},
+  "delivery_status": "confirmed",
+  "compliance_threshold": {"amount": "10000.00", "currency": "USD"},
+  "buyer_requested_refund": false,
+  "line_items": [
+    {"id": "L1", "description": "Widget A", "amount": {"amount": "5000.00", "currency": "USD"}, "valid": true},
+    {"id": "L2", "description": "Widget B", "amount": {"amount": "3500.00", "currency": "USD"}, "valid": true}
+  ]
+}

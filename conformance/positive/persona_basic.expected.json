@@ -1,0 +1,95 @@
+{
+  "constructs": [
+    {
+      "id": "status",
+      "kind": "Fact",
+      "provenance": {
+        "file": "persona_basic.tenor",
+        "line": 8
+      },
+      "source": {
+        "field": "status",
+        "system": "sys"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Enum",
+        "values": [
+          "active",
+          "inactive"
+        ]
+      }
+    },
+    {
+      "id": "Account",
+      "initial": "open",
+      "kind": "Entity",
+      "provenance": {
+        "file": "persona_basic.tenor",
+        "line": 13
+      },
+      "states": [
+        "open",
+        "closed"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "open",
+          "to": "closed"
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "kind": "Persona",
+      "provenance": {
+        "file": "persona_basic.tenor",
+        "line": 6
+      },
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "admin"
+      ],
+      "effects": [
+        {
+          "entity_id": "Account",
+          "from": "open",
+          "to": "closed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed"
+      ],
+      "id": "close_account",
+      "kind": "Operation",
+      "precondition": {
+        "left": {
+          "fact_ref": "status"
+        },
+        "op": "=",
+        "right": {
+          "literal": "active",
+          "type": {
+            "base": "Enum",
+            "values": [
+              "active",
+              "inactive"
+            ]
+          }
+        }
+      },
+      "provenance": {
+        "file": "persona_basic.tenor",
+        "line": 19
+      },
+      "tenor": "1.0"
+    }
+  ],
+  "id": "persona_basic",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

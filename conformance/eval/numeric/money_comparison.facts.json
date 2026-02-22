@@ -1,0 +1,4 @@
+{
+  "payment_amount": { "amount": "999.99", "currency": "USD" },
+  "payment_limit": { "amount": "1000.00", "currency": "USD" }
+}

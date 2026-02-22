@@ -15,7 +15,7 @@
         "field": "refund_requested",
         "system": "buyer_portal"
       },
-      "tenor": "0.3",
+      "tenor": "1.0",
       "type": {
         "base": "Bool"
       }
@@ -41,7 +41,7 @@
         "field": "release_threshold",
         "system": "compliance_service"
       },
-      "tenor": "0.3",
+      "tenor": "1.0",
       "type": {
         "base": "Money",
         "currency": "USD"
@@ -58,7 +58,7 @@
         "field": "status",
         "system": "delivery_service"
       },
-      "tenor": "0.3",
+      "tenor": "1.0",
       "type": {
         "base": "Enum",
         "values": [
@@ -79,7 +79,7 @@
         "field": "current_balance",
         "system": "escrow_service"
       },
-      "tenor": "0.3",
+      "tenor": "1.0",
       "type": {
         "base": "Money",
         "currency": "USD"
@@ -96,7 +96,7 @@
         "field": "line_items",
         "system": "order_service"
       },
-      "tenor": "0.3",
+      "tenor": "1.0",
       "type": {
         "base": "List",
         "element_type": {
@@ -135,7 +135,7 @@
         "confirmed",
         "failed"
       ],
-      "tenor": "0.3",
+      "tenor": "1.0",
       "transitions": [
         {
           "from": "pending",
@@ -165,7 +165,7 @@
         "refunded",
         "disputed"
       ],
-      "tenor": "0.3",
+      "tenor": "1.0",
       "transitions": [
         {
           "from": "held",
@@ -250,7 +250,7 @@
         "line": 70
       },
       "stratum": 0,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "body": {
@@ -284,7 +284,7 @@
         "line": 88
       },
       "stratum": 0,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "body": {
@@ -322,7 +322,7 @@
         "line": 76
       },
       "stratum": 0,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "body": {
@@ -360,7 +360,7 @@
         "line": 82
       },
       "stratum": 0,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "body": {
@@ -393,7 +393,7 @@
         "line": 94
       },
       "stratum": 0,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "body": {
@@ -423,7 +423,7 @@
         "line": 118
       },
       "stratum": 1,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "body": {
@@ -460,7 +460,7 @@
         "line": 102
       },
       "stratum": 1,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "body": {
@@ -499,7 +499,7 @@
         "line": 110
       },
       "stratum": 1,
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "allowed_personas": [
@@ -564,7 +564,7 @@
         "file": "integration_escrow.tenor",
         "line": 156
       },
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "allowed_personas": [
@@ -597,7 +597,7 @@
         "file": "integration_escrow.tenor",
         "line": 148
       },
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "allowed_personas": [
@@ -623,7 +623,7 @@
         "file": "integration_escrow.tenor",
         "line": 163
       },
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "allowed_personas": [
@@ -649,7 +649,7 @@
         "file": "integration_escrow.tenor",
         "line": 141
       },
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "allowed_personas": [
@@ -675,7 +675,7 @@
         "file": "integration_escrow.tenor",
         "line": 127
       },
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "allowed_personas": [
@@ -701,7 +701,7 @@
         "file": "integration_escrow.tenor",
         "line": 134
       },
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "allowed_personas": [
@@ -727,7 +727,7 @@
         "file": "integration_escrow.tenor",
         "line": 170
       },
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "entry": "step_refund",
@@ -756,7 +756,7 @@
           "persona": "escrow_agent"
         }
       ],
-      "tenor": "0.3"
+      "tenor": "1.0"
     },
     {
       "entry": "step_confirm",
@@ -857,10 +857,11 @@
           "persona": "compliance_officer"
         }
       ],
-      "tenor": "0.3"
+      "tenor": "1.0"
     }
   ],
   "id": "integration_escrow",
   "kind": "Bundle",
-  "tenor": "0.3"
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
 }

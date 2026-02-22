@@ -1,0 +1,68 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "payment_ok"
+        ],
+        "rule": "payment_failed",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "payment_failed"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "current_seat_count",
+          "plan_features"
+        ],
+        "rule": "seats_within_limit",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "seats_ok"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "should_suspend",
+        "stratum": 1,
+        "verdicts_used": [
+          "payment_failed"
+        ]
+      },
+      "type": "suspension_required"
+    }
+  ],
+  "flow_outcome": "suspended",
+  "steps_executed": [
+    {
+      "step_id": "step_activate",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_check_payment",
+      "step_type": "branch",
+      "result": "false"
+    },
+    {
+      "step_id": "step_suspend",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

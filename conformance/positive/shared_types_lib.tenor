@@ -1,0 +1,8 @@
+// Shared type library -- contains only TypeDecl constructs
+// Imported by shared_types.tenor
+
+type Address {
+  street: Text(max_length: 200)
+  city:   Text(max_length: 100)
+  zip:    Text(max_length: 10)
+}

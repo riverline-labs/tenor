@@ -1,0 +1,25 @@
+{
+  "auth_status": "submitted",
+  "medical_records": [
+    {"record_id": "MR-001", "record_type": "Lab Results", "is_relevant": true, "is_complete": true},
+    {"record_id": "MR-002", "record_type": "Imaging", "is_relevant": true, "is_complete": true},
+    {"record_id": "MR-003", "record_type": "Clinical Notes", "is_relevant": true, "is_complete": true}
+  ],
+  "policy_criteria": {
+    "diagnosis_covered": true,
+    "treatment_in_formulary": true,
+    "provider_in_network": true,
+    "step_therapy_completed": true,
+    "prior_treatments_documented": true
+  },
+  "diagnosis_code": "M54.5",
+  "treatment_code": "97140",
+  "urgency_level": "routine",
+  "clinical_criteria_met": true,
+  "appeal_deadline": "2026-06-15",
+  "denial_reason": "medical_necessity",
+  "peer_review_requested": false,
+  "appeal_filed": false,
+  "appeal_merit_score": 0,
+  "new_evidence_submitted": false
+}

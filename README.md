@@ -6,7 +6,7 @@ Tenor is a finite, stratified, verdict-producing formal system for describing th
 
 > Any agent that can read this specification can fully understand a system described in it, without reading any implementation code.
 
-**Status:** Pre-alpha. Core constructs canonicalized. Tenor v1.0 defined. Elaborator 47/47 conformance tests passing.  
+**Status:** Pre-alpha. Core constructs canonicalized. Tenor v1.0 defined.
 **Stability:** Pre-release (v0.3). Do not build production systems against this version. See [`STABILITY.md`](STABILITY.md).
 
 ---
@@ -149,11 +149,30 @@ Every step is bounded, deterministic, and statically analyzable.
 ## Structure
 
 ```
-docs/TENOR.md     — full formal specification (v0.3)
-STABILITY.md      — pre-release stability notice
-CONTRIBUTING.md   — contribution guidelines
-conformance/      — elaborator conformance suite (47/47 tests passing)
-elaborator/       — reference elaborator implementation (Rust)
+docs/TENOR.md       — full formal specification (v1.0)
+STABILITY.md        — pre-release stability notice
+CONTRIBUTING.md     — contribution guidelines
+conformance/        — elaborator conformance suite
+crates/
+  core/             — library: elaboration pipeline, AST, typed pass outputs
+  cli/              — binary: `tenor` command-line tool
+  eval/             — library: contract evaluator (Phase 3)
+  analyze/          — library: static analysis S1-S7 (Phase 4)
+  codegen/          — library: code generation targets (Phase 6)
+  lsp/              — library: Language Server Protocol (Phase 8)
+```
+
+## Build
+
+```bash
+# Build all crates
+cargo build --workspace
+
+# Run conformance suite
+cargo run -p tenor-cli -- run conformance
+
+# Elaborate a single file
+cargo run -p tenor-cli -- elaborate path/to/file.tenor
 ```
 
 ---

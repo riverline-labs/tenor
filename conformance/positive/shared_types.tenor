@@ -1,0 +1,21 @@
+// Positive test: Shared type library usage
+// Covers: import of a type library file, TypeRef resolution across files
+// Expected: elaborates without error, produces shared_types.expected.json
+
+import "shared_types_lib.tenor"
+
+fact customer_address {
+  type:   Address
+  source: "crm.address"
+}
+
+fact is_valid {
+  type:   Bool
+  source: "validation.valid"
+}
+
+rule address_present {
+  stratum: 0
+  when:    is_valid = true
+  produce: verdict address_ok { payload: Bool = true }
+}

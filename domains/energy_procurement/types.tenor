@@ -1,0 +1,26 @@
+// Energy Procurement RFP Workflow — Shared Types
+// Models supplier evaluation scoring and cost breakdown structures
+// used across the RFP approval and award lifecycle.
+
+// ── Named Types ──────────────────────────────────────────────────────────────
+
+type SupplierScore {
+  technical_score:   Int(min: 0, max: 100)
+  price_score:       Int(min: 0, max: 100)
+  reliability_score: Int(min: 0, max: 100)
+  total_score:       Int(min: 0, max: 300)
+}
+
+type CostBreakdown {
+  commodity_cost: Money(currency: "USD")
+  delivery_cost:  Money(currency: "USD")
+  risk_premium:   Money(currency: "USD")
+}
+
+type BidRecord {
+  supplier_id:   Text(max_length: 64)
+  bid_amount:    Money(currency: "USD")
+  scores:        SupplierScore
+  cost_detail:   CostBreakdown
+  compliant:     Bool
+}

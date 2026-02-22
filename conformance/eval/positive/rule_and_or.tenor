@@ -1,0 +1,22 @@
+// Evaluator test: compound logical conditions (And/Or/Not)
+
+fact is_active {
+  type:   Bool
+  source: "account.active"
+}
+
+fact is_verified {
+  type:   Bool
+  source: "account.verified"
+}
+
+fact is_blocked {
+  type:   Bool
+  source: "account.blocked"
+}
+
+rule eligible {
+  stratum: 0
+  when:    (is_active = true ∧ is_verified = true) ∧ ¬(is_blocked = true)
+  produce: verdict account_eligible { payload: Bool = true }
+}

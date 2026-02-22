@@ -1,0 +1,27 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_premium"
+        ],
+        "rule": "check_premium",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "premium_account"
+    }
+  ],
+  "flow_outcome": "premium_path",
+  "steps_executed": [
+    {
+      "step_id": "step_check",
+      "step_type": "branch",
+      "result": "true"
+    }
+  ]
+}

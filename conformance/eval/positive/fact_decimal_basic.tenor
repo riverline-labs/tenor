@@ -1,0 +1,17 @@
+// Evaluator test: decimal fact with comparison rule
+
+fact unit_price {
+  type:   Decimal(precision: 10, scale: 2)
+  source: "pricing.unit_price"
+}
+
+fact threshold {
+  type:   Decimal(precision: 10, scale: 2)
+  source: "pricing.threshold"
+}
+
+rule above_threshold {
+  stratum: 0
+  when:    unit_price > threshold
+  produce: verdict price_above_threshold { payload: Bool = true }
+}

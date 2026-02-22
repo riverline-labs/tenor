@@ -1,0 +1,87 @@
+{
+  "constructs": [
+    {
+      "id": "customer_address",
+      "kind": "Fact",
+      "provenance": {
+        "file": "shared_types.tenor",
+        "line": 7
+      },
+      "source": {
+        "field": "address",
+        "system": "crm"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Record",
+        "fields": {
+          "city": {
+            "base": "Text",
+            "max_length": 100
+          },
+          "street": {
+            "base": "Text",
+            "max_length": 200
+          },
+          "zip": {
+            "base": "Text",
+            "max_length": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "is_valid",
+      "kind": "Fact",
+      "provenance": {
+        "file": "shared_types.tenor",
+        "line": 12
+      },
+      "source": {
+        "field": "valid",
+        "system": "validation"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "address_ok"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "is_valid"
+          },
+          "op": "=",
+          "right": {
+            "literal": true,
+            "type": {
+              "base": "Bool"
+            }
+          }
+        }
+      },
+      "id": "address_present",
+      "kind": "Rule",
+      "provenance": {
+        "file": "shared_types.tenor",
+        "line": 17
+      },
+      "stratum": 0,
+      "tenor": "1.0"
+    }
+  ],
+  "id": "shared_types",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

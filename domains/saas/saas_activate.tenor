@@ -1,0 +1,173 @@
+// SaaS Subscription Lifecycle — Activation Path Fixture
+// Same contract as saas_subscription.tenor. Eval facts exercise the happy path:
+// trial -> active, payment ok, flow terminates with "activated" outcome.
+// Exercises: OperationStep success, BranchStep true path, entity state transition.
+
+// ── Named Types ──────────────────────────────────────────────────────────────
+
+type PlanFeatures {
+  max_seats:       Int(min: 1, max: 10000)
+  api_access:      Bool
+  sso_enabled:     Bool
+  custom_branding: Bool
+}
+
+// ── Personas ─────────────────────────────────────────────────────────────────
+
+persona account_admin
+persona billing_system
+persona support_agent
+
+// ── Facts ────────────────────────────────────────────────────────────────────
+
+fact current_seat_count {
+  type:   Int(min: 0, max: 10000)
+  source: "identity_service.active_users"
+}
+
+fact subscription_plan {
+  type:   Enum(values: ["free", "starter", "professional", "enterprise"])
+  source: "billing_service.current_plan"
+}
+
+fact plan_features {
+  type:   PlanFeatures
+  source: "plan_service.features"
+}
+
+fact payment_ok {
+  type:    Bool
+  source:  "billing_service.payment_status"
+  default: true
+}
+
+fact account_age_days {
+  type:   Int(min: 0, max: 100000)
+  source: "account_service.age_days"
+}
+
+fact cancellation_requested {
+  type:    Bool
+  source:  "account_service.cancel_requested"
+  default: false
+}
+
+// ── Entities ─────────────────────────────────────────────────────────────────
+
+entity Subscription {
+  states:  [trial, active, suspended, cancelled]
+  initial: trial
+  transitions: [
+    (trial, active),
+    (trial, cancelled),
+    (active, suspended),
+    (active, cancelled),
+    (suspended, active),
+    (suspended, cancelled)
+  ]
+}
+
+// ── Rules — Stratum 0 (direct fact checks) ───────────────────────────────────
+
+rule seats_within_limit {
+  stratum: 0
+  when:    current_seat_count <= plan_features.max_seats
+  produce: verdict seats_ok { payload: Bool = true }
+}
+
+rule payment_current {
+  stratum: 0
+  when:    payment_ok = true
+  produce: verdict payment_current { payload: Bool = true }
+}
+
+rule payment_failed {
+  stratum: 0
+  when:    payment_ok = false
+  produce: verdict payment_failed { payload: Bool = true }
+}
+
+rule trial_eligible {
+  stratum: 0
+  when:    account_age_days <= 30
+  produce: verdict within_trial_period { payload: Bool = true }
+}
+
+// ── Rules — Stratum 1 (composite verdicts) ───────────────────────────────────
+
+rule can_activate {
+  stratum: 1
+  when:    verdict_present(seats_ok)
+         ∧ verdict_present(payment_current)
+  produce: verdict activation_approved { payload: Bool = true }
+}
+
+rule should_suspend {
+  stratum: 1
+  when:    verdict_present(payment_failed)
+  produce: verdict suspension_required { payload: Bool = true }
+}
+
+// ── Operations ───────────────────────────────────────────────────────────────
+
+operation activate_subscription {
+  allowed_personas: [billing_system]
+  precondition:     verdict_present(seats_ok)
+  effects:          [(Subscription, trial, active)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation suspend_subscription {
+  allowed_personas: [billing_system, support_agent]
+  precondition:     verdict_present(suspension_required)
+  effects:          [(Subscription, active, suspended)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation reactivate_subscription {
+  allowed_personas: [billing_system]
+  precondition:     verdict_present(activation_approved)
+  effects:          [(Subscription, suspended, active)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation cancel_subscription {
+  allowed_personas: [account_admin, billing_system]
+  precondition:     cancellation_requested = true
+  effects:          [(Subscription, active, cancelled)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+// ── Flows ────────────────────────────────────────────────────────────────────
+
+flow subscription_lifecycle {
+  snapshot: at_initiation
+  entry:    step_activate
+
+  steps: {
+    step_activate: OperationStep {
+      op:      activate_subscription
+      persona: billing_system
+      outcomes: {
+        success: step_check_payment
+      }
+      on_failure: Terminate(outcome: activation_failed)
+    }
+
+    step_check_payment: BranchStep {
+      condition: verdict_present(payment_current)
+      persona:   billing_system
+      if_true:   Terminal(activated)
+      if_false:  step_suspend
+    }
+
+    step_suspend: OperationStep {
+      op:      suspend_subscription
+      persona: billing_system
+      outcomes: {
+        success: Terminal(suspended)
+      }
+      on_failure: Terminate(outcome: suspension_failed)
+    }
+  }
+}

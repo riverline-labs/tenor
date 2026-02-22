@@ -5,211 +5,137 @@
 ## Naming Patterns
 
 **Files:**
-- Lowercase snake_case with `.rs` extension
-- Match module/struct names exactly: `lexer.rs` contains the `Spanned` and `lex()` function; `elaborate.rs` contains elaboration passes
-- Test/fixture files use `.tenor` extension for DSL source and `.expected.json` for expected output
+- Pass modules: `pass{N}_{name}.rs` — e.g., `pass1_bundle.rs`, `pass4_typecheck.rs`
+- Test files in `tests/` directory: snake_case — e.g., `cli_integration.rs`, `schema_validation.rs`
+- Source modules: snake_case — e.g., `ast.rs`, `elaborate.rs`, `runner.rs`
 
 **Functions:**
-- Lowercase snake_case: `load_bundle`, `check_cross_file_dups`, `build_type_env`
-- Public functions prefixed with `pub fn`
-- Helper functions (private) use same naming: no distinction between public/private except `pub` keyword
-- Pass-related functions explicit: `type_check_rules`, `validate_rule`, `serialize_construct`
+- Public API entry points: snake_case verbs — `elaborate()`, `load_bundle()`, `build_index()`, `build_type_env()`, `resolve_types()`
+- Helper functions: snake_case — `detect_typedecl_cycle()`, `check_cross_file_dups()`, `glob_tenor_files()`
+- Test helper functions: descriptive snake_case — `comparison_bundle()`, `assert_verdict_produced()`, `workspace_root()`
+- Constructor methods: `new()`, `from_interchange()`, `from_json()`
 
 **Variables:**
-- Lowercase snake_case: `all_constructs`, `fact_types`, `bundle_id`
-- Single-letter or abbreviated names only for loop counters and very local scope: `pos`, `c` (for construct)
-- Meaningful names even in loops: `for c in constructs` instead of `for item in constructs`
+- snake_case throughout — `fact_types`, `bundle_id`, `root_dir`, `verdict_strata`
+- Short abbreviations for local iteration — `c` for construct, `t` for type, `p` for path, `e` for entry
+- Underscore prefix for intentionally unused params — `_persona`, `_index`
 
 **Types:**
-- PascalCase for structs: `Parser`, `Provenance`, `RawConstruct`, `ElabError`, `Tap`
-- PascalCase for enums: `Token`, `RawType`, `RawExpr`, `RawTerm`, `RawStep`
-- Enum variants: PascalCase when compound, snake_case for simple: `TypeRef(String)`, `Fact { ... }`, `lex` command keyword
-- Type aliases use full words: `TypeEnv = HashMap<String, RawType>`
+- Structs: PascalCase — `ElabError`, `Provenance`, `Index`, `TypeEnv`, `RunResult`, `Tap`
+- Enums: PascalCase — `RawConstruct`, `RawType`, `RawExpr`, `RawTerm`, `Token`, `EvalError`, `Value`
+- Enum variants: PascalCase — `Fact`, `Entity`, `Rule`, `Operation`, `Flow`, `Bool`, `Int`, `Decimal`
+- Type aliases: PascalCase — `TypeEnv = HashMap<String, RawType>`
+
+**DSL Construct Names in Code:**
+- Construct kind strings in interchange JSON use PascalCase: `"Fact"`, `"Entity"`, `"Rule"`, `"Operation"`, `"Flow"`
+- DSL source keywords are lowercase (`fact`, `entity`, `rule`) — not in Rust source, only in `.tenor` files
 
 ## Code Style
 
 **Formatting:**
-- Standard Rust conventions (no explicit formatter referenced)
-- Indentation: 4 spaces (observed throughout)
-- Lines: generally under 100 characters; longer lines appear in complex match statements and error messages
-- Braces: Allman style for structs/enums (opening brace on same line)
+- `cargo fmt` (rustfmt) with default settings — enforced in CI
+- No `rustfmt.toml` customization detected — standard Rust formatting rules apply
 
 **Linting:**
-- No explicit linting config found in repo (.eslintrc, .clippy.toml absent)
-- Code follows standard Rust idioms: result types, pattern matching, no unwraps in library code
+- `cargo clippy --workspace -- -D warnings` — all warnings treated as errors in CI
+- One explicit allow at crate level: `#![allow(clippy::result_large_err)]` in `crates/core/src/lib.rs`
+- Two targeted allows on specific types: `#[allow(clippy::large_enum_variant)]` on `PayloadValue` and `FlowStep` in `crates/eval/src/types.rs`
 
 ## Import Organization
 
-**Order:**
-1. External crate imports (`use serde::...`, `use serde_json::...`)
-2. Standard library (`use std::...`)
-3. Local crate modules (`use crate::...`)
+**Order (within each file):**
+1. External crate imports: `use serde_json::Value;`, `use std::collections::HashMap;`
+2. Crate-local imports: `use crate::ast::*;`, `use crate::error::ElabError;`
+3. No enforced blank-line grouping observed — files typically group by std then crate
 
-**Path Aliases:**
-- No path aliases used (`@` shortcuts absent in code)
-- Imports explicit and full: `use crate::elaborate`, `use crate::error::ElabError`
+**Pattern:**
+- `use crate::ast::*;` glob imports are used for AST types within pass modules (acceptable because ast.rs is a shared type module within the same crate)
+- All other imports are explicit — `use crate::pass2_index::Index;` not `use crate::pass2_index::*;`
+- Cross-crate imports use full paths — `use tenor_core::elaborate;`
 
-**Examples:**
-```rust
-// elaborate.rs imports
-use crate::error::ElabError;
-use crate::lexer;
-use crate::parser::{self, Provenance, RawBranch, RawCompStep, RawConstruct, RawExpr, ...};
-use serde_json::{json, Map, Value};
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
-use std::path::{Path, PathBuf};
-```
+**Re-exports:**
+- `crates/core/src/lib.rs` re-exports key public types and entry points at crate root for consumer convenience
+- Pattern: group by "types" then "entry points" with labeled section comments
 
 ## Error Handling
 
-**Patterns:**
-- All fallible operations return `Result<T, ElabError>`
-- `ElabError::new(pass, kind, id, field, file, line, message)` factory used throughout
-- Errors never unwrap; always propagate with `?` operator or explicit `Err` return
-- Error context includes elaboration pass number (0-6), construct metadata, file location, line number
-- Error messages are user-facing, descriptive, and actionable
+**Primary Pattern:**
+- All elaboration errors return `Result<T, ElabError>` — never panics in production code paths
+- `ElabError::new()` with explicit pass number, construct kind, construct id, field, file, line, message
+- Constructor helpers for common cases: `ElabError::lex()`, `ElabError::parse()`
+- Errors propagated with `?` operator — no `unwrap()` in non-test production code except where invariants are guaranteed (e.g., after cycle detection that proved membership)
 
-**Error examples:**
-```rust
-// From elaborate.rs line 220-224
-if let Some(first) = idx.facts.get(id) {
-    return Err(ElabError::new(
-        2, Some("Fact"), Some(id), Some("id"),
-        &prov.file, prov.line,
-        format!("duplicate Fact id '{}': first declared at line {}", id, first.line),
-    ));
-}
+**Evaluation Errors:**
+- `EvalError` enum with named struct variants — `MissingFact { fact_id }`, `TypeMismatch { fact_id, expected, got }`
+- `impl fmt::Display for EvalError` — all variants produce human-readable messages
+- `impl std::error::Error for EvalError`
 
-// From elaborate.rs line 344-349
-return Err(ElabError::new(
-    3, Some("TypeDecl"), Some(back_edge_name),
-    Some(&format!("type.fields.{}", field_name)),
-    &prov.file, prov.line,
-    format!("TypeDecl cycle detected: {}", cycle_str),
-));
-```
+**CLI Error Handling:**
+- Pattern: `match result { Ok(v) => { ... } Err(e) => { report_error(...); process::exit(1); } }`
+- Exit codes: 0 = success, 1 = runtime error, 2 = not-yet-implemented stub
+- `report_error()` helper respects `--quiet` and `--output` flags before printing
+
+**Invariant Unwraps:**
+- `unwrap()` used only after guards that logically guarantee presence — e.g., after `if stack.contains(&name)` then `.position().unwrap()`
+- Tests use `.unwrap()` and `.unwrap_or_else(|e| panic!(...))` freely
 
 ## Logging
 
-**Framework:** Built-in Rust `eprintln!` macro for stderr, `println!` for stdout
+**Framework:** None — no logging crate detected.
 
 **Patterns:**
-- Error output: `eprintln!("error: ...")` to stderr
-- Help text: `eprintln!("Usage: ...")` to stderr
-- Normal output: `println!("{}", pretty)` for successful elaboration, `println!("ok ...")` for TAP test output
-- No structured logging framework; messages are plain text
-
-**Examples from `main.rs`:**
-```rust
-eprintln!("error: conformance suite directory not found: {}", suite_dir.display());
-eprintln!("unknown command '{}'; use 'run' or 'elaborate'", cmd);
-```
+- Diagnostic output goes to stderr via `eprintln!`
+- Success output goes to stdout via `println!`
+- `--quiet` flag suppresses non-essential output at CLI layer; errors on stderr may still be suppressed
+- No structured logging in library crates — errors are returned as typed values, not logged
 
 ## Comments
 
+**Module-Level Doc Comments:**
+- Every `.rs` file begins with a `//!` doc comment describing the module's purpose and pass role
+- Example: `//! Pass 0+1: Lex, parse, import resolution, cycle detection, bundle assembly.`
+- Top-level crate lib.rs has full `//!` doc block listing public API items with rustdoc links
+
+**Section Dividers:**
+- Horizontal rule style: `// ── Section Name ─────────────────────────────────────────────` (box-drawing chars)
+- Used consistently in large files to separate logical sections — `ast.rs`, `pass4_typecheck.rs`, `pass5_validate.rs`, `types.rs`
+- Shorter variant: `// ── Short label ────────────────────────────────────` for lib.rs re-export groups
+
+**Inline Comments:**
+- `///` doc comments on public items (structs, enums, functions, fields) explaining purpose
+- `//` inline for clarifying non-obvious choices: field semantics, algorithm steps, invariant notes
+- Example from `ast.rs`: `/// Line of the `initial:` field keyword`
+- Test category labels: `// ──── A. Int arithmetic (5 cases) ────────────────────`
+
 **When to Comment:**
-- Module-level documentation above module declarations (e.g., `/// Six-pass elaborator: ...`)
-- Function-level documentation for public entry points only: `/// Elaborate the given root file...`
-- Inline comments for non-obvious algorithm steps or complex pass transitions
-- Inline comments explaining why, not what: "// cross-file duplicate check (Pass 1)" not "// check duplicates"
-- Block separators for major pass boundaries: `// ──────────────────────────────────────────────...`
-
-**Doc Comments (///)**
-- Used only for high-level, public APIs: `pub fn elaborate()`, module overview
-- Not used for internal helper functions or struct fields (seen in parser.rs for RawConstruct variants only)
-- Include pass number context for elaboration functions: `/// Pass 4: check produce clause...`
-
-**Test Comments:**
-- DSL test files (.tenor) include descriptive comments: `// Positive test: basic Fact declarations...` explaining test intent and expected behavior
-- Comments reference error location if applicable: `// An unrecognized character '@' appears in the source.`
-
-**Examples:**
-```rust
-// From elaborate.rs module header (lines 1-9)
-/// Six-pass elaborator: Tenor → TenorInterchange JSON bundle.
-///
-/// Pass 0 — Lex and parse
-/// Pass 1 — Import resolution and bundle assembly
-...
-
-// From elaborate.rs function (lines 75-77)
-/// Detect constructs with the same (kind, id) coming from different files.
-/// Scans in reverse so that root-file constructs (appended last) are treated as
-/// "first declared", and imports with clashing ids get the Pass 1 error.
-
-// From elaborate.rs inline (line 67)
-// all_constructs is in imports-first order (depth-first); scanning in reverse
-// means root-file constructs are encountered first, so they are "first declared".
-```
+- All public items: required
+- Algorithm steps in passes: one comment per major phase within a function
+- Tricky ordering decisions: document the "why" — see `parse_predicate()` comment about Mul nodes
 
 ## Function Design
 
-**Size:** Functions average 20-40 lines; longest functions handle complex validation (80-120 lines like `validate_flow`)
-- Helper functions are extracted for readability: `references_type`, `type_refs`, `resolve_typedecl`
-- Pass-specific logic grouped in dedicated functions matching pass name
+**Size:** Functions are kept focused — pass entry points delegate to private helpers immediately. Large match arms in `types.rs` and `pass5_validate.rs` are the exception where exhaustive matching requires length.
 
 **Parameters:**
-- Explicit struct passing preferred over references to primitive collections
-- Input references immutable unless mutating collection: `&mut Tap`, `&mut in_stack`
-- File provenance (`prov: &Provenance` or `file: &str, line: u32`) always explicit
-- Fact/type lookups passed as `&HashMap` for read-only access
+- Pass functions accept slices `&[RawConstruct]` not owned Vecs (except where ownership transfer is needed)
+- Error context propagated through parameters: `file: &str`, `line: u32` passed to sub-functions
+- Mutable state threaded via `&mut` parameters in the bundle loader: `visited`, `stack`, `out`
 
 **Return Values:**
-- All potentially-failing operations return `Result<T, ElabError>`
-- Success returns inner value without wrapper: `Ok(bundle)` not `Ok(Ok(...))`
-- Helper builders return inner type then wrap caller: `build_type_env() -> Result<TypeEnv, ...>` not `Option`
-- Void operations return `()`: `validate()`, `check_cross_file_dups()`
-
-**Examples:**
-```rust
-// From elaborate.rs line 204
-fn build_index(constructs: &[RawConstruct]) -> Result<Index, ElabError> {
-    let mut idx = Index { ... };
-    for c in constructs { ... }
-    Ok(idx)
-}
-
-// From elaborate.rs line 321-326
-fn detect_typedecl_cycle(
-    name: &str,
-    decls: &BTreeMap<String, (BTreeMap<String, RawType>, Provenance)>,
-    visited: &mut HashSet<String>,
-    in_stack: &mut Vec<String>,
-) -> Result<(), ElabError> {
-```
+- `Result<T, ElabError>` for all fallible operations in the elaborator
+- `Result<T, EvalError>` for all fallible evaluator operations
+- Infallible helpers return `T` directly — no wrapping in `Ok()`
 
 ## Module Design
 
 **Exports:**
-- `pub fn` for entry points used outside module: `pub fn lex()`, `pub fn parse()`, `pub fn elaborate()`, `pub fn run_suite()`
-- Type exports via `pub enum`/`pub struct` only where used externally: `pub struct ElabError`, `pub enum Token`
-- Internal helpers remain private: `fn build_index()`, `fn serialize_construct()` not exported
+- Library crates expose a minimal public API; internal helpers are `fn` (private by default)
+- `pub` on types and functions only when consumed outside the module
+- `pub use` in `lib.rs` creates flat re-export surface — callers use `tenor_core::ElabError` not `tenor_core::error::ElabError`
 
 **Barrel Files:**
-- No barrel file pattern observed (no `mod.rs` with re-exports)
-- Each module self-contained: `lexer.rs` has all lexing logic, `parser.rs` has all parsing logic
-- Main module (`main.rs`) imports and orchestrates: `mod elaborate; mod error; mod lexer; mod parser; ...`
-
-**No re-exports:** Each module boundary respected; clients import from specific modules: `use crate::elaborate::elaborate`, `use crate::error::ElabError`
-
-## Cross-Cutting Patterns
-
-**Provenance tracking:**
-All constructs carry exact source location (`file: String, line: u32`). Used in every error to pinpoint DSL source.
-
-**Pass numbering:**
-Every error includes pass number (0-6) as first field. Errors reported to users and in tests with pass number prefix.
-
-**Collections over iteration:**
-Prefer `BTreeMap` for stable ordering (enum variant iteration, typeDecl field iteration).
-Use `HashMap` for O(1) lookups (construct index, type env).
-Use `HashSet` for membership tests (visited tracking, duplicate detection).
-Use `Vec` for ordered sequences (constructs, transitions, steps).
-
-**JSON serialization:**
-- All output via serde_json with explicit field ordering (Map construction, not derive)
-- Keys always alphabetically sorted per Tenor interchange spec
-- Numeric values wrapped in structured types: `{"kind": "decimal_value", "precision": P, "scale": S, "value": "..."}`
+- `lib.rs` acts as a barrel for re-exports in `tenor-core`
+- Individual pass modules are all `pub mod` — fully accessible if needed for partial pipeline execution
 
 ---
 

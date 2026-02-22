@@ -1,0 +1,9 @@
+{
+  "construct_id": "multi_op",
+  "construct_kind": "Operation",
+  "field": "effects",
+  "file": "effect_undeclared_outcome.tenor",
+  "line": 23,
+  "message": "effect (E, a, c) references undeclared outcome 'unknown'; declared outcomes are: [success, failure]",
+  "pass": 5
+}

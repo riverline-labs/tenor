@@ -2,83 +2,175 @@
   "constructs": [
     {
       "default": {
-        "amount": { "kind": "decimal_value", "precision": 10, "scale": 2, "value": "0.00" },
+        "amount": {
+          "kind": "decimal_value",
+          "precision": 10,
+          "scale": 2,
+          "value": "0.00"
+        },
         "currency": "USD",
         "kind": "money_value"
       },
       "id": "balance",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 39 },
-      "source": { "field": "balance", "system": "account_service" },
-      "tenor": "0.3",
-      "type": { "base": "Money", "currency": "USD" }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 39
+      },
+      "source": {
+        "field": "balance",
+        "system": "account_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Money",
+        "currency": "USD"
+      }
     },
     {
       "id": "created_date",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 29 },
-      "source": { "field": "created_date", "system": "account_service" },
-      "tenor": "0.3",
-      "type": { "base": "Date" }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 29
+      },
+      "source": {
+        "field": "created_date",
+        "system": "account_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Date"
+      }
     },
     {
       "id": "description",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 19 },
-      "source": { "field": "description", "system": "catalog_service" },
-      "tenor": "0.3",
-      "type": { "base": "Text", "max_length": 512 }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 19
+      },
+      "source": {
+        "field": "description",
+        "system": "catalog_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Text",
+        "max_length": 512
+      }
     },
     {
       "id": "is_active",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 4 },
-      "source": { "field": "active", "system": "account_service" },
-      "tenor": "0.3",
-      "type": { "base": "Bool" }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 4
+      },
+      "source": {
+        "field": "active",
+        "system": "account_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
     },
     {
       "id": "item_count",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 9 },
-      "source": { "field": "item_count", "system": "inventory_service" },
-      "tenor": "0.3",
-      "type": { "base": "Int", "max": 1000, "min": 0 }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 9
+      },
+      "source": {
+        "field": "item_count",
+        "system": "inventory_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Int",
+        "max": 1000,
+        "min": 0
+      }
     },
     {
       "id": "last_updated",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 34 },
-      "source": { "field": "last_updated", "system": "account_service" },
-      "tenor": "0.3",
-      "type": { "base": "DateTime" }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 34
+      },
+      "source": {
+        "field": "last_updated",
+        "system": "account_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "DateTime"
+      }
     },
     {
       "id": "processing_time",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 45 },
-      "source": { "field": "elapsed", "system": "processing_service" },
-      "tenor": "0.3",
-      "type": { "base": "Duration", "max": 86400, "min": 0, "unit": "seconds" }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 45
+      },
+      "source": {
+        "field": "elapsed",
+        "system": "processing_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Duration",
+        "max": 86400,
+        "min": 0,
+        "unit": "seconds"
+      }
     },
     {
       "id": "status",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 24 },
-      "source": { "field": "status", "system": "account_service" },
-      "tenor": "0.3",
-      "type": { "base": "Enum", "values": ["pending", "active", "closed"] }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 24
+      },
+      "source": {
+        "field": "status",
+        "system": "account_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Enum",
+        "values": [
+          "pending",
+          "active",
+          "closed"
+        ]
+      }
     },
     {
       "id": "unit_price",
       "kind": "Fact",
-      "provenance": { "file": "fact_basic.tenor", "line": 14 },
-      "source": { "field": "unit_price", "system": "pricing_service" },
-      "tenor": "0.3",
-      "type": { "base": "Decimal", "precision": 10, "scale": 2 }
+      "provenance": {
+        "file": "fact_basic.tenor",
+        "line": 14
+      },
+      "source": {
+        "field": "unit_price",
+        "system": "pricing_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Decimal",
+        "precision": 10,
+        "scale": 2
+      }
     }
   ],
   "id": "fact_basic",
   "kind": "Bundle",
-  "tenor": "0.3"
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
 }
