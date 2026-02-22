@@ -83,36 +83,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SYS-01 | TBD | Pending |
-| SYS-02 | TBD | Pending |
-| SYS-03 | TBD | Pending |
-| SYS-04 | TBD | Pending |
-| SYS-05 | TBD | Pending |
-| SYS-06 | TBD | Pending |
-| SYS-07 | TBD | Pending |
-| SYS-08 | TBD | Pending |
-| ANLZ-09 | TBD | Pending |
-| ANLZ-10 | TBD | Pending |
-| ANLZ-11 | TBD | Pending |
-| EXEC-01 | TBD | Pending |
-| EXEC-02 | TBD | Pending |
-| SPEC-09 | TBD | Pending |
-| SPEC-10 | TBD | Pending |
-| DOMN-10 | TBD | Pending |
-| DOMN-11 | TBD | Pending |
-| DOMN-12 | TBD | Pending |
-| DOMN-13 | TBD | Pending |
-| DOMN-14 | TBD | Pending |
-| DOMN-15 | TBD | Pending |
-| DEVX-05 | TBD | Pending |
-| DEVX-06 | TBD | Pending |
-| DEVX-07 | TBD | Pending |
+| SYS-01 | Phase 12 | Pending |
+| SYS-02 | Phase 12 | Pending |
+| SYS-03 | Phase 12 | Pending |
+| SYS-04 | Phase 12 | Pending |
+| SYS-05 | Phase 12 | Pending |
+| SYS-06 | Phase 12 | Pending |
+| SYS-07 | Phase 12 | Pending |
+| SYS-08 | Phase 12 | Pending |
+| ANLZ-09 | Phase 12 | Pending |
+| ANLZ-10 | Phase 12 | Pending |
+| ANLZ-11 | Phase 12 | Pending |
+| EXEC-01 | Phase 12 | Pending |
+| EXEC-02 | Phase 12 | Pending |
+| SPEC-09 | Phase 12.1 | Pending |
+| SPEC-10 | Phase 12.1 | Pending |
+| DOMN-10 | Phase 13 | Pending |
+| DOMN-11 | Phase 13 | Pending |
+| DOMN-12 | Phase 13 | Pending |
+| DOMN-13 | Phase 13 | Pending |
+| DOMN-14 | Phase 13 | Pending |
+| DOMN-15 | Phase 13 | Pending |
+| DEVX-05 | Phase 14 | Pending |
+| DEVX-06 | Phase 14 | Pending |
+| DEVX-07 | Phase 14 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 after roadmap creation*
