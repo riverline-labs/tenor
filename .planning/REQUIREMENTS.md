@@ -18,12 +18,12 @@
 - [ ] **HARD-10**: Elaborate endpoint validates user content before writing to temp files
 - [ ] **HARD-11**: Auth, CORS, and rate limiting added to all HTTP endpoints
 - [ ] **HARD-12**: SystemContract coordinator designed for cross-contract triggers and shared entity state
-- [ ] **HARD-13**: Contract type uses HashMap indexes instead of Vec for O(1) lookups
+- [x] **HARD-13**: Contract type uses HashMap indexes instead of Vec for O(1) lookups
 - [ ] **HARD-14**: LSP crate has unit tests covering navigation and completion correctness
 - [x] **HARD-15**: Duplicate manifest/etag logic in runner.rs consolidated to import from manifest.rs
 - [x] **HARD-16**: Dead code annotations in LSP crate (semantic_tokens.rs, navigation.rs) resolved
-- [ ] **HARD-17**: Stratum rule evaluation uses indexed lookup instead of O(k*n) scan
-- [ ] **HARD-18**: Flow execution eliminates unnecessary deep clones (handle_failure vector cloning)
+- [x] **HARD-17**: Stratum rule evaluation uses indexed lookup instead of O(k*n) scan
+- [x] **HARD-18**: Flow execution eliminates unnecessary deep clones (handle_failure vector cloning)
 - [x] **HARD-19**: S6 path enumeration MAX_PATHS and MAX_DEPTH made configurable
 - [ ] **HARD-20**: Flow error-path conformance fixtures added (replacing inline unit tests with panic! asserts)
 - [x] **HARD-21**: All hardcoded version strings reference TENOR_BUNDLE_VERSION constant

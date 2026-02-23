@@ -3,9 +3,9 @@
 ## Current Position
 
 Phase: 18 (Platform Hardening)
-Plan: 7 of 9
+Plan: 8 of 9
 Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-01 (interchange crate: shared typed deserialization replacing triplicated parsing)
+Last activity: 2026-02-23 — Completed 18-04 (evaluator runtime optimization: HashMap indexes, BTreeMap stratum eval, clone-free flow)
 
 ## Project Reference
 
@@ -49,3 +49,6 @@ None.
 - pass6_serialize uses static key constants and ins() helper for reduced allocations
 - tenor-interchange crate provides single-source typed deserialization for interchange JSON bundles
 - eval, analyze, codegen all delegate to tenor_interchange::from_interchange() for initial parsing
+- Contract type has HashMap indexes for O(1) lookups; use Contract::new() and get_* methods
+- Stratum evaluation uses BTreeMap index (O(n) vs previous O(k*n))
+- Flow failure handling uses std::mem::take() instead of deep clones
