@@ -15,8 +15,8 @@
 - [x] **HARD-07**: spec_sections dead code in ambiguity testing removed or wired through
 - [x] **HARD-08**: HTTP stack replaced with production-grade framework (axum or actix-web) with TLS and concurrent request handling
 - [x] **HARD-09**: Unsafe signal handling in serve.rs replaced with ctrlc or signal-hook
-- [ ] **HARD-10**: Elaborate endpoint validates user content before writing to temp files
-- [ ] **HARD-11**: Auth, CORS, and rate limiting added to all HTTP endpoints
+- [x] **HARD-10**: Elaborate endpoint validates user content before writing to temp files
+- [x] **HARD-11**: Auth, CORS, and rate limiting added to all HTTP endpoints
 - [ ] **HARD-12**: SystemContract coordinator designed for cross-contract triggers and shared entity state
 - [x] **HARD-13**: Contract type uses HashMap indexes instead of Vec for O(1) lookups
 - [ ] **HARD-14**: LSP crate has unit tests covering navigation and completion correctness

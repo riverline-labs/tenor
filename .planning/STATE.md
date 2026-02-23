@@ -3,9 +3,9 @@
 ## Current Position
 
 Phase: 18 (Platform Hardening)
-Plan: 8 of 9
+Plan: 9 of 9
 Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-07 (typed explain.rs rewrite using tenor-interchange)
+Last activity: 2026-02-23 — Completed 18-08 (HTTP security hardening: input validation, CORS, rate limiting, API key auth)
 
 ## Project Reference
 
@@ -55,3 +55,4 @@ None.
 - HTTP server uses axum + tokio (replaced tiny_http + libc); optional TLS via axum-server + rustls
 - libc removed from CLI crate -- tenor-core and tenor-eval have zero libc in production builds
 - explain.rs uses typed tenor-interchange structs (from_interchange + InterchangeConstruct variants) instead of raw JSON traversal
+- HTTP server hardened: input validation (size, null bytes, import escape, filename), CORS via tower-http, per-IP rate limiting (60 req/min), optional API key auth via TENOR_API_KEY env var
