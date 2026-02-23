@@ -6,129 +6,15 @@
 //! 3. Fact Inventory — all facts with types and sources
 //! 4. Risk / Coverage Notes — analysis findings from S1-S8
 //!
-//! Uses a typed `ExplainBundle` struct for deserialization so that
-//! interchange format changes cause loud errors instead of silently
-//! dropping output sections.
+//! Uses typed structs from `tenor-interchange` for deserialization so that
+//! interchange format changes cause compile errors across all consumers
+//! (eval, analyze, codegen, explain) instead of silently dropping output.
 
-use serde::Deserialize;
 use std::collections::BTreeMap;
-
-// ─── Typed interchange structs ───────────────────────────────────────────────
-//
-// These cover exactly the fields that explain.rs reads. Using serde::Deserialize
-// means any interchange key rename or type change breaks deserialization loudly.
-// Fields not needed by explain are ignored (serde default behavior for structs).
-// Complex nested expressions (conditions, preconditions) stay as serde_json::Value.
-
-/// Top-level interchange bundle for explain deserialization.
-#[derive(Deserialize)]
-struct ExplainBundle {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    constructs: Vec<ExplainConstruct>,
-}
-
-/// Tagged enum for construct kinds in the interchange format.
-#[derive(Deserialize)]
-#[serde(tag = "kind")]
-enum ExplainConstruct {
-    Fact(ExplainFact),
-    Entity(ExplainEntity),
-    Persona(ExplainPersona),
-    Rule(ExplainRule),
-    Operation(ExplainOperation),
-    Flow(ExplainFlow),
-    // Ignore unknown construct kinds (TypeDecl, System, etc.)
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Deserialize)]
-struct ExplainFact {
-    #[serde(default)]
-    id: String,
-    #[serde(rename = "type", default)]
-    fact_type: serde_json::Value,
-    #[serde(default)]
-    source: Option<ExplainSource>,
-    #[serde(default)]
-    default: Option<serde_json::Value>,
-}
-
-#[derive(Deserialize)]
-struct ExplainSource {
-    #[serde(default)]
-    system: String,
-    #[serde(default)]
-    field: String,
-}
-
-#[derive(Deserialize)]
-struct ExplainEntity {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    states: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct ExplainPersona {
-    #[serde(default)]
-    id: String,
-}
-
-/// Rule construct. Fields `id` and `body` are deserialized for drift detection
-/// (tests verify these fields exist in the interchange format) even though the
-/// main explain output only uses `stratum`.
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct ExplainRule {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    stratum: i64,
-    #[serde(default)]
-    body: serde_json::Value,
-}
-
-/// Operation construct. Fields `allowed_personas` and `error_contract` are
-/// deserialized for drift detection (tests verify these fields exist) even
-/// though the main explain output only uses `id`, `precondition`, and `effects`.
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct ExplainOperation {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    precondition: serde_json::Value,
-    #[serde(default)]
-    effects: Vec<ExplainEffect>,
-    #[serde(default)]
-    allowed_personas: Vec<String>,
-    #[serde(default)]
-    error_contract: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct ExplainEffect {
-    #[serde(default)]
-    entity_id: String,
-    #[serde(default)]
-    from: String,
-    #[serde(default)]
-    to: String,
-}
-
-#[derive(Deserialize)]
-struct ExplainFlow {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    entry: String,
-    #[serde(default)]
-    steps: Vec<serde_json::Value>,
-}
+use tenor_interchange::{
+    EntityConstruct, FactConstruct, FlowConstruct, InterchangeConstruct, OperationConstruct,
+    PersonaConstruct, RuleConstruct,
+};
 
 /// Output format for the explain command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,33 +33,34 @@ pub fn explain(
     format: ExplainFormat,
     verbose: bool,
 ) -> Result<String, String> {
-    let bundle: ExplainBundle = serde_json::from_value(raw_bundle.clone())
+    let bundle = tenor_interchange::from_interchange(raw_bundle)
         .map_err(|e| format!("failed to parse interchange bundle: {}", e))?;
 
     let mut out = String::new();
 
     // Classify constructs by kind
-    let mut facts: Vec<&ExplainFact> = Vec::new();
-    let mut entities: Vec<&ExplainEntity> = Vec::new();
-    let mut personas: Vec<&ExplainPersona> = Vec::new();
-    let mut rules: Vec<&ExplainRule> = Vec::new();
-    let mut operations: Vec<&ExplainOperation> = Vec::new();
-    let mut flows: Vec<&ExplainFlow> = Vec::new();
+    let mut facts: Vec<&FactConstruct> = Vec::new();
+    let mut entities: Vec<&EntityConstruct> = Vec::new();
+    let mut personas: Vec<&PersonaConstruct> = Vec::new();
+    let mut rules: Vec<&RuleConstruct> = Vec::new();
+    let mut operations: Vec<&OperationConstruct> = Vec::new();
+    let mut flows: Vec<&FlowConstruct> = Vec::new();
 
     for c in &bundle.constructs {
         match c {
-            ExplainConstruct::Fact(f) => facts.push(f),
-            ExplainConstruct::Entity(e) => entities.push(e),
-            ExplainConstruct::Persona(p) => personas.push(p),
-            ExplainConstruct::Rule(r) => rules.push(r),
-            ExplainConstruct::Operation(o) => operations.push(o),
-            ExplainConstruct::Flow(f) => flows.push(f),
-            ExplainConstruct::Other => {}
+            InterchangeConstruct::Fact(f) => facts.push(f),
+            InterchangeConstruct::Entity(e) => entities.push(e),
+            InterchangeConstruct::Persona(p) => personas.push(p),
+            InterchangeConstruct::Rule(r) => rules.push(r),
+            InterchangeConstruct::Operation(o) => operations.push(o),
+            InterchangeConstruct::Flow(f) => flows.push(f),
+            // TypeDecl and System are not rendered in explain output
+            InterchangeConstruct::TypeDecl(_) | InterchangeConstruct::System(_) => {}
         }
     }
 
     // Build an operation lookup by id for flow narrative
-    let op_map: BTreeMap<&str, &ExplainOperation> =
+    let op_map: BTreeMap<&str, &OperationConstruct> =
         operations.iter().map(|op| (op.id.as_str(), *op)).collect();
 
     // Section 1: Contract Summary
@@ -210,12 +97,12 @@ fn section_contract_summary(
     out: &mut String,
     format: ExplainFormat,
     contract_id: &str,
-    facts: &[&ExplainFact],
-    entities: &[&ExplainEntity],
-    personas: &[&ExplainPersona],
-    rules: &[&ExplainRule],
-    operations: &[&ExplainOperation],
-    flows: &[&ExplainFlow],
+    facts: &[&FactConstruct],
+    entities: &[&EntityConstruct],
+    personas: &[&PersonaConstruct],
+    rules: &[&RuleConstruct],
+    operations: &[&OperationConstruct],
+    flows: &[&FlowConstruct],
     verbose: bool,
 ) {
     heading(out, format, "CONTRACT SUMMARY");
@@ -273,7 +160,7 @@ fn section_contract_summary(
 
         // Verbose: list entity states
         for e in entities {
-            let state_names: Vec<&str> = e.states.iter().map(|s| s.as_str()).collect();
+            let state_names = &e.states;
             emit_line(
                 out,
                 format,
@@ -282,7 +169,7 @@ fn section_contract_summary(
         }
 
         // Verbose: rule strata breakdown
-        let mut strata_counts: BTreeMap<i64, usize> = BTreeMap::new();
+        let mut strata_counts: BTreeMap<u64, usize> = BTreeMap::new();
         for r in rules {
             *strata_counts.entry(r.stratum).or_insert(0) += 1;
         }
@@ -294,7 +181,7 @@ fn section_contract_summary(
     out.push('\n');
 }
 
-fn count_strata(rules: &[&ExplainRule]) -> usize {
+fn count_strata(rules: &[&RuleConstruct]) -> usize {
     let mut strata = std::collections::BTreeSet::new();
     for r in rules {
         strata.insert(r.stratum);
@@ -307,8 +194,8 @@ fn count_strata(rules: &[&ExplainRule]) -> usize {
 fn section_flow_narrative(
     out: &mut String,
     format: ExplainFormat,
-    flows: &[&ExplainFlow],
-    op_map: &BTreeMap<&str, &ExplainOperation>,
+    flows: &[&FlowConstruct],
+    op_map: &BTreeMap<&str, &OperationConstruct>,
     verbose: bool,
 ) {
     heading(out, format, "DECISION FLOW NARRATIVE");
@@ -335,7 +222,9 @@ fn section_flow_narrative(
         let step_map: BTreeMap<&str, &serde_json::Value> = flow
             .steps
             .iter()
-            .filter_map(|s| s.get("id").and_then(|v| v.as_str()).map(|id| (id, s)))
+            .filter_map(|s: &serde_json::Value| {
+                s.get("id").and_then(|v| v.as_str()).map(|id| (id, s))
+            })
             .collect();
 
         // Walk from entry
@@ -361,7 +250,7 @@ fn walk_steps(
     format: ExplainFormat,
     step_id: &str,
     step_map: &BTreeMap<&str, &serde_json::Value>,
-    op_map: &BTreeMap<&str, &ExplainOperation>,
+    op_map: &BTreeMap<&str, &OperationConstruct>,
     verbose: bool,
     visited: &mut std::collections::HashSet<String>,
     depth: usize,
@@ -393,7 +282,6 @@ fn walk_steps(
     match kind {
         "OperationStep" => {
             describe_operation_step(out, format, step, op_map, verbose, depth);
-            // Follow outcomes
             if let Some(outcomes) = step.get("outcomes").and_then(|v| v.as_object()) {
                 for (_outcome_name, target) in outcomes {
                     if let Some(next_id) = resolve_step_target(target) {
@@ -406,7 +294,6 @@ fn walk_steps(
         }
         "BranchStep" => {
             describe_branch_step(out, format, step, verbose, depth);
-            // Follow both branches
             let if_true = step.get("if_true");
             let if_false = step.get("if_false");
 
@@ -426,7 +313,6 @@ fn walk_steps(
             }
             if let Some(target) = if_false {
                 if let Some(next_id) = resolve_step_target(target) {
-                    // Create a new visited set for the else branch so both paths can walk independently
                     let mut else_visited = visited.clone();
                     walk_steps(
                         out,
@@ -438,7 +324,6 @@ fn walk_steps(
                         &mut else_visited,
                         depth + 1,
                     );
-                    // Merge else_visited back
                     visited.extend(else_visited);
                 }
             }
@@ -453,7 +338,6 @@ fn walk_steps(
         }
         "SubFlowStep" => {
             describe_subflow_step(out, format, step, depth);
-            // on_success may route to another step
             if let Some(target) = step.get("on_success") {
                 if let Some(next_id) = resolve_step_target(target) {
                     walk_steps(
@@ -464,7 +348,6 @@ fn walk_steps(
         }
         "ParallelStep" => {
             describe_parallel_step(out, format, step, op_map, verbose, depth);
-            // Follow join on_all_success
             if let Some(join) = step.get("join") {
                 if let Some(next_id) = join.get("on_all_success").and_then(|v| v.as_str()) {
                     walk_steps(
@@ -483,12 +366,10 @@ fn walk_steps(
     }
 }
 
-/// Resolve a step target (can be a string step_id or a Terminal/Terminate object).
 fn resolve_step_target(target: &serde_json::Value) -> Option<String> {
     if let Some(s) = target.as_str() {
         return Some(s.to_string());
     }
-    // Terminal or Terminate objects end the flow -- no next step
     None
 }
 
@@ -496,7 +377,7 @@ fn describe_operation_step(
     out: &mut String,
     format: ExplainFormat,
     step: &serde_json::Value,
-    op_map: &BTreeMap<&str, &ExplainOperation>,
+    op_map: &BTreeMap<&str, &OperationConstruct>,
     verbose: bool,
     depth: usize,
 ) {
@@ -517,17 +398,15 @@ fn describe_operation_step(
     );
 
     if verbose {
-        // Show precondition
         if let Some(op) = op_map.get(op_id) {
-            if !op.precondition.is_null() {
-                let pre_str = describe_condition(&op.precondition);
+            if let Some(ref precondition) = op.precondition {
+                let pre_str = describe_condition(precondition);
                 emit_line(
                     out,
                     format,
                     &format!("{}  Precondition: {}", indent(depth), pre_str),
                 );
             }
-            // Show effects
             for eff in &op.effects {
                 emit_line(
                     out,
@@ -544,7 +423,6 @@ fn describe_operation_step(
         }
     }
 
-    // Note on_failure if present
     if let Some(on_failure) = step.get("on_failure") {
         let fail_kind = on_failure
             .get("kind")
@@ -581,7 +459,6 @@ fn describe_operation_step(
         }
     }
 
-    // Note outcomes leading to Terminal
     if let Some(outcomes) = step.get("outcomes").and_then(|v| v.as_object()) {
         for (outcome_name, target) in outcomes {
             if let Some(obj) = target.as_object() {
@@ -622,7 +499,6 @@ fn describe_branch_step(
         &format!("{}Decision: {}", indent(depth), cond_str),
     );
 
-    // Describe branches
     let if_true_desc = describe_target(step.get("if_true"));
     let if_false_desc = describe_target(step.get("if_false"));
 
@@ -693,7 +569,6 @@ fn describe_subflow_step(
         ),
     );
 
-    // Note on_success and on_failure
     if let Some(on_success) = step.get("on_success") {
         let desc = describe_inline_target(on_success);
         emit_line(
@@ -716,7 +591,7 @@ fn describe_parallel_step(
     out: &mut String,
     format: ExplainFormat,
     step: &serde_json::Value,
-    _op_map: &BTreeMap<&str, &ExplainOperation>,
+    _op_map: &BTreeMap<&str, &OperationConstruct>,
     _verbose: bool,
     depth: usize,
 ) {
@@ -759,18 +634,15 @@ fn describe_parallel_step(
 }
 
 fn describe_condition(cond: &serde_json::Value) -> String {
-    // verdict_present
     if let Some(vp) = cond.get("verdict_present").and_then(|v| v.as_str()) {
         return format!("verdict '{}' is present", vp);
     }
-    // Operators with left/right (or operand for unary)
     if let Some(op) = cond.get("op").and_then(|v| v.as_str()) {
         let left = cond.get("left");
         let right = cond.get("right");
 
         match op {
             "not" => {
-                // Unary not: uses "operand" field
                 let operand = cond.get("operand");
                 let operand_str = operand
                     .map(describe_condition)
@@ -778,7 +650,6 @@ fn describe_condition(cond: &serde_json::Value) -> String {
                 return format!("not ({})", operand_str);
             }
             "and" | "or" => {
-                // Logical operators: recurse into both sides as conditions
                 let left_str = left
                     .map(describe_condition)
                     .unwrap_or_else(|| "?".to_string());
@@ -788,7 +659,6 @@ fn describe_condition(cond: &serde_json::Value) -> String {
                 return format!("({} {} {})", left_str, op, right_str);
             }
             _ => {
-                // Comparison operators: describe as expressions
                 let left_str = describe_expr(left);
                 let right_str = describe_expr(right);
                 return format!("{} {} {}", left_str, op, right_str);
@@ -863,7 +733,7 @@ fn describe_inline_target(target: &serde_json::Value) -> String {
 fn section_fact_inventory(
     out: &mut String,
     format: ExplainFormat,
-    facts: &[&ExplainFact],
+    facts: &[&FactConstruct],
     verbose: bool,
 ) {
     heading(out, format, "FACT INVENTORY");
@@ -874,8 +744,7 @@ fn section_fact_inventory(
         return;
     }
 
-    // Group facts by type category
-    let mut grouped: BTreeMap<&str, Vec<&ExplainFact>> = BTreeMap::new();
+    let mut grouped: BTreeMap<&str, Vec<&FactConstruct>> = BTreeMap::new();
     for fact in facts {
         let category = categorize_fact_type(&fact.fact_type);
         grouped.entry(category).or_default().push(fact);
@@ -888,8 +757,8 @@ fn section_fact_inventory(
             for group_facts in grouped.values() {
                 for fact in group_facts {
                     let type_str = describe_fact_type(&fact.fact_type, verbose);
-                    let source_str = describe_source_typed(fact.source.as_ref());
-                    let default_str = describe_default_typed(fact.default.as_ref());
+                    let source_str = describe_source(&fact.source);
+                    let default_str = describe_default(fact.default.as_ref());
                     out.push_str(&format!(
                         "| {} | {} | {} | {} |\n",
                         fact.id, type_str, source_str, default_str
@@ -898,19 +767,17 @@ fn section_fact_inventory(
             }
         }
         ExplainFormat::Terminal => {
-            // Calculate column widths
             let mut max_id = 4;
             let mut max_type = 4;
             let mut max_source = 6;
             for fact in facts {
                 let type_str = describe_fact_type(&fact.fact_type, verbose);
-                let source_str = describe_source_typed(fact.source.as_ref());
+                let source_str = describe_source(&fact.source);
                 max_id = max_id.max(fact.id.len());
                 max_type = max_type.max(type_str.len());
                 max_source = max_source.max(source_str.len());
             }
 
-            // Header
             out.push_str(&format!(
                 "  {:<id_w$}  {:<type_w$}  {:<src_w$}  {}\n",
                 "FACT",
@@ -933,12 +800,11 @@ fn section_fact_inventory(
             ));
 
             for (category, group_facts) in &grouped {
-                // Category sub-header
                 out.push_str(&format!("  [{}]\n", category));
                 for fact in group_facts {
                     let type_str = describe_fact_type(&fact.fact_type, verbose);
-                    let source_str = describe_source_typed(fact.source.as_ref());
-                    let default_str = describe_default_typed(fact.default.as_ref());
+                    let source_str = describe_source(&fact.source);
+                    let default_str = describe_default(fact.default.as_ref());
                     out.push_str(&format!(
                         "  {:<id_w$}  {:<type_w$}  {:<src_w$}  {}\n",
                         fact.id,
@@ -959,7 +825,6 @@ fn section_fact_inventory(
 
 fn categorize_fact_type(type_val: &serde_json::Value) -> &'static str {
     let base = type_val.get("base").and_then(|v| v.as_str()).unwrap_or("");
-
     match base {
         "Int" | "Decimal" => "numeric",
         "Bool" => "boolean",
@@ -969,7 +834,6 @@ fn categorize_fact_type(type_val: &serde_json::Value) -> &'static str {
         "Record" => "record",
         "List" => "list",
         _ => {
-            // Named type (Record-like)
             if type_val.get("name").is_some() {
                 "record"
             } else {
@@ -983,16 +847,11 @@ fn describe_fact_type(type_val: &serde_json::Value, verbose: bool) -> String {
     if type_val.is_null() {
         return "?".to_string();
     }
-
-    // Named type
     if let Some(name) = type_val.get("name").and_then(|v| v.as_str()) {
         return name.to_string();
     }
-
     let base = type_val.get("base").and_then(|v| v.as_str()).unwrap_or("?");
-
     if verbose {
-        // Include constraints
         match base {
             "Int" => {
                 let min = type_val.get("min").and_then(|v| v.as_i64());
@@ -1012,13 +871,10 @@ fn describe_fact_type(type_val: &serde_json::Value, verbose: bool) -> String {
                     _ => "Decimal".to_string(),
                 }
             }
-            "Money" => {
-                let cur = type_val.get("currency").and_then(|v| v.as_str());
-                match cur {
-                    Some(c) => format!("Money({})", c),
-                    None => "Money".to_string(),
-                }
-            }
+            "Money" => match type_val.get("currency").and_then(|v| v.as_str()) {
+                Some(c) => format!("Money({})", c),
+                None => "Money".to_string(),
+            },
             "Enum" => {
                 if let Some(vals) = type_val.get("values").and_then(|v| v.as_array()) {
                     let names: Vec<&str> = vals.iter().filter_map(|v| v.as_str()).collect();
@@ -1030,7 +886,6 @@ fn describe_fact_type(type_val: &serde_json::Value, verbose: bool) -> String {
             _ => base.to_string(),
         }
     } else {
-        // Simplified type names
         match base {
             "Enum" => {
                 if let Some(vals) = type_val.get("values").and_then(|v| v.as_array()) {
@@ -1044,14 +899,18 @@ fn describe_fact_type(type_val: &serde_json::Value, verbose: bool) -> String {
     }
 }
 
-fn describe_source_typed(source: Option<&ExplainSource>) -> String {
+fn describe_source(source: &Option<serde_json::Value>) -> String {
     match source {
         None => "-".to_string(),
-        Some(s) => format!("{}.{}", s.system, s.field),
+        Some(s) => {
+            let system = s.get("system").and_then(|v| v.as_str()).unwrap_or("?");
+            let field = s.get("field").and_then(|v| v.as_str()).unwrap_or("?");
+            format!("{}.{}", system, field)
+        }
     }
 }
 
-fn describe_default_typed(default: Option<&serde_json::Value>) -> String {
+fn describe_default(default: Option<&serde_json::Value>) -> String {
     match default {
         None => "-".to_string(),
         Some(default) => {
@@ -1081,8 +940,6 @@ fn section_risk_coverage(
     verbose: bool,
 ) {
     heading(out, format, "RISK / COVERAGE NOTES");
-
-    // Run analysis
     let report = match tenor_analyze::analyze(bundle) {
         Ok(r) => r,
         Err(e) => {
@@ -1090,8 +947,6 @@ fn section_risk_coverage(
             return;
         }
     };
-
-    // S1: State space
     if let Some(ref s1) = report.s1_state_space {
         let total_states: usize = s1.entities.values().map(|e| e.state_count).sum();
         emit_checkmark(
@@ -1100,12 +955,10 @@ fn section_risk_coverage(
             &format!(
                 "{} entities, {} total states",
                 s1.entities.len(),
-                total_states,
+                total_states
             ),
         );
     }
-
-    // S2: Reachability
     if let Some(ref s2) = report.s2_reachability {
         if s2.has_dead_states {
             let dead_count: usize = s2
@@ -1118,12 +971,10 @@ fn section_risk_coverage(
             emit_checkmark(
                 out,
                 format,
-                &format!("All {} entities fully reachable", s2.entities.len(),),
+                &format!("All {} entities fully reachable", s2.entities.len()),
             );
         }
     }
-
-    // S5: Verdicts
     if let Some(ref s5) = report.s5_verdicts {
         emit_checkmark(
             out,
@@ -1131,8 +982,6 @@ fn section_risk_coverage(
             &format!("{} verdict types defined", s5.total_verdict_types),
         );
     }
-
-    // S6: Flow paths
     if let Some(ref s6) = report.s6_flow_paths {
         let truncated_count = s6.flows.values().filter(|f| f.truncated).count();
         if truncated_count > 0 {
@@ -1141,7 +990,7 @@ fn section_risk_coverage(
                 format,
                 &format!(
                     "{} flow paths ({} flow(s) truncated)",
-                    s6.total_paths, truncated_count,
+                    s6.total_paths, truncated_count
                 ),
             );
         } else {
@@ -1151,20 +1000,16 @@ fn section_risk_coverage(
                 &format!(
                     "{} flow paths across {} flows",
                     s6.total_paths,
-                    s6.flows.len(),
+                    s6.flows.len()
                 ),
             );
         }
     }
-
-    // S8: Verdict uniqueness
     if let Some(ref s8) = report.s8_verdict_uniqueness {
         if s8.pre_verified {
             emit_checkmark(out, format, "Verdict uniqueness pre-verified (Pass 5)");
         }
     }
-
-    // Verbose: list all findings with severity
     if verbose {
         out.push('\n');
         if report.findings.is_empty() {
@@ -1190,13 +1035,12 @@ fn section_risk_coverage(
                     format,
                     &format!(
                         "    [{}/{}]{}: {}",
-                        finding.analysis, severity, context, finding.message,
+                        finding.analysis, severity, context, finding.message
                     ),
                 );
             }
         }
     }
-
     out.push('\n');
 }
 
@@ -1258,17 +1102,10 @@ fn humanize_id(id: &str) -> String {
 }
 
 /// Produce a JSON explanation of a contract bundle.
-///
-/// Used by the `tenor serve` endpoint to return structured explain output.
-/// Generates both terminal and markdown formats and returns them as JSON fields.
 pub fn explain_bundle(bundle: &serde_json::Value) -> Result<serde_json::Value, String> {
     let markdown = explain(bundle, ExplainFormat::Markdown, false)?;
     let verbose_markdown = explain(bundle, ExplainFormat::Markdown, true)?;
-
-    Ok(serde_json::json!({
-        "summary": markdown,
-        "verbose": verbose_markdown,
-    }))
+    Ok(serde_json::json!({ "summary": markdown, "verbose": verbose_markdown }))
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -1277,80 +1114,38 @@ pub fn explain_bundle(bundle: &serde_json::Value) -> Result<serde_json::Value, S
 mod tests {
     use super::*;
 
-    /// Verify ExplainBundle deserializes correctly from a minimal interchange bundle.
-    /// This test will break if the interchange format changes field names or types,
-    /// which is exactly the purpose of typed deserialization.
     #[test]
     fn deserialize_minimal_bundle() {
         let bundle_json = serde_json::json!({
-            "kind": "Bundle",
-            "id": "test_contract",
-            "tenor": "1.0",
+            "kind": "Bundle", "id": "test_contract", "tenor": "1.0",
             "constructs": [
-                {
-                    "kind": "Fact",
-                    "id": "my_fact",
-                    "type": { "base": "Bool" },
-                    "source": { "system": "sys", "field": "fld" },
-                    "default": { "kind": "bool_literal", "value": true },
-                    "provenance": { "file": "test.tenor", "line": 1 },
-                    "tenor": "1.0"
-                },
-                {
-                    "kind": "Entity",
-                    "id": "my_entity",
-                    "states": ["active", "inactive"],
-                    "initial": "active",
-                    "transitions": [],
-                    "provenance": { "file": "test.tenor", "line": 5 },
-                    "tenor": "1.0"
-                },
-                {
-                    "kind": "Persona",
-                    "id": "admin",
-                    "provenance": { "file": "test.tenor", "line": 10 },
-                    "tenor": "1.0"
-                },
-                {
-                    "kind": "Rule",
-                    "id": "my_rule",
-                    "stratum": 0,
-                    "body": { "when": {}, "produce": {} },
-                    "provenance": { "file": "test.tenor", "line": 15 },
-                    "tenor": "1.0"
-                },
-                {
-                    "kind": "Operation",
-                    "id": "my_op",
-                    "precondition": null,
-                    "effects": [
-                        { "entity_id": "my_entity", "from": "active", "to": "inactive" }
-                    ],
-                    "allowed_personas": ["admin"],
-                    "error_contract": ["precondition_failed"],
-                    "provenance": { "file": "test.tenor", "line": 20 },
-                    "tenor": "1.0"
-                },
-                {
-                    "kind": "Flow",
-                    "id": "my_flow",
-                    "entry": "step_one",
-                    "steps": [
-                        { "kind": "OperationStep", "id": "step_one", "op": "my_op", "persona": "admin", "outcomes": {} }
-                    ],
-                    "provenance": { "file": "test.tenor", "line": 25 },
-                    "tenor": "1.0"
-                }
+                { "kind": "Fact", "id": "my_fact", "type": { "base": "Bool" },
+                  "source": { "system": "sys", "field": "fld" },
+                  "default": { "kind": "bool_literal", "value": true },
+                  "provenance": { "file": "test.tenor", "line": 1 }, "tenor": "1.0" },
+                { "kind": "Entity", "id": "my_entity", "states": ["active", "inactive"],
+                  "initial": "active", "transitions": [],
+                  "provenance": { "file": "test.tenor", "line": 5 }, "tenor": "1.0" },
+                { "kind": "Persona", "id": "admin",
+                  "provenance": { "file": "test.tenor", "line": 10 }, "tenor": "1.0" },
+                { "kind": "Rule", "id": "my_rule", "stratum": 0,
+                  "body": { "when": {}, "produce": {} },
+                  "provenance": { "file": "test.tenor", "line": 15 }, "tenor": "1.0" },
+                { "kind": "Operation", "id": "my_op", "precondition": null,
+                  "effects": [{ "entity_id": "my_entity", "from": "active", "to": "inactive" }],
+                  "allowed_personas": ["admin"], "error_contract": ["precondition_failed"],
+                  "provenance": { "file": "test.tenor", "line": 20 }, "tenor": "1.0" },
+                { "kind": "Flow", "id": "my_flow", "entry": "step_one",
+                  "steps": [{ "kind": "OperationStep", "id": "step_one", "op": "my_op", "persona": "admin", "outcomes": {} }],
+                  "provenance": { "file": "test.tenor", "line": 25 }, "tenor": "1.0" }
             ]
         });
 
-        let bundle: ExplainBundle =
-            serde_json::from_value(bundle_json).expect("ExplainBundle deserialization failed");
-
+        let bundle = tenor_interchange::from_interchange(&bundle_json)
+            .expect("interchange deserialization failed");
         assert_eq!(bundle.id, "test_contract");
         assert_eq!(bundle.constructs.len(), 6);
 
-        // Verify each construct type
         let mut fact_count = 0;
         let mut entity_count = 0;
         let mut persona_count = 0;
@@ -1360,30 +1155,30 @@ mod tests {
 
         for c in &bundle.constructs {
             match c {
-                ExplainConstruct::Fact(f) => {
+                InterchangeConstruct::Fact(f) => {
                     assert_eq!(f.id, "my_fact");
                     assert!(f.source.is_some());
                     let src = f.source.as_ref().unwrap();
-                    assert_eq!(src.system, "sys");
-                    assert_eq!(src.field, "fld");
+                    assert_eq!(src.get("system").and_then(|v| v.as_str()), Some("sys"));
+                    assert_eq!(src.get("field").and_then(|v| v.as_str()), Some("fld"));
                     assert!(f.default.is_some());
                     fact_count += 1;
                 }
-                ExplainConstruct::Entity(e) => {
+                InterchangeConstruct::Entity(e) => {
                     assert_eq!(e.id, "my_entity");
                     assert_eq!(e.states, vec!["active", "inactive"]);
                     entity_count += 1;
                 }
-                ExplainConstruct::Persona(p) => {
+                InterchangeConstruct::Persona(p) => {
                     assert_eq!(p.id, "admin");
                     persona_count += 1;
                 }
-                ExplainConstruct::Rule(r) => {
+                InterchangeConstruct::Rule(r) => {
                     assert_eq!(r.id, "my_rule");
                     assert_eq!(r.stratum, 0);
                     rule_count += 1;
                 }
-                ExplainConstruct::Operation(o) => {
+                InterchangeConstruct::Operation(o) => {
                     assert_eq!(o.id, "my_op");
                     assert_eq!(o.effects.len(), 1);
                     assert_eq!(o.effects[0].entity_id, "my_entity");
@@ -1392,16 +1187,15 @@ mod tests {
                     assert_eq!(o.allowed_personas, vec!["admin"]);
                     op_count += 1;
                 }
-                ExplainConstruct::Flow(f) => {
+                InterchangeConstruct::Flow(f) => {
                     assert_eq!(f.id, "my_flow");
                     assert_eq!(f.entry, "step_one");
                     assert_eq!(f.steps.len(), 1);
                     flow_count += 1;
                 }
-                ExplainConstruct::Other => {}
+                _ => {}
             }
         }
-
         assert_eq!(fact_count, 1);
         assert_eq!(entity_count, 1);
         assert_eq!(persona_count, 1);
@@ -1410,40 +1204,21 @@ mod tests {
         assert_eq!(flow_count, 1);
     }
 
-    /// Verify that the explain function produces output (end-to-end with deserialization).
     #[test]
     fn explain_produces_output_for_minimal_bundle() {
         let bundle_json = serde_json::json!({
-            "kind": "Bundle",
-            "id": "test_contract",
-            "tenor": "1.0",
+            "kind": "Bundle", "id": "test_contract", "tenor": "1.0",
             "constructs": [
-                {
-                    "kind": "Fact",
-                    "id": "payment_ok",
-                    "type": { "base": "Bool" },
-                    "default": { "kind": "bool_literal", "value": true },
-                    "provenance": { "file": "test.tenor", "line": 1 },
-                    "tenor": "1.0"
-                },
-                {
-                    "kind": "Entity",
-                    "id": "Order",
-                    "states": ["pending", "completed"],
-                    "initial": "pending",
-                    "transitions": [],
-                    "provenance": { "file": "test.tenor", "line": 5 },
-                    "tenor": "1.0"
-                },
-                {
-                    "kind": "Persona",
-                    "id": "user",
-                    "provenance": { "file": "test.tenor", "line": 10 },
-                    "tenor": "1.0"
-                }
+                { "kind": "Fact", "id": "payment_ok", "type": { "base": "Bool" },
+                  "default": { "kind": "bool_literal", "value": true },
+                  "provenance": { "file": "test.tenor", "line": 1 }, "tenor": "1.0" },
+                { "kind": "Entity", "id": "Order", "states": ["pending", "completed"],
+                  "initial": "pending", "transitions": [],
+                  "provenance": { "file": "test.tenor", "line": 5 }, "tenor": "1.0" },
+                { "kind": "Persona", "id": "user",
+                  "provenance": { "file": "test.tenor", "line": 10 }, "tenor": "1.0" }
             ]
         });
-
         let result = explain(&bundle_json, ExplainFormat::Markdown, false);
         assert!(result.is_ok());
         let output = result.unwrap();
@@ -1452,24 +1227,16 @@ mod tests {
         assert!(output.contains("## FACT INVENTORY"));
     }
 
-    /// Verify that deserialization fails loudly when a required field is the wrong type.
     #[test]
     fn deserialization_fails_on_wrong_type() {
         let bad_json = serde_json::json!({
-            "kind": "Bundle",
-            "id": "test",
-            "constructs": [
-                {
-                    "kind": "Entity",
-                    "id": "my_entity",
-                    "states": "not_an_array",
-                    "provenance": { "file": "test.tenor", "line": 1 },
-                    "tenor": "1.0"
-                }
-            ]
+            "kind": "Bundle", "id": "test",
+            "constructs": [{
+                "kind": "Entity", "id": "my_entity", "states": "not_an_array",
+                "provenance": { "file": "test.tenor", "line": 1 }, "tenor": "1.0"
+            }]
         });
-
-        let result: Result<ExplainBundle, _> = serde_json::from_value(bad_json);
+        let result = tenor_interchange::from_interchange(&bad_json);
         assert!(
             result.is_err(),
             "should fail when states is a string instead of array"

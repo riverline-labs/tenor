@@ -1,39 +1,51 @@
 //! `tenor serve` -- HTTP JSON API server for the Tenor evaluator.
 //!
-//! Exposes the Rust elaborator and evaluator as a synchronous HTTP service
-//! using `tiny_http`. No async runtime required.
+//! Exposes the Rust elaborator and evaluator as an async HTTP service
+//! using `axum` + `tokio`. Supports concurrent request handling.
 //!
 //! Endpoints:
-//! - GET  /health                  - Server status
-//! - GET  /contracts               - List loaded contract bundles
-//! - GET  /contracts/{id}/operations - Operations for a specific contract
-//! - POST /elaborate               - Elaborate .tenor source text
-//! - POST /evaluate                - Evaluate a contract against facts
-//! - POST /explain                 - Explain a contract bundle
+//! - GET  /health                      - Server status
+//! - GET  /contracts                   - List loaded contract bundles
+//! - GET  /contracts/{id}/operations   - Operations for a specific contract
+//! - POST /elaborate                   - Elaborate .tenor source text
+//! - POST /evaluate                    - Evaluate a contract against facts
+//! - POST /explain                     - Explain a contract bundle
 //!
 //! All responses use Content-Type: application/json.
 
 use std::collections::HashMap;
-use std::io::Read as IoRead;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use tokio::sync::RwLock;
 
 use super::explain;
 
 /// Maximum request body size: 10 MB.
 const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
 
-/// Server state shared across request handlers.
-struct ServeState {
+/// Application state shared across request handlers.
+struct AppState {
     /// Loaded contract bundles keyed by bundle ID.
-    contracts: HashMap<String, serde_json::Value>,
+    contracts: RwLock<HashMap<String, serde_json::Value>>,
 }
 
 /// Start the HTTP server on the given port, optionally pre-loading contracts.
-pub fn start_server(port: u16, contract_paths: Vec<PathBuf>) {
-    let mut state = ServeState {
-        contracts: HashMap::new(),
-    };
+///
+/// When TLS cert/key paths are provided, the server listens over HTTPS
+/// using `axum-server` with rustls. Otherwise it uses plain HTTP.
+pub async fn start_server(
+    port: u16,
+    contract_paths: Vec<PathBuf>,
+    _tls_cert: Option<PathBuf>,
+    _tls_key: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut contracts = HashMap::new();
 
     // Pre-load contracts
     for path in &contract_paths {
@@ -45,7 +57,7 @@ pub fn start_server(port: u16, contract_paths: Vec<PathBuf>) {
                     .unwrap_or("unknown")
                     .to_string();
                 eprintln!("Loaded contract: {} (from {})", bundle_id, path.display());
-                state.contracts.insert(bundle_id, bundle);
+                contracts.insert(bundle_id, bundle);
             }
             Err(e) => {
                 eprintln!("Warning: failed to load {}: {:?}", path.display(), e);
@@ -53,157 +65,80 @@ pub fn start_server(port: u16, contract_paths: Vec<PathBuf>) {
         }
     }
 
+    let state = Arc::new(AppState {
+        contracts: RwLock::new(contracts),
+    });
+
+    let app = Router::new()
+        .route("/health", get(handle_health))
+        .route("/contracts", get(handle_list_contracts))
+        .route("/contracts/{id}/operations", get(handle_get_operations))
+        .route("/elaborate", post(handle_elaborate))
+        .route("/evaluate", post(handle_evaluate))
+        .route("/explain", post(handle_explain))
+        .fallback(handle_not_found)
+        .layer(DefaultBodyLimit::max(MAX_BODY_SIZE))
+        .with_state(state);
+
     let addr = format!("0.0.0.0:{}", port);
-    let server = match tiny_http::Server::http(&addr) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Failed to bind to {}: {}", addr, e);
-            std::process::exit(1);
-        }
-    };
 
-    eprintln!("Tenor evaluator listening on http://0.0.0.0:{}", port);
-
-    let state = Arc::new(Mutex::new(state));
-
-    // Install signal handlers for graceful shutdown.
-    SHUTDOWN_FLAG.store(false, std::sync::atomic::Ordering::SeqCst);
-    install_signal_handlers();
-
-    // Request loop: use recv_timeout so we can check the shutdown flag periodically.
-    loop {
-        if SHUTDOWN_FLAG.load(std::sync::atomic::Ordering::SeqCst) {
-            break;
-        }
-
-        let request = match server.recv_timeout(std::time::Duration::from_secs(1)) {
-            Ok(Some(r)) => r,
-            Ok(None) => continue, // Timeout, check shutdown flag
-            Err(_) => break,      // Server error
-        };
-
-        let state = Arc::clone(&state);
-        handle_request(request, &state);
+    // TLS support via axum-server + rustls (requires `tls` feature)
+    #[cfg(feature = "tls")]
+    if let (Some(cert_path), Some(key_path)) = (&_tls_cert, &_tls_key) {
+        let config =
+            axum_server::tls_rustls::RustlsConfig::from_pem_file(cert_path, key_path).await?;
+        let socket_addr: std::net::SocketAddr = addr.parse()?;
+        eprintln!("Tenor evaluator listening on https://0.0.0.0:{}", port);
+        axum_server::bind_rustls(socket_addr, config)
+            .serve(app.into_make_service())
+            .await?;
+        return Ok(());
     }
+
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    eprintln!("Tenor evaluator listening on http://0.0.0.0:{}", port);
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     eprintln!("\nServer shut down.");
+    Ok(())
 }
 
-static SHUTDOWN_FLAG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// Install signal handlers for SIGINT and SIGTERM that set SHUTDOWN_FLAG.
-fn install_signal_handlers() {
-    unsafe {
-        libc::signal(
-            libc::SIGINT,
-            signal_handler as *const () as libc::sighandler_t,
-        );
-        libc::signal(
-            libc::SIGTERM,
-            signal_handler as *const () as libc::sighandler_t,
-        );
-    }
+/// Wait for a shutdown signal (Ctrl+C).
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install Ctrl+C handler");
+    eprintln!("\nReceived shutdown signal...");
 }
 
-extern "C" fn signal_handler(_sig: libc::c_int) {
-    SHUTDOWN_FLAG.store(true, std::sync::atomic::Ordering::SeqCst);
+/// Construct a JSON error response with the given status code and message.
+fn json_error(status: StatusCode, message: &str) -> impl IntoResponse {
+    (status, Json(serde_json::json!({"error": message})))
 }
 
-/// Route a request to the appropriate handler.
-fn handle_request(mut request: tiny_http::Request, state: &Arc<Mutex<ServeState>>) {
-    let method = request.method().to_string();
-    let url = request.url().to_string();
+// --- Route handlers ---
 
-    // Parse the path (strip query string)
-    let path = url.split('?').next().unwrap_or(&url);
-
-    let (status, body) = match (method.as_str(), path) {
-        ("GET", "/health") => handle_health(),
-        ("GET", "/contracts") => handle_list_contracts(state),
-        ("GET", p) if p.starts_with("/contracts/") && p.ends_with("/operations") => {
-            let id = &p["/contracts/".len()..p.len() - "/operations".len()];
-            handle_get_operations(state, id)
-        }
-        ("POST", "/elaborate") => {
-            let body = read_body(&mut request);
-            match body {
-                Ok(b) => handle_elaborate(&b),
-                Err(e) => (400, json_error(&e)),
-            }
-        }
-        ("POST", "/evaluate") => {
-            let body = read_body(&mut request);
-            match body {
-                Ok(b) => handle_evaluate(state, &b),
-                Err(e) => (400, json_error(&e)),
-            }
-        }
-        ("POST", "/explain") => {
-            let body = read_body(&mut request);
-            match body {
-                Ok(b) => handle_explain(state, &b),
-                Err(e) => (400, json_error(&e)),
-            }
-        }
-        _ => (404, json_error("not found")),
-    };
-
-    let response = tiny_http::Response::from_string(body)
-        .with_status_code(status)
-        .with_header(
-            tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
-                .expect("valid header"),
-        );
-
-    let _ = request.respond(response);
+/// Fallback handler for unmatched routes.
+async fn handle_not_found() -> impl IntoResponse {
+    json_error(StatusCode::NOT_FOUND, "not found")
 }
-
-/// Read the request body up to MAX_BODY_SIZE.
-fn read_body(request: &mut tiny_http::Request) -> Result<String, String> {
-    let content_length = request.body_length().unwrap_or(0);
-
-    if content_length > MAX_BODY_SIZE {
-        return Err(format!(
-            "request body too large: {} bytes (max {})",
-            content_length, MAX_BODY_SIZE
-        ));
-    }
-
-    let mut body = Vec::with_capacity(content_length.min(65536));
-    request
-        .as_reader()
-        .take(MAX_BODY_SIZE as u64)
-        .read_to_end(&mut body)
-        .map_err(|e| format!("failed to read request body: {}", e))?;
-
-    String::from_utf8(body).map_err(|e| format!("invalid UTF-8 in request body: {}", e))
-}
-
-/// Construct a JSON error response.
-fn json_error(message: &str) -> String {
-    serde_json::json!({"error": message}).to_string()
-}
-
-// ─── Route handlers ─────────────────────────────────────────────────────────
 
 /// GET /health
-fn handle_health() -> (u16, String) {
+async fn handle_health() -> impl IntoResponse {
     let response = serde_json::json!({
         "status": "ok",
         "tenor_version": tenor_core::TENOR_BUNDLE_VERSION,
     });
-    (
-        200,
-        serde_json::to_string_pretty(&response).unwrap_or_default(),
-    )
+    (StatusCode::OK, Json(response))
 }
 
 /// GET /contracts
-fn handle_list_contracts(state: &Arc<Mutex<ServeState>>) -> (u16, String) {
-    let state = state.lock().expect("lock poisoned");
+async fn handle_list_contracts(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let contracts = state.contracts.read().await;
 
-    let contracts: Vec<serde_json::Value> = state
-        .contracts
+    let contract_list: Vec<serde_json::Value> = contracts
         .iter()
         .map(|(id, bundle)| {
             let constructs = bundle
@@ -239,20 +174,26 @@ fn handle_list_contracts(state: &Arc<Mutex<ServeState>>) -> (u16, String) {
         })
         .collect();
 
-    let response = serde_json::json!({ "contracts": contracts });
-    (
-        200,
-        serde_json::to_string_pretty(&response).unwrap_or_default(),
-    )
+    let response = serde_json::json!({ "contracts": contract_list });
+    (StatusCode::OK, Json(response))
 }
 
 /// GET /contracts/{id}/operations
-fn handle_get_operations(state: &Arc<Mutex<ServeState>>, id: &str) -> (u16, String) {
-    let state = state.lock().expect("lock poisoned");
+async fn handle_get_operations(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let contracts = state.contracts.read().await;
 
-    let bundle = match state.contracts.get(id) {
+    let bundle = match contracts.get(&id) {
         Some(b) => b,
-        None => return (404, json_error(&format!("contract '{}' not found", id))),
+        None => {
+            return json_error(
+                StatusCode::NOT_FOUND,
+                &format!("contract '{}' not found", id),
+            )
+            .into_response()
+        }
     };
 
     let constructs = bundle
@@ -292,7 +233,6 @@ fn handle_get_operations(state: &Arc<Mutex<ServeState>>, id: &str) -> (u16, Stri
                 })
                 .unwrap_or_default();
 
-            // Build a preconditions summary from effects
             let summary: Vec<String> = effects
                 .iter()
                 .map(|e| {
@@ -314,118 +254,119 @@ fn handle_get_operations(state: &Arc<Mutex<ServeState>>, id: &str) -> (u16, Stri
         .collect();
 
     let response = serde_json::json!({ "operations": operations });
-    (
-        200,
-        serde_json::to_string_pretty(&response).unwrap_or_default(),
-    )
+    (StatusCode::OK, Json(response)).into_response()
 }
 
 /// POST /elaborate
-fn handle_elaborate(body: &str) -> (u16, String) {
-    let parsed: serde_json::Value = match serde_json::from_str(body) {
-        Ok(v) => v,
-        Err(e) => return (400, json_error(&format!("invalid JSON: {}", e))),
-    };
-
+async fn handle_elaborate(Json(parsed): Json<serde_json::Value>) -> impl IntoResponse {
     let source = match parsed.get("source").and_then(|v| v.as_str()) {
-        Some(s) => s,
-        None => return (400, json_error("missing 'source' field")),
+        Some(s) => s.to_string(),
+        None => {
+            return json_error(StatusCode::BAD_REQUEST, "missing 'source' field").into_response()
+        }
     };
 
     let filename = parsed
         .get("filename")
         .and_then(|v| v.as_str())
-        .unwrap_or("input.tenor");
+        .unwrap_or("input.tenor")
+        .to_string();
 
-    // Write to a unique temp file and elaborate
-    let tmp_dir = match tempfile::tempdir() {
-        Ok(d) => d,
-        Err(e) => {
-            return (
-                500,
-                json_error(&format!("failed to create temp dir: {}", e)),
-            )
-        }
-    };
-    let tmp_path = tmp_dir.path().join(filename);
-
-    if let Err(e) = std::fs::write(&tmp_path, source) {
-        return (
-            500,
-            json_error(&format!("failed to write temp file: {}", e)),
-        );
-    }
-
-    let result = tenor_core::elaborate::elaborate(&tmp_path);
-    // tmp_dir is dropped here, cleaning up automatically
+    let result = tokio::task::spawn_blocking(move || {
+        let tmp_dir = tempfile::tempdir()?;
+        let tmp_path = tmp_dir.path().join(&filename);
+        std::fs::write(&tmp_path, &source)?;
+        let elab_result = tenor_core::elaborate::elaborate(&tmp_path);
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(elab_result)
+    })
+    .await;
 
     match result {
-        Ok(bundle) => (
-            200,
-            serde_json::to_string_pretty(&bundle).unwrap_or_default(),
-        ),
-        Err(e) => {
+        Ok(Ok(Ok(bundle))) => (StatusCode::OK, Json(bundle)).into_response(),
+        Ok(Ok(Err(e))) => {
             let err_response = serde_json::json!({
                 "error": format!("{:?}", e),
                 "details": e.to_json_value(),
             });
-            (
-                400,
-                serde_json::to_string_pretty(&err_response).unwrap_or_default(),
-            )
+            (StatusCode::BAD_REQUEST, Json(err_response)).into_response()
         }
+        Ok(Err(e)) => json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("failed to elaborate: {}", e),
+        )
+        .into_response(),
+        Err(e) => json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("task join error: {}", e),
+        )
+        .into_response(),
     }
 }
 
 /// POST /evaluate
-fn handle_evaluate(state: &Arc<Mutex<ServeState>>, body: &str) -> (u16, String) {
-    let parsed: serde_json::Value = match serde_json::from_str(body) {
-        Ok(v) => v,
-        Err(e) => return (400, json_error(&format!("invalid JSON: {}", e))),
-    };
-
+async fn handle_evaluate(
+    State(state): State<Arc<AppState>>,
+    Json(parsed): Json<serde_json::Value>,
+) -> impl IntoResponse {
     let bundle_id = match parsed.get("bundle_id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
-        None => return (400, json_error("missing 'bundle_id' field")),
+        None => {
+            return json_error(StatusCode::BAD_REQUEST, "missing 'bundle_id' field").into_response()
+        }
     };
 
     let facts = match parsed.get("facts") {
         Some(f) => f.clone(),
-        None => return (400, json_error("missing 'facts' field")),
-    };
-
-    let flow_id = parsed.get("flow_id").and_then(|v| v.as_str());
-    let persona = parsed.get("persona").and_then(|v| v.as_str());
-
-    let state = state.lock().expect("lock poisoned");
-    let bundle = match state.contracts.get(&bundle_id) {
-        Some(b) => b.clone(),
         None => {
-            return (
-                404,
-                json_error(&format!("contract '{}' not found", bundle_id)),
-            )
+            return json_error(StatusCode::BAD_REQUEST, "missing 'facts' field").into_response()
         }
     };
-    // Release the lock before evaluation
-    drop(state);
 
-    // Flow evaluation
+    let flow_id = parsed
+        .get("flow_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let persona = parsed
+        .get("persona")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let contracts = state.contracts.read().await;
+    let bundle = match contracts.get(&bundle_id) {
+        Some(b) => b.clone(),
+        None => {
+            return json_error(
+                StatusCode::NOT_FOUND,
+                &format!("contract '{}' not found", bundle_id),
+            )
+            .into_response()
+        }
+    };
+    drop(contracts);
+
     if let Some(fid) = flow_id {
         let p = match persona {
             Some(p) => p,
             None => {
-                return (
-                    400,
-                    json_error("'persona' is required when 'flow_id' is specified"),
+                return json_error(
+                    StatusCode::BAD_REQUEST,
+                    "'persona' is required when 'flow_id' is specified",
                 )
+                .into_response()
             }
         };
 
-        match tenor_eval::evaluate_flow(&bundle, &facts, fid, p) {
-            Ok(result) => {
+        let fid_for_response = fid.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            tenor_eval::evaluate_flow(&bundle, &facts, &fid, &p)
+        })
+        .await;
+
+        match result {
+            Ok(Ok(result)) => {
                 let mut json_output = serde_json::Map::new();
-                json_output.insert("flow_id".to_string(), serde_json::json!(fid));
+                json_output.insert("flow_id".to_string(), serde_json::json!(fid_for_response));
                 json_output.insert(
                     "outcome".to_string(),
                     serde_json::json!(result.flow_result.outcome),
@@ -460,62 +401,73 @@ fn handle_evaluate(state: &Arc<Mutex<ServeState>>, body: &str) -> (u16, String) 
                     .collect();
                 json_output.insert("steps_executed".to_string(), steps);
                 json_output.insert("verdicts".to_string(), result.verdicts.to_json());
-                (
-                    200,
-                    serde_json::to_string_pretty(&serde_json::Value::Object(json_output))
-                        .unwrap_or_default(),
-                )
+                (StatusCode::OK, Json(serde_json::Value::Object(json_output))).into_response()
             }
-            Err(e) => (
-                500,
-                serde_json::json!({"error": format!("{}", e)}).to_string(),
-            ),
+            Ok(Err(e)) => {
+                json_error(StatusCode::INTERNAL_SERVER_ERROR, &format!("{}", e)).into_response()
+            }
+            Err(e) => json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("task join error: {}", e),
+            )
+            .into_response(),
         }
     } else {
-        // Rule-only evaluation
-        match tenor_eval::evaluate(&bundle, &facts) {
-            Ok(result) => (
-                200,
-                serde_json::to_string_pretty(&result.verdicts.to_json()).unwrap_or_default(),
-            ),
-            Err(e) => (
-                500,
-                serde_json::json!({"error": format!("{}", e)}).to_string(),
-            ),
+        let result =
+            tokio::task::spawn_blocking(move || tenor_eval::evaluate(&bundle, &facts)).await;
+
+        match result {
+            Ok(Ok(result)) => (StatusCode::OK, Json(result.verdicts.to_json())).into_response(),
+            Ok(Err(e)) => {
+                json_error(StatusCode::INTERNAL_SERVER_ERROR, &format!("{}", e)).into_response()
+            }
+            Err(e) => json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("task join error: {}", e),
+            )
+            .into_response(),
         }
     }
 }
 
 /// POST /explain
-fn handle_explain(state: &Arc<Mutex<ServeState>>, body: &str) -> (u16, String) {
-    let parsed: serde_json::Value = match serde_json::from_str(body) {
-        Ok(v) => v,
-        Err(e) => return (400, json_error(&format!("invalid JSON: {}", e))),
-    };
-
+async fn handle_explain(
+    State(state): State<Arc<AppState>>,
+    Json(parsed): Json<serde_json::Value>,
+) -> impl IntoResponse {
     let bundle_id = match parsed.get("bundle_id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
-        None => return (400, json_error("missing 'bundle_id' field")),
-    };
-
-    let state = state.lock().expect("lock poisoned");
-    let bundle = match state.contracts.get(&bundle_id) {
-        Some(b) => b.clone(),
         None => {
-            return (
-                404,
-                json_error(&format!("contract '{}' not found", bundle_id)),
-            )
+            return json_error(StatusCode::BAD_REQUEST, "missing 'bundle_id' field").into_response()
         }
     };
-    drop(state);
 
-    // Use the explain module to generate a markdown explanation
-    match explain::explain_bundle(&bundle) {
-        Ok(explanation) => (
-            200,
-            serde_json::to_string_pretty(&explanation).unwrap_or_default(),
-        ),
-        Err(e) => (500, json_error(&format!("explain error: {}", e))),
+    let contracts = state.contracts.read().await;
+    let bundle = match contracts.get(&bundle_id) {
+        Some(b) => b.clone(),
+        None => {
+            return json_error(
+                StatusCode::NOT_FOUND,
+                &format!("contract '{}' not found", bundle_id),
+            )
+            .into_response()
+        }
+    };
+    drop(contracts);
+
+    let result = tokio::task::spawn_blocking(move || explain::explain_bundle(&bundle)).await;
+
+    match result {
+        Ok(Ok(explanation)) => (StatusCode::OK, Json(explanation)).into_response(),
+        Ok(Err(e)) => json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("explain error: {}", e),
+        )
+        .into_response(),
+        Err(e) => json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("task join error: {}", e),
+        )
+        .into_response(),
     }
 }

@@ -135,6 +135,12 @@ enum Commands {
         /// Port to listen on
         #[arg(long, default_value = "8080")]
         port: u16,
+        /// Path to TLS certificate PEM file (requires --tls-key)
+        #[arg(long)]
+        tls_cert: Option<PathBuf>,
+        /// Path to TLS private key PEM file (requires --tls-cert)
+        #[arg(long)]
+        tls_key: Option<PathBuf>,
         /// .tenor contract files to pre-load
         #[arg()]
         contracts: Vec<PathBuf>,
@@ -210,8 +216,22 @@ fn main() {
         } => {
             cmd_ambiguity(&suite_dir, spec.as_deref(), model.as_deref());
         }
-        Commands::Serve { port, contracts } => {
-            serve::start_server(port, contracts);
+        Commands::Serve {
+            port,
+            contracts,
+            tls_cert,
+            tls_key,
+        } => {
+            // Validate TLS flags: both must be provided or neither
+            if tls_cert.is_some() != tls_key.is_some() {
+                eprintln!("error: --tls-cert and --tls-key must both be provided");
+                process::exit(1);
+            }
+            let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+            if let Err(e) = rt.block_on(serve::start_server(port, contracts, tls_cert, tls_key)) {
+                eprintln!("Server error: {}", e);
+                process::exit(1);
+            }
         }
         Commands::Lsp => {
             if let Err(e) = tenor_lsp::run() {

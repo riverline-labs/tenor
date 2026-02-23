@@ -8,20 +8,26 @@ description = "Tenor elaborator CLI"
 name = "tenor"
 path = "src/main.rs"
 
+[features]
+default = []
+tls = ["axum-server"]
+
 [dependencies]
 tenor-core = { path = "../core" }
 tenor-eval = { path = "../eval" }
 tenor-analyze = { path = "../analyze" }
 tenor-codegen = { path = "../codegen" }
+tenor-interchange = { path = "../interchange" }
 tenor-lsp = { path = "../lsp" }
+axum = { workspace = true }
+axum-server = { workspace = true, optional = true }
 clap = { workspace = true }
 jsonschema = { workspace = true }
-libc = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 tempfile = "3"
-tiny_http = { workspace = true }
+tokio = { workspace = true }
 ureq = { workspace = true }
 
 [dev-dependencies]
