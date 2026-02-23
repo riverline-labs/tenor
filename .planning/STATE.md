@@ -3,9 +3,9 @@
 ## Current Position
 
 Phase: 18 (Platform Hardening)
-Plan: 9 of 9
-Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-08 (HTTP security hardening: input validation, CORS, rate limiting, API key auth)
+Plan: 9 of 9 -- COMPLETE
+Status: Phase complete
+Last activity: 2026-02-23 — Completed 18-09 (test coverage gaps + SystemContract coordinator design)
 
 ## Project Reference
 
@@ -19,6 +19,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 - v0.9 Core (Phases 1-5.1) — shipped 2026-02-22
 - v1.0 System Construct + Documentation (Phases 12-14) — shipped 2026-02-22
 - Agent Tooling (Phases 14.1-17) — shipped 2026-02-23
+- Platform Hardening (Phase 18) — shipped 2026-02-23
 
 ## Pending Todos
 
@@ -56,3 +57,8 @@ None.
 - libc removed from CLI crate -- tenor-core and tenor-eval have zero libc in production builds
 - explain.rs uses typed tenor-interchange structs (from_interchange + InterchangeConstruct variants) instead of raw JSON traversal
 - HTTP server hardened: input validation (size, null bytes, import escape, filename), CORS via tower-http, per-IP rate limiting (60 req/min), optional API key auth via TENOR_API_KEY env var
+- LSP unit tests cover navigation (goto-definition, find-references, document-symbols), completion, and hover via direct function calls
+- diff CLI has 6 e2e tests (identical bundles, additions, breaking changes, error handling)
+- Flow error-path conformance fixture exercises FailureHandler::Escalate with 4-step escalation trace
+- S3a admissibility negative tests verify dead states have no admissible operations
+- SystemContract coordinator design documented (docs/system-contract-coordinator.md) targeting Phase 25
