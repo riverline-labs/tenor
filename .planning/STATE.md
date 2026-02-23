@@ -3,9 +3,9 @@
 ## Current Position
 
 Phase: 18 (Platform Hardening)
-Plan: 6 of 9
+Plan: 7 of 9
 Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-03 (parser error recovery + WASM I/O trait)
+Last activity: 2026-02-23 — Completed 18-02 (core hardening: panic-free passes, O(1) cycle detection, string allocation reduction)
 
 ## Project Reference
 
@@ -44,3 +44,6 @@ None.
 - SourceProvider trait abstracts file I/O for WASM-ready elaboration (source.rs)
 - Parser multi-error recovery available via parse_recovering() (opt-in)
 - InMemoryProvider enables filesystem-free elaboration for WASM and testing
+- All expect()/unwrap() removed from pass3/4/5 (ElabError propagation)
+- Import cycle detection uses O(1) HashSet (parallel to Vec for error reporting)
+- pass6_serialize uses static key constants and ins() helper for reduced allocations

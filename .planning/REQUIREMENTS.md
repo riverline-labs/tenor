@@ -8,7 +8,7 @@
 
 - [ ] **HARD-01**: Shared interchange deserialization library replaces triplicated parsing in eval, analyze, and codegen
 - [ ] **HARD-02**: explain.rs uses typed interchange structs instead of untyped JSON traversal with silent fallbacks
-- [ ] **HARD-03**: All expect() calls in pass5_validate.rs and pass3_types.rs replaced with proper error propagation
+- [x] **HARD-03**: All expect() calls in pass5_validate.rs and pass3_types.rs replaced with proper error propagation
 - [x] **HARD-04**: Parser recovers from first error and reports multiple diagnostics per parse
 - [x] **HARD-05**: tenor-core file I/O factored behind a trait so elaborate() works without filesystem (WASM prerequisite)
 - [ ] **HARD-06**: libc dependency in serve.rs isolated from tenor-core and tenor-eval crate graph
@@ -27,8 +27,8 @@
 - [x] **HARD-19**: S6 path enumeration MAX_PATHS and MAX_DEPTH made configurable
 - [ ] **HARD-20**: Flow error-path conformance fixtures added (replacing inline unit tests with panic! asserts)
 - [x] **HARD-21**: All hardcoded version strings reference TENOR_BUNDLE_VERSION constant
-- [ ] **HARD-22**: Import cycle detection uses HashSet instead of linear Vec::contains
-- [ ] **HARD-23**: Excessive string allocations in pass6_serialize.rs reduced (matters for WASM embedding)
+- [x] **HARD-22**: Import cycle detection uses HashSet instead of linear Vec::contains
+- [x] **HARD-23**: Excessive string allocations in pass6_serialize.rs reduced (matters for WASM embedding)
 - [ ] **HARD-24**: tenor diff CLI integration tested end-to-end
 - [ ] **HARD-25**: explain.rs Markdown format output tested
 - [ ] **HARD-26**: S3a admissibility has negative test cases
