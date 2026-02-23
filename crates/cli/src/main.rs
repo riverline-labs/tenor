@@ -1,3 +1,4 @@
+mod agent;
 mod ambiguity;
 mod diff;
 mod explain;
@@ -146,6 +147,12 @@ enum Commands {
         contracts: Vec<PathBuf>,
     },
 
+    /// Start an interactive agent shell for a contract
+    Agent {
+        /// Path to the .tenor source file
+        file: PathBuf,
+    },
+
     /// Start the Language Server Protocol server over stdio
     Lsp,
 }
@@ -232,6 +239,9 @@ fn main() {
                 eprintln!("Server error: {}", e);
                 process::exit(1);
             }
+        }
+        Commands::Agent { file } => {
+            agent::run_agent(&file);
         }
         Commands::Lsp => {
             if let Err(e) = tenor_lsp::run() {
