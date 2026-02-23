@@ -12,7 +12,7 @@
 - [ ] **HARD-04**: Parser recovers from first error and reports multiple diagnostics per parse
 - [ ] **HARD-05**: tenor-core file I/O factored behind a trait so elaborate() works without filesystem (WASM prerequisite)
 - [ ] **HARD-06**: libc dependency in serve.rs isolated from tenor-core and tenor-eval crate graph
-- [ ] **HARD-07**: spec_sections dead code in ambiguity testing removed or wired through
+- [x] **HARD-07**: spec_sections dead code in ambiguity testing removed or wired through
 - [ ] **HARD-08**: HTTP stack replaced with production-grade framework (axum or actix-web) with TLS and concurrent request handling
 - [ ] **HARD-09**: Unsafe signal handling in serve.rs replaced with ctrlc or signal-hook
 - [ ] **HARD-10**: Elaborate endpoint validates user content before writing to temp files
@@ -20,13 +20,13 @@
 - [ ] **HARD-12**: SystemContract coordinator designed for cross-contract triggers and shared entity state
 - [ ] **HARD-13**: Contract type uses HashMap indexes instead of Vec for O(1) lookups
 - [ ] **HARD-14**: LSP crate has unit tests covering navigation and completion correctness
-- [ ] **HARD-15**: Duplicate manifest/etag logic in runner.rs consolidated to import from manifest.rs
-- [ ] **HARD-16**: Dead code annotations in LSP crate (semantic_tokens.rs, navigation.rs) resolved
+- [x] **HARD-15**: Duplicate manifest/etag logic in runner.rs consolidated to import from manifest.rs
+- [x] **HARD-16**: Dead code annotations in LSP crate (semantic_tokens.rs, navigation.rs) resolved
 - [ ] **HARD-17**: Stratum rule evaluation uses indexed lookup instead of O(k*n) scan
 - [ ] **HARD-18**: Flow execution eliminates unnecessary deep clones (handle_failure vector cloning)
-- [ ] **HARD-19**: S6 path enumeration MAX_PATHS and MAX_DEPTH made configurable
+- [x] **HARD-19**: S6 path enumeration MAX_PATHS and MAX_DEPTH made configurable
 - [ ] **HARD-20**: Flow error-path conformance fixtures added (replacing inline unit tests with panic! asserts)
-- [ ] **HARD-21**: All hardcoded version strings reference TENOR_BUNDLE_VERSION constant
+- [x] **HARD-21**: All hardcoded version strings reference TENOR_BUNDLE_VERSION constant
 - [ ] **HARD-22**: Import cycle detection uses HashSet instead of linear Vec::contains
 - [ ] **HARD-23**: Excessive string allocations in pass6_serialize.rs reduced (matters for WASM embedding)
 - [ ] **HARD-24**: tenor diff CLI integration tested end-to-end
