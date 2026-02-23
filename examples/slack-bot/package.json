@@ -1,0 +1,17 @@
+{
+  "name": "@tenor-examples/slack-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node --experimental-strip-types src/app.ts",
+    "dev": "node --experimental-strip-types --watch src/app.ts"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.0"
+  }
+}
