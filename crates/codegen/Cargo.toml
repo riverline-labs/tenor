@@ -5,6 +5,7 @@ edition.workspace = true
 description = "Tenor code generator"
 
 [dependencies]
+tenor-interchange = { path = "../interchange" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

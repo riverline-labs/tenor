@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 use std::fmt;
+use tenor_interchange::InterchangeConstruct;
 
 /// Error type for analysis operations.
 #[derive(Debug, Clone)]
@@ -28,6 +29,12 @@ impl fmt::Display for AnalysisError {
 }
 
 impl std::error::Error for AnalysisError {}
+
+impl From<tenor_interchange::InterchangeError> for AnalysisError {
+    fn from(e: tenor_interchange::InterchangeError) -> Self {
+        AnalysisError::InvalidBundle(e.to_string())
+    }
+}
 
 /// A state transition in an Entity.
 #[derive(Debug, Clone, Serialize)]
@@ -165,12 +172,7 @@ impl AnalysisBundle {
     /// dispatching on the `kind` field. Unknown kinds are silently skipped
     /// for forward compatibility.
     pub fn from_interchange(bundle: &serde_json::Value) -> Result<Self, AnalysisError> {
-        let constructs = bundle
-            .get("constructs")
-            .and_then(|c| c.as_array())
-            .ok_or_else(|| {
-                AnalysisError::InvalidBundle("missing or invalid 'constructs' array".to_string())
-            })?;
+        let parsed = tenor_interchange::from_interchange(bundle)?;
 
         let mut entities = Vec::new();
         let mut facts = Vec::new();
@@ -180,18 +182,120 @@ impl AnalysisBundle {
         let mut personas = Vec::new();
         let mut systems = Vec::new();
 
-        for construct in constructs {
-            let kind = construct.get("kind").and_then(|k| k.as_str()).unwrap_or("");
-
-            match kind {
-                "Entity" => entities.push(parse_entity(construct)?),
-                "Fact" => facts.push(parse_fact(construct)?),
-                "Rule" => rules.push(parse_rule(construct)?),
-                "Operation" => operations.push(parse_operation(construct)?),
-                "Flow" => flows.push(parse_flow(construct)?),
-                "Persona" => personas.push(parse_persona(construct)?),
-                "System" => systems.push(parse_system(construct)?),
-                _ => {} // Skip unknown kinds for forward compatibility
+        for construct in &parsed.constructs {
+            match construct {
+                InterchangeConstruct::Entity(e) => {
+                    entities.push(AnalysisEntity {
+                        id: e.id.clone(),
+                        states: e.states.clone(),
+                        initial: e.initial.clone(),
+                        transitions: e
+                            .transitions
+                            .iter()
+                            .map(|t| Transition {
+                                from: t.from.clone(),
+                                to: t.to.clone(),
+                            })
+                            .collect(),
+                        parent: e.parent.clone(),
+                    });
+                }
+                InterchangeConstruct::Fact(f) => {
+                    facts.push(AnalysisFact {
+                        id: f.id.clone(),
+                        fact_type: f.fact_type.clone(),
+                    });
+                }
+                InterchangeConstruct::Rule(r) => {
+                    let verdict_type =
+                        r.verdict_type()
+                            .ok_or_else(|| AnalysisError::MissingField {
+                                construct: r.id.clone(),
+                                field: "body.produce.verdict_type".to_string(),
+                            })?;
+                    rules.push(AnalysisRule {
+                        id: r.id.clone(),
+                        stratum: r.stratum,
+                        when: r.when().cloned().unwrap_or(serde_json::Value::Null),
+                        produce_verdict_type: verdict_type.to_string(),
+                        produce_payload: r
+                            .produce_payload()
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null),
+                    });
+                }
+                InterchangeConstruct::Operation(op) => {
+                    operations.push(AnalysisOperation {
+                        id: op.id.clone(),
+                        allowed_personas: op.allowed_personas.clone(),
+                        precondition: op.precondition.clone(),
+                        effects: op
+                            .effects
+                            .iter()
+                            .map(|e| Effect {
+                                entity_id: e.entity_id.clone(),
+                                from_state: e.from.clone(),
+                                to_state: e.to.clone(),
+                                outcome: e.outcome.clone(),
+                            })
+                            .collect(),
+                        outcomes: op.outcomes.clone(),
+                        error_contract: op.error_contract.clone(),
+                    });
+                }
+                InterchangeConstruct::Flow(f) => {
+                    flows.push(AnalysisFlow {
+                        id: f.id.clone(),
+                        entry: f.entry.clone(),
+                        steps: f.steps.clone(),
+                        snapshot: f.snapshot.clone(),
+                    });
+                }
+                InterchangeConstruct::Persona(p) => {
+                    personas.push(AnalysisPersona { id: p.id.clone() });
+                }
+                InterchangeConstruct::System(s) => {
+                    systems.push(AnalysisSystem {
+                        id: s.id.clone(),
+                        members: s
+                            .members
+                            .iter()
+                            .map(|m| SystemMember {
+                                id: m.id.clone(),
+                                path: m.path.clone(),
+                            })
+                            .collect(),
+                        shared_personas: s
+                            .shared_personas
+                            .iter()
+                            .map(|sp| SharedPersona {
+                                persona: sp.persona.clone(),
+                                contracts: sp.contracts.clone(),
+                            })
+                            .collect(),
+                        flow_triggers: s
+                            .flow_triggers
+                            .iter()
+                            .map(|ft| FlowTrigger {
+                                source_contract: ft.source_contract.clone(),
+                                source_flow: ft.source_flow.clone(),
+                                on: ft.on.clone(),
+                                target_contract: ft.target_contract.clone(),
+                                target_flow: ft.target_flow.clone(),
+                                persona: ft.persona.clone(),
+                            })
+                            .collect(),
+                        shared_entities: s
+                            .shared_entities
+                            .iter()
+                            .map(|se| SharedEntity {
+                                entity: se.entity.clone(),
+                                contracts: se.contracts.clone(),
+                            })
+                            .collect(),
+                    });
+                }
+                InterchangeConstruct::TypeDecl(_) => {}
             }
         }
 
@@ -243,314 +347,6 @@ impl AnalysisBundle {
             systems,
         })
     }
-}
-
-/// Extract a required string field from a JSON object.
-fn required_str(
-    obj: &serde_json::Value,
-    field: &str,
-    construct_id: &str,
-) -> Result<String, AnalysisError> {
-    obj.get(field)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| AnalysisError::MissingField {
-            construct: construct_id.to_string(),
-            field: field.to_string(),
-        })
-}
-
-/// Extract a required u64 field from a JSON object.
-fn required_u64(
-    obj: &serde_json::Value,
-    field: &str,
-    construct_id: &str,
-) -> Result<u64, AnalysisError> {
-    obj.get(field)
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| AnalysisError::MissingField {
-            construct: construct_id.to_string(),
-            field: field.to_string(),
-        })
-}
-
-fn parse_entity(obj: &serde_json::Value) -> Result<AnalysisEntity, AnalysisError> {
-    let id = required_str(obj, "id", "Entity")?;
-
-    let states = obj
-        .get("states")
-        .and_then(|s| s.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .ok_or_else(|| AnalysisError::MissingField {
-            construct: id.clone(),
-            field: "states".to_string(),
-        })?;
-
-    let initial = required_str(obj, "initial", &id)?;
-
-    let transitions = obj
-        .get("transitions")
-        .and_then(|t| t.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|t| {
-                    let from = t.get("from")?.as_str()?.to_string();
-                    let to = t.get("to")?.as_str()?.to_string();
-                    Some(Transition { from, to })
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    let parent = obj
-        .get("parent")
-        .and_then(|p| p.as_str())
-        .map(|s| s.to_string());
-
-    Ok(AnalysisEntity {
-        id,
-        states,
-        initial,
-        transitions,
-        parent,
-    })
-}
-
-fn parse_fact(obj: &serde_json::Value) -> Result<AnalysisFact, AnalysisError> {
-    let id = required_str(obj, "id", "Fact")?;
-    let fact_type = obj.get("type").cloned().unwrap_or(serde_json::Value::Null);
-
-    Ok(AnalysisFact { id, fact_type })
-}
-
-fn parse_rule(obj: &serde_json::Value) -> Result<AnalysisRule, AnalysisError> {
-    let id = required_str(obj, "id", "Rule")?;
-    let stratum = required_u64(obj, "stratum", &id)?;
-
-    let body = obj.get("body").ok_or_else(|| AnalysisError::MissingField {
-        construct: id.clone(),
-        field: "body".to_string(),
-    })?;
-
-    let when = body.get("when").cloned().unwrap_or(serde_json::Value::Null);
-
-    let produce = body
-        .get("produce")
-        .ok_or_else(|| AnalysisError::MissingField {
-            construct: id.clone(),
-            field: "body.produce".to_string(),
-        })?;
-
-    let produce_verdict_type = produce
-        .get("verdict_type")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| AnalysisError::MissingField {
-            construct: id.clone(),
-            field: "body.produce.verdict_type".to_string(),
-        })?;
-
-    let produce_payload = produce
-        .get("payload")
-        .cloned()
-        .unwrap_or(serde_json::Value::Null);
-
-    Ok(AnalysisRule {
-        id,
-        stratum,
-        when,
-        produce_verdict_type,
-        produce_payload,
-    })
-}
-
-fn parse_operation(obj: &serde_json::Value) -> Result<AnalysisOperation, AnalysisError> {
-    let id = required_str(obj, "id", "Operation")?;
-
-    let allowed_personas = obj
-        .get("allowed_personas")
-        .and_then(|a| a.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    // precondition can be null or a predicate expression object
-    let precondition =
-        obj.get("precondition")
-            .and_then(|p| if p.is_null() { None } else { Some(p.clone()) });
-
-    let effects = obj
-        .get("effects")
-        .and_then(|e| e.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|e| {
-                    let entity_id = e.get("entity_id")?.as_str()?.to_string();
-                    let from_state = e.get("from")?.as_str()?.to_string();
-                    let to_state = e.get("to")?.as_str()?.to_string();
-                    let outcome = e
-                        .get("outcome")
-                        .and_then(|o| o.as_str())
-                        .map(|s| s.to_string());
-                    Some(Effect {
-                        entity_id,
-                        from_state,
-                        to_state,
-                        outcome,
-                    })
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    // outcomes can be null or an array of strings
-    let outcomes = obj
-        .get("outcomes")
-        .and_then(|o| o.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    let error_contract =
-        obj.get("error_contract")
-            .and_then(|e| if e.is_null() { None } else { Some(e.clone()) });
-
-    Ok(AnalysisOperation {
-        id,
-        allowed_personas,
-        precondition,
-        effects,
-        outcomes,
-        error_contract,
-    })
-}
-
-fn parse_flow(obj: &serde_json::Value) -> Result<AnalysisFlow, AnalysisError> {
-    let id = required_str(obj, "id", "Flow")?;
-    let entry = required_str(obj, "entry", &id)?;
-
-    let steps = obj
-        .get("steps")
-        .and_then(|s| s.as_array())
-        .cloned()
-        .unwrap_or_default();
-
-    let snapshot = obj
-        .get("snapshot")
-        .and_then(|s| s.as_str())
-        .unwrap_or("at_initiation")
-        .to_string();
-
-    Ok(AnalysisFlow {
-        id,
-        entry,
-        steps,
-        snapshot,
-    })
-}
-
-fn parse_persona(obj: &serde_json::Value) -> Result<AnalysisPersona, AnalysisError> {
-    let id = required_str(obj, "id", "Persona")?;
-    Ok(AnalysisPersona { id })
-}
-
-fn parse_system(obj: &serde_json::Value) -> Result<AnalysisSystem, AnalysisError> {
-    let id = required_str(obj, "id", "System")?;
-
-    let members = obj
-        .get("members")
-        .and_then(|m| m.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|m| {
-                    let mid = m.get("id")?.as_str()?.to_string();
-                    let path = m.get("path")?.as_str()?.to_string();
-                    Some(SystemMember { id: mid, path })
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    let shared_personas = obj
-        .get("shared_personas")
-        .and_then(|sp| sp.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|sp| {
-                    let persona = sp.get("persona")?.as_str()?.to_string();
-                    let contracts = sp
-                        .get("contracts")?
-                        .as_array()?
-                        .iter()
-                        .filter_map(|c| c.as_str().map(|s| s.to_string()))
-                        .collect();
-                    Some(SharedPersona { persona, contracts })
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    let flow_triggers = obj
-        .get("triggers")
-        .and_then(|t| t.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|t| {
-                    let source_contract = t.get("source_contract")?.as_str()?.to_string();
-                    let source_flow = t.get("source_flow")?.as_str()?.to_string();
-                    let on = t.get("on")?.as_str()?.to_string();
-                    let target_contract = t.get("target_contract")?.as_str()?.to_string();
-                    let target_flow = t.get("target_flow")?.as_str()?.to_string();
-                    let persona = t.get("persona")?.as_str()?.to_string();
-                    Some(FlowTrigger {
-                        source_contract,
-                        source_flow,
-                        on,
-                        target_contract,
-                        target_flow,
-                        persona,
-                    })
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    let shared_entities = obj
-        .get("shared_entities")
-        .and_then(|se| se.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|se| {
-                    let entity = se.get("entity")?.as_str()?.to_string();
-                    let contracts = se
-                        .get("contracts")?
-                        .as_array()?
-                        .iter()
-                        .filter_map(|c| c.as_str().map(|s| s.to_string()))
-                        .collect();
-                    Some(SharedEntity { entity, contracts })
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    Ok(AnalysisSystem {
-        id,
-        members,
-        shared_personas,
-        flow_triggers,
-        shared_entities,
-    })
 }
 
 #[cfg(test)]

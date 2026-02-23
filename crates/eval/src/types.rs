@@ -309,15 +309,17 @@ pub struct Contract {
 impl Contract {
     /// Deserialize a Contract from interchange JSON bundle.
     ///
-    /// Walks the `constructs` array and extracts facts, entities, rules,
-    /// operations, flows, and personas by matching on the `kind` field.
+    /// Uses `tenor_interchange::from_interchange()` for initial JSON parsing
+    /// and kind dispatch, then converts shared types to eval-specific domain
+    /// types using deep parsers for predicates, flow steps, etc.
     pub fn from_interchange(bundle: &serde_json::Value) -> Result<Contract, EvalError> {
-        let constructs = bundle
-            .get("constructs")
-            .and_then(|c| c.as_array())
-            .ok_or_else(|| EvalError::DeserializeError {
-                message: "bundle missing 'constructs' array".to_string(),
-            })?;
+        use tenor_interchange::InterchangeConstruct;
+
+        let parsed = tenor_interchange::from_interchange(bundle).map_err(|e| {
+            EvalError::DeserializeError {
+                message: e.to_string(),
+            }
+        })?;
 
         let mut facts = Vec::new();
         let mut entities = Vec::new();
@@ -326,26 +328,106 @@ impl Contract {
         let mut flows = Vec::new();
         let mut personas = Vec::new();
 
-        for construct in constructs {
-            let kind = construct
-                .get("kind")
-                .and_then(|k| k.as_str())
-                .ok_or_else(|| EvalError::DeserializeError {
-                    message: "construct missing 'kind' field".to_string(),
-                })?;
-
-            match kind {
-                "Fact" => facts.push(parse_fact(construct)?),
-                "Entity" => entities.push(parse_entity(construct)?),
-                "Rule" => rules.push(parse_rule(construct)?),
-                "Operation" => operations.push(parse_operation(construct)?),
-                "Flow" => flows.push(parse_flow(construct)?),
-                "Persona" => {
-                    let id = get_str(construct, "id")?;
-                    personas.push(id);
+        for construct in &parsed.constructs {
+            match construct {
+                InterchangeConstruct::Fact(f) => {
+                    let fact_type = TypeSpec::from_json(&f.fact_type)?;
+                    let default = if let Some(ref def) = f.default {
+                        Some(parse_default_value(def, &fact_type)?)
+                    } else {
+                        None
+                    };
+                    facts.push(FactDecl {
+                        id: f.id.clone(),
+                        fact_type,
+                        default,
+                    });
                 }
-                _ => {
-                    // Ignore unknown construct kinds for forward compatibility
+                InterchangeConstruct::Entity(e) => {
+                    entities.push(Entity {
+                        id: e.id.clone(),
+                        states: e.states.clone(),
+                        initial: e.initial.clone(),
+                        transitions: e
+                            .transitions
+                            .iter()
+                            .map(|t| Transition {
+                                from: t.from.clone(),
+                                to: t.to.clone(),
+                            })
+                            .collect(),
+                    });
+                }
+                InterchangeConstruct::Rule(r) => {
+                    let when = r.when().ok_or_else(|| EvalError::DeserializeError {
+                        message: format!("Rule '{}' body missing 'when'", r.id),
+                    })?;
+                    let condition = parse_predicate(when)?;
+                    let produce_obj = r.produce().ok_or_else(|| EvalError::DeserializeError {
+                        message: format!("Rule '{}' body missing 'produce'", r.id),
+                    })?;
+                    let produce = parse_produce(produce_obj)?;
+                    rules.push(Rule {
+                        id: r.id.clone(),
+                        stratum: r.stratum as u32,
+                        condition,
+                        produce,
+                    });
+                }
+                InterchangeConstruct::Operation(op) => {
+                    let precondition = if let Some(ref pre) = op.precondition {
+                        parse_predicate(pre)?
+                    } else {
+                        // Null precondition means no precondition -- always true.
+                        parse_predicate(&serde_json::json!(null))?
+                    };
+                    let effects: Vec<Effect> = op
+                        .effects
+                        .iter()
+                        .map(|e| Effect {
+                            entity_id: e.entity_id.clone(),
+                            from: e.from.clone(),
+                            to: e.to.clone(),
+                            outcome: e.outcome.clone(),
+                        })
+                        .collect();
+                    let error_contract: Vec<String> = op
+                        .error_contract
+                        .as_ref()
+                        .and_then(|e| e.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    operations.push(Operation {
+                        id: op.id.clone(),
+                        allowed_personas: op.allowed_personas.clone(),
+                        precondition,
+                        effects,
+                        error_contract,
+                        outcomes: op.outcomes.clone(),
+                    });
+                }
+                InterchangeConstruct::Flow(f) => {
+                    let steps: Vec<FlowStep> = f
+                        .steps
+                        .iter()
+                        .map(parse_flow_step)
+                        .collect::<Result<Vec<_>, EvalError>>()?;
+                    flows.push(Flow {
+                        id: f.id.clone(),
+                        snapshot: f.snapshot.clone(),
+                        entry: f.entry.clone(),
+                        steps,
+                    });
+                }
+                InterchangeConstruct::Persona(p) => {
+                    personas.push(p.id.clone());
+                }
+                InterchangeConstruct::System(_) | InterchangeConstruct::TypeDecl(_) => {
+                    // System and TypeDecl constructs are not used in evaluation
                 }
             }
         }
@@ -372,24 +454,6 @@ fn get_str(obj: &serde_json::Value, field: &str) -> Result<String, EvalError> {
         .ok_or_else(|| EvalError::DeserializeError {
             message: format!("missing string field '{}'", field),
         })
-}
-
-fn parse_fact(v: &serde_json::Value) -> Result<FactDecl, EvalError> {
-    let id = get_str(v, "id")?;
-    let type_val = v.get("type").ok_or_else(|| EvalError::DeserializeError {
-        message: format!("Fact '{}' missing 'type' field", id),
-    })?;
-    let fact_type = TypeSpec::from_json(type_val)?;
-    let default = if let Some(def) = v.get("default") {
-        Some(parse_default_value(def, &fact_type)?)
-    } else {
-        None
-    };
-    Ok(FactDecl {
-        id,
-        fact_type,
-        default,
-    })
 }
 
 /// Parse a default value from interchange JSON format.
@@ -624,69 +688,6 @@ pub fn parse_plain_value(v: &serde_json::Value, type_spec: &TypeSpec) -> Result<
     }
 }
 
-fn parse_entity(v: &serde_json::Value) -> Result<Entity, EvalError> {
-    let id = get_str(v, "id")?;
-    let initial = get_str(v, "initial")?;
-    let states: Vec<String> = v
-        .get("states")
-        .and_then(|s| s.as_array())
-        .ok_or_else(|| EvalError::DeserializeError {
-            message: format!("Entity '{}' missing 'states'", id),
-        })?
-        .iter()
-        .filter_map(|s| s.as_str().map(|s| s.to_string()))
-        .collect();
-    let transitions: Vec<Transition> = v
-        .get("transitions")
-        .and_then(|t| t.as_array())
-        .unwrap_or(&Vec::new())
-        .iter()
-        .map(|t| {
-            Ok(Transition {
-                from: get_str(t, "from")?,
-                to: get_str(t, "to")?,
-            })
-        })
-        .collect::<Result<Vec<_>, EvalError>>()?;
-    Ok(Entity {
-        id,
-        states,
-        initial,
-        transitions,
-    })
-}
-
-fn parse_rule(v: &serde_json::Value) -> Result<Rule, EvalError> {
-    let id = get_str(v, "id")?;
-    let stratum =
-        v.get("stratum")
-            .and_then(|s| s.as_u64())
-            .ok_or_else(|| EvalError::DeserializeError {
-                message: format!("Rule '{}' missing 'stratum'", id),
-            })? as u32;
-    let body = v.get("body").ok_or_else(|| EvalError::DeserializeError {
-        message: format!("Rule '{}' missing 'body'", id),
-    })?;
-    let when = body
-        .get("when")
-        .ok_or_else(|| EvalError::DeserializeError {
-            message: format!("Rule '{}' body missing 'when'", id),
-        })?;
-    let condition = parse_predicate(when)?;
-    let produce_obj = body
-        .get("produce")
-        .ok_or_else(|| EvalError::DeserializeError {
-            message: format!("Rule '{}' body missing 'produce'", id),
-        })?;
-    let produce = parse_produce(produce_obj)?;
-    Ok(Rule {
-        id,
-        stratum,
-        condition,
-        produce,
-    })
-}
-
 fn parse_produce(v: &serde_json::Value) -> Result<ProduceClause, EvalError> {
     let verdict_type = get_str(v, "verdict_type")?;
     let payload = v
@@ -777,89 +778,6 @@ fn parse_literal_value(v: &serde_json::Value, type_spec: &TypeSpec) -> Result<Va
             parse_default_value(v, type_spec)
         }
     }
-}
-
-fn parse_operation(v: &serde_json::Value) -> Result<Operation, EvalError> {
-    let id = get_str(v, "id")?;
-    let allowed_personas: Vec<String> = v
-        .get("allowed_personas")
-        .and_then(|a| a.as_array())
-        .unwrap_or(&Vec::new())
-        .iter()
-        .filter_map(|p| p.as_str().map(|s| s.to_string()))
-        .collect();
-    let precondition =
-        parse_predicate(
-            v.get("precondition")
-                .ok_or_else(|| EvalError::DeserializeError {
-                    message: format!("Operation '{}' missing 'precondition'", id),
-                })?,
-        )?;
-    let effects: Vec<Effect> = v
-        .get("effects")
-        .and_then(|e| e.as_array())
-        .unwrap_or(&Vec::new())
-        .iter()
-        .map(|e| {
-            Ok(Effect {
-                entity_id: get_str(e, "entity_id")?,
-                from: get_str(e, "from")?,
-                to: get_str(e, "to")?,
-                outcome: e
-                    .get("outcome")
-                    .and_then(|o| o.as_str())
-                    .map(|s| s.to_string()),
-            })
-        })
-        .collect::<Result<Vec<_>, EvalError>>()?;
-    let error_contract: Vec<String> = v
-        .get("error_contract")
-        .and_then(|e| e.as_array())
-        .unwrap_or(&Vec::new())
-        .iter()
-        .filter_map(|e| e.as_str().map(|s| s.to_string()))
-        .collect();
-    let outcomes: Vec<String> = v
-        .get("outcomes")
-        .and_then(|o| o.as_array())
-        .unwrap_or(&Vec::new())
-        .iter()
-        .filter_map(|o| o.as_str().map(|s| s.to_string()))
-        .collect();
-    Ok(Operation {
-        id,
-        allowed_personas,
-        precondition,
-        effects,
-        error_contract,
-        outcomes,
-    })
-}
-
-fn parse_flow(v: &serde_json::Value) -> Result<Flow, EvalError> {
-    let id = get_str(v, "id")?;
-    let snapshot = v
-        .get("snapshot")
-        .and_then(|s| s.as_str())
-        .unwrap_or("at_initiation")
-        .to_string();
-    let entry = get_str(v, "entry")?;
-    let steps_arr =
-        v.get("steps")
-            .and_then(|s| s.as_array())
-            .ok_or_else(|| EvalError::DeserializeError {
-                message: format!("Flow '{}' missing 'steps'", id),
-            })?;
-    let steps: Vec<FlowStep> = steps_arr
-        .iter()
-        .map(parse_flow_step)
-        .collect::<Result<Vec<_>, EvalError>>()?;
-    Ok(Flow {
-        id,
-        snapshot,
-        entry,
-        steps,
-    })
 }
 
 fn parse_flow_step(v: &serde_json::Value) -> Result<FlowStep, EvalError> {

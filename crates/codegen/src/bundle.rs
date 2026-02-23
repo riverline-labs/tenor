@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use tenor_interchange::InterchangeConstruct;
 
 /// Error type for code generation operations.
 #[derive(Debug, Clone)]
@@ -30,6 +31,12 @@ impl fmt::Display for CodegenError {
 }
 
 impl std::error::Error for CodegenError {}
+
+impl From<tenor_interchange::InterchangeError> for CodegenError {
+    fn from(e: tenor_interchange::InterchangeError) -> Self {
+        CodegenError::InvalidBundle(e.to_string())
+    }
+}
 
 /// Type information from interchange JSON BaseType.
 #[derive(Debug, Clone)]
@@ -125,19 +132,12 @@ pub struct CodegenBundle {
 
 impl CodegenBundle {
     /// Deserialize an interchange JSON bundle into typed codegen structs.
+    ///
+    /// Uses `tenor_interchange::from_interchange()` for initial JSON parsing
+    /// and kind dispatch, then converts shared types to codegen-specific types,
+    /// including deep type parsing via `parse_type_info()`.
     pub fn from_interchange(bundle: &serde_json::Value) -> Result<Self, CodegenError> {
-        let id = bundle
-            .get("id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| CodegenError::InvalidBundle("missing 'id' field".to_string()))?
-            .to_string();
-
-        let constructs = bundle
-            .get("constructs")
-            .and_then(|c| c.as_array())
-            .ok_or_else(|| {
-                CodegenError::InvalidBundle("missing or invalid 'constructs' array".to_string())
-            })?;
+        let parsed = tenor_interchange::from_interchange(bundle)?;
 
         let mut facts = Vec::new();
         let mut entities = Vec::new();
@@ -146,18 +146,51 @@ impl CodegenBundle {
         let mut flows = Vec::new();
         let mut personas = Vec::new();
 
-        for construct in constructs {
-            let kind = construct.get("kind").and_then(|k| k.as_str()).unwrap_or("");
-
-            match kind {
-                "Fact" => facts.push(parse_fact(construct)?),
-                "Entity" => entities.push(parse_entity(construct)?),
-                "Operation" => operations.push(parse_operation(construct)?),
-                "Rule" => rules.push(parse_rule(construct)?),
-                "Flow" => flows.push(parse_flow(construct)?),
-                "Persona" => personas.push(parse_persona(construct)?),
-                "System" => {} // System constructs are not relevant for TypeScript codegen
-                _ => {}        // Skip unknown kinds for forward compatibility
+        for construct in &parsed.constructs {
+            match construct {
+                InterchangeConstruct::Fact(f) => {
+                    let type_info = parse_type_info(&f.fact_type)?;
+                    facts.push(CodegenFact {
+                        id: f.id.clone(),
+                        type_info,
+                    });
+                }
+                InterchangeConstruct::Entity(e) => {
+                    entities.push(CodegenEntity {
+                        id: e.id.clone(),
+                        states: e.states.clone(),
+                    });
+                }
+                InterchangeConstruct::Operation(op) => {
+                    operations.push(CodegenOperation {
+                        id: op.id.clone(),
+                        allowed_personas: op.allowed_personas.clone(),
+                    });
+                }
+                InterchangeConstruct::Rule(r) => {
+                    let verdict_type = r
+                        .verdict_type()
+                        .ok_or_else(|| {
+                            CodegenError::InvalidBundle(format!(
+                                "Rule '{}' missing body.produce.verdict_type",
+                                r.id
+                            ))
+                        })?
+                        .to_string();
+                    rules.push(CodegenRule {
+                        id: r.id.clone(),
+                        verdict_type,
+                    });
+                }
+                InterchangeConstruct::Flow(f) => {
+                    flows.push(CodegenFlow { id: f.id.clone() });
+                }
+                InterchangeConstruct::Persona(p) => {
+                    personas.push(CodegenPersona { id: p.id.clone() });
+                }
+                InterchangeConstruct::System(_) | InterchangeConstruct::TypeDecl(_) => {
+                    // System and TypeDecl constructs are not relevant for TypeScript codegen
+                }
             }
         }
 
@@ -174,7 +207,7 @@ impl CodegenBundle {
         }
 
         Ok(CodegenBundle {
-            id,
+            id: parsed.id.clone(),
             facts,
             entities,
             operations,
@@ -289,77 +322,6 @@ fn parse_type_info(v: &serde_json::Value) -> Result<TypeInfo, CodegenError> {
             other
         ))),
     }
-}
-
-fn parse_fact(obj: &serde_json::Value) -> Result<CodegenFact, CodegenError> {
-    let id = required_str(obj, "id")?;
-    let type_val = obj.get("type").ok_or_else(|| {
-        CodegenError::InvalidBundle(format!("Fact '{}' missing 'type' field", id))
-    })?;
-    let type_info = parse_type_info(type_val)?;
-    Ok(CodegenFact { id, type_info })
-}
-
-fn parse_entity(obj: &serde_json::Value) -> Result<CodegenEntity, CodegenError> {
-    let id = required_str(obj, "id")?;
-    let states = obj
-        .get("states")
-        .and_then(|s| s.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-    Ok(CodegenEntity { id, states })
-}
-
-fn parse_operation(obj: &serde_json::Value) -> Result<CodegenOperation, CodegenError> {
-    let id = required_str(obj, "id")?;
-    let allowed_personas = obj
-        .get("allowed_personas")
-        .and_then(|a| a.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-    Ok(CodegenOperation {
-        id,
-        allowed_personas,
-    })
-}
-
-fn parse_rule(obj: &serde_json::Value) -> Result<CodegenRule, CodegenError> {
-    let id = required_str(obj, "id")?;
-    let verdict_type = obj
-        .get("body")
-        .and_then(|b| b.get("produce"))
-        .and_then(|p| p.get("verdict_type"))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            CodegenError::InvalidBundle(format!("Rule '{}' missing body.produce.verdict_type", id))
-        })?
-        .to_string();
-    Ok(CodegenRule { id, verdict_type })
-}
-
-fn parse_flow(obj: &serde_json::Value) -> Result<CodegenFlow, CodegenError> {
-    let id = required_str(obj, "id")?;
-    Ok(CodegenFlow { id })
-}
-
-fn parse_persona(obj: &serde_json::Value) -> Result<CodegenPersona, CodegenError> {
-    let id = required_str(obj, "id")?;
-    Ok(CodegenPersona { id })
-}
-
-fn required_str(obj: &serde_json::Value, field: &str) -> Result<String, CodegenError> {
-    obj.get(field)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| CodegenError::InvalidBundle(format!("missing '{}' field", field)))
 }
 
 #[cfg(test)]

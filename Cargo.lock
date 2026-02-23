@@ -2031,6 +2031,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tenor-core",
+ "tenor-interchange",
 ]
 
 [[package]]
@@ -2062,6 +2063,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tenor-interchange",
 ]
 
 [[package]]
@@ -2081,6 +2083,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tenor-core",
+ "tenor-interchange",
  "time",
 ]
 
