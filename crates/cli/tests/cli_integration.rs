@@ -272,6 +272,87 @@ fn diff_different_files_exits_1() {
         .code(1);
 }
 
+#[test]
+fn diff_fact_added_shows_addition() {
+    // Create two bundles: one minimal, one with an extra fact
+    let tmp = TempDir::new().unwrap();
+    let bundle1 = serde_json::json!({
+        "kind": "Bundle", "id": "test_contract", "tenor": "1.0",
+        "constructs": [
+            { "kind": "Fact", "id": "amount", "type": { "base": "Int" },
+              "source": { "system": "billing", "field": "amt" },
+              "provenance": { "file": "test.tenor", "line": 1 }, "tenor": "1.0" }
+        ]
+    });
+    let bundle2 = serde_json::json!({
+        "kind": "Bundle", "id": "test_contract", "tenor": "1.0",
+        "constructs": [
+            { "kind": "Fact", "id": "amount", "type": { "base": "Int" },
+              "source": { "system": "billing", "field": "amt" },
+              "provenance": { "file": "test.tenor", "line": 1 }, "tenor": "1.0" },
+            { "kind": "Fact", "id": "is_active", "type": { "base": "Bool" },
+              "source": { "system": "crm", "field": "active" },
+              "provenance": { "file": "test.tenor", "line": 5 }, "tenor": "1.0" }
+        ]
+    });
+
+    let path1 = tmp.path().join("bundle1.json");
+    let path2 = tmp.path().join("bundle2.json");
+    fs::write(&path1, serde_json::to_string_pretty(&bundle1).unwrap()).unwrap();
+    fs::write(&path2, serde_json::to_string_pretty(&bundle2).unwrap()).unwrap();
+
+    // Diff should detect the addition and exit 1
+    tenor()
+        .args(["diff", path1.to_str().unwrap(), path2.to_str().unwrap()])
+        .assert()
+        .failure()
+        .code(1);
+}
+
+#[test]
+fn diff_breaking_non_breaking_changes() {
+    // Identical bundles should exit 0 with --breaking
+    tenor()
+        .args([
+            "diff",
+            "--breaking",
+            "conformance/positive/fact_basic.expected.json",
+            "conformance/positive/fact_basic.expected.json",
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn diff_invalid_file_exits_1() {
+    let tmp = TempDir::new().unwrap();
+    let bad_path = tmp.path().join("not_json.txt");
+    fs::write(&bad_path, "this is not JSON at all").unwrap();
+
+    tenor()
+        .args([
+            "diff",
+            bad_path.to_str().unwrap(),
+            "conformance/positive/fact_basic.expected.json",
+        ])
+        .assert()
+        .failure()
+        .code(1);
+}
+
+#[test]
+fn diff_nonexistent_file_exits_1() {
+    tenor()
+        .args([
+            "diff",
+            "nonexistent_file_xyz.json",
+            "conformance/positive/fact_basic.expected.json",
+        ])
+        .assert()
+        .failure()
+        .code(1);
+}
+
 // ──────────────────────────────────────────────
 // 7. Check subcommand
 // ──────────────────────────────────────────────
