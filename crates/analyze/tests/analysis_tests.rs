@@ -116,6 +116,87 @@ fn test_s3a_escrow() {
 }
 
 // ──────────────────────────────────────────────
+// S3a — Admissibility (negative tests)
+// ──────────────────────────────────────────────
+
+/// An operation references a state that doesn't exist in the entity.
+/// S3a should report zero admissible operations for that state/persona combo.
+#[test]
+fn test_s3a_no_admissible_from_unreachable_state() {
+    let report = elaborate_and_analyze("conformance/analysis/dead_states.tenor");
+    let s3a = report.s3a_admissibility.expect("S3a should be populated");
+
+    // The dead_states fixture has an "archived" state with no transitions FROM it.
+    // No operation should be admissible from the "archived" state.
+    let archived_ops: Vec<_> = s3a
+        .admissible_operations
+        .iter()
+        .filter(|(key, _)| key.state == "archived")
+        .collect();
+
+    assert!(
+        archived_ops.is_empty(),
+        "no operations should be admissible from the dead 'archived' state; got: {:?}",
+        archived_ops
+    );
+}
+
+/// Ensure S3a total combinations are non-zero for a contract with entities,
+/// personas, and operations.
+#[test]
+fn test_s3a_authority_basic_has_admissible_ops() {
+    let report = elaborate_and_analyze("conformance/analysis/authority_basic.tenor");
+    let s3a = report.s3a_admissibility.expect("S3a should be populated");
+
+    assert!(
+        s3a.total_combinations_checked > 0,
+        "authority_basic has entities and personas, should check combinations"
+    );
+
+    // At least one (entity, state, persona) combo should have admissible operations
+    assert!(
+        !s3a.admissible_operations.is_empty(),
+        "authority_basic should have at least one admissible operation"
+    );
+}
+
+/// Verify S3a reports findings correctly through the analysis pipeline
+/// when combined with S2 dead states.
+#[test]
+fn test_s3a_dead_state_findings_in_full_report() {
+    let report = elaborate_and_analyze("conformance/analysis/dead_states.tenor");
+
+    // S2 should detect the dead state
+    let s2 = report.s2_reachability.expect("S2 should be populated");
+    assert!(s2.has_dead_states, "should detect dead states");
+
+    // Findings should include s2 warning about unreachable state
+    let s2_findings: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|f| f.analysis == "s2")
+        .collect();
+    assert!(
+        !s2_findings.is_empty(),
+        "should have S2 findings about dead states"
+    );
+
+    // The finding should report "archived" as unreachable
+    let mentions_archived = s2_findings.iter().any(|f| f.message.contains("archived"));
+    assert!(
+        mentions_archived,
+        "S2 finding should mention 'archived' state"
+    );
+
+    // Severity should be Warning for dead states
+    assert_eq!(
+        s2_findings[0].severity,
+        tenor_analyze::FindingSeverity::Warning,
+        "dead state finding should be Warning severity"
+    );
+}
+
+// ──────────────────────────────────────────────
 // S4 — Authority
 // ──────────────────────────────────────────────
 

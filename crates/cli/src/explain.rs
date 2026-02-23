@@ -1242,4 +1242,132 @@ mod tests {
             "should fail when states is a string instead of array"
         );
     }
+
+    /// Helper: build a rich test bundle for Markdown format testing.
+    fn make_rich_bundle() -> serde_json::Value {
+        serde_json::json!({
+            "kind": "Bundle", "id": "test_contract", "tenor": "1.0",
+            "constructs": [
+                { "kind": "Fact", "id": "amount", "type": { "base": "Int", "min": 0, "max": 10000 },
+                  "source": { "system": "billing", "field": "total" },
+                  "provenance": { "file": "test.tenor", "line": 1 }, "tenor": "1.0" },
+                { "kind": "Fact", "id": "is_active",
+                  "type": { "base": "Bool" },
+                  "default": { "kind": "bool_literal", "value": true },
+                  "provenance": { "file": "test.tenor", "line": 3 }, "tenor": "1.0" },
+                { "kind": "Entity", "id": "Order", "states": ["draft", "submitted", "approved"],
+                  "initial": "draft", "transitions": [
+                    {"from": "draft", "to": "submitted"},
+                    {"from": "submitted", "to": "approved"}
+                  ],
+                  "provenance": { "file": "test.tenor", "line": 10 }, "tenor": "1.0" },
+                { "kind": "Persona", "id": "admin",
+                  "provenance": { "file": "test.tenor", "line": 20 }, "tenor": "1.0" },
+                { "kind": "Rule", "id": "check_amount", "stratum": 0,
+                  "body": {
+                    "when": { "left": {"fact_ref": "amount"}, "op": ">", "right": {"literal": 100, "type": {"base": "Int"}} },
+                    "produce": { "verdict_type": "high_value", "payload": {"type": {"base": "Bool"}, "value": true} }
+                  },
+                  "provenance": { "file": "test.tenor", "line": 25 }, "tenor": "1.0" },
+                { "kind": "Operation", "id": "submit_order",
+                  "allowed_personas": ["admin"], "precondition": null,
+                  "effects": [{ "entity_id": "Order", "from": "draft", "to": "submitted" }],
+                  "error_contract": ["precondition_failed"],
+                  "provenance": { "file": "test.tenor", "line": 30 }, "tenor": "1.0" },
+                { "kind": "Flow", "id": "approval_flow", "entry": "step_submit",
+                  "steps": [
+                    { "kind": "OperationStep", "id": "step_submit", "op": "submit_order",
+                      "persona": "admin", "outcomes": { "success": "Terminal" } }
+                  ],
+                  "provenance": { "file": "test.tenor", "line": 40 }, "tenor": "1.0" }
+            ]
+        })
+    }
+
+    #[test]
+    fn markdown_format_uses_headings_and_backticks() {
+        let bundle = make_rich_bundle();
+        let result = explain(&bundle, ExplainFormat::Markdown, false);
+        assert!(result.is_ok());
+        let output = result.unwrap();
+
+        // Markdown headings (##) for all four sections
+        assert!(
+            output.contains("## CONTRACT SUMMARY"),
+            "should have ## heading for CONTRACT SUMMARY"
+        );
+        assert!(
+            output.contains("## DECISION FLOW NARRATIVE"),
+            "should have ## heading for DECISION FLOW NARRATIVE"
+        );
+        assert!(
+            output.contains("## FACT INVENTORY"),
+            "should have ## heading for FACT INVENTORY"
+        );
+        assert!(
+            output.contains("## RISK / COVERAGE NOTES"),
+            "should have ## heading for RISK / COVERAGE NOTES"
+        );
+
+        // Backtick-quoted construct names in markdown mode
+        assert!(
+            output.contains("`test_contract`"),
+            "contract name should be backtick-quoted in markdown"
+        );
+        assert!(
+            output.contains("`Order`"),
+            "entity name should be backtick-quoted in markdown"
+        );
+
+        // Markdown table in fact inventory
+        assert!(
+            output.contains("| Fact |"),
+            "fact inventory should use markdown table headers"
+        );
+        assert!(
+            output.contains("|---"),
+            "fact inventory should have markdown table separator"
+        );
+
+        // Markdown checkbox in risk section (checkmark or warning)
+        assert!(
+            output.contains("- [x]") || output.contains("- [ ]"),
+            "risk section should use markdown checkbox syntax"
+        );
+
+        // Should NOT contain ANSI escape codes
+        assert!(
+            !output.contains("\x1b["),
+            "markdown format should not contain ANSI escape codes"
+        );
+    }
+
+    #[test]
+    fn markdown_vs_terminal_format_differences() {
+        let bundle = make_rich_bundle();
+        let md_result = explain(&bundle, ExplainFormat::Markdown, false).unwrap();
+        let term_result = explain(&bundle, ExplainFormat::Terminal, false).unwrap();
+
+        // Markdown uses ## headings, terminal uses bold ANSI codes
+        assert!(md_result.contains("## CONTRACT SUMMARY"));
+        assert!(!term_result.contains("## CONTRACT SUMMARY"));
+        assert!(term_result.contains("\x1b[1m")); // ANSI bold
+        assert!(!md_result.contains("\x1b[1m"));
+
+        // Markdown uses backticks for names, terminal uses cyan ANSI
+        assert!(md_result.contains("`test_contract`"));
+        assert!(term_result.contains("\x1b[36m")); // ANSI cyan
+
+        // Markdown uses checkboxes, terminal uses [ok]
+        let md_has_checkbox = md_result.contains("- [x]") || md_result.contains("- [ ]");
+        let term_has_ok = term_result.contains("[ok]") || term_result.contains("[!!]");
+        assert!(md_has_checkbox, "markdown should use checkbox syntax");
+        assert!(term_has_ok, "terminal should use [ok]/[!!] syntax");
+
+        // Both should contain the same key content (contract name, facts, etc.)
+        assert!(md_result.contains("amount"));
+        assert!(term_result.contains("amount"));
+        assert!(md_result.contains("is_active"));
+        assert!(term_result.contains("is_active"));
+    }
 }

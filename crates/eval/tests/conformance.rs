@@ -313,6 +313,20 @@ fn escalate_handler() {
 }
 
 // ──────────────────────────────────────────────
+// Flow error-path fixtures (HARD-20)
+// ──────────────────────────────────────────────
+
+#[test]
+fn flow_error_escalate() {
+    run_eval_flow_fixture(
+        &positive_dir(),
+        "flow_error_escalate",
+        "escalation_flow",
+        "reviewer",
+    );
+}
+
+// ──────────────────────────────────────────────
 // Frozen verdict edge cases (EVAL-06)
 // ──────────────────────────────────────────────
 
