@@ -1592,7 +1592,229 @@ impl<'a> Parser<'a> {
     }
 }
 
+/// Default maximum number of errors collected in multi-error mode before aborting.
+pub const DEFAULT_MAX_ERRORS: usize = 10;
+
 pub fn parse(tokens: &[Spanned], filename: &str) -> Result<Vec<RawConstruct>, ElabError> {
     let mut p = Parser::new(tokens, filename);
     p.parse_file()
+}
+
+/// Parse in multi-error recovery mode.
+///
+/// Returns successfully-parsed constructs plus accumulated errors.
+/// If a truly fatal error occurs (e.g., a lexer-level issue that prevents
+/// any recovery), returns `Err` with that single error.
+///
+/// The parser recovers at construct boundaries: when an error occurs inside
+/// a construct body, it skips tokens until it reaches a closing `}` at the
+/// matching nesting level or a top-level keyword, then resumes parsing.
+pub fn parse_recovering(
+    tokens: &[Spanned],
+    filename: &str,
+    max_errors: usize,
+) -> Result<(Vec<RawConstruct>, Vec<ElabError>), ElabError> {
+    let mut p = Parser::new(tokens, filename);
+    p.parse_file_recovering(max_errors)
+}
+
+impl<'a> Parser<'a> {
+    /// Check whether the current token is a top-level construct keyword.
+    fn is_construct_keyword(&self) -> bool {
+        matches!(
+            self.peek(),
+            Token::Word(w) if matches!(
+                w.as_str(),
+                "fact" | "entity" | "rule" | "operation" | "flow"
+                    | "type" | "persona" | "system" | "import"
+            )
+        )
+    }
+
+    /// Skip tokens until we find a closing `}` at the original nesting level,
+    /// or a top-level construct keyword at nesting level 0.
+    fn recover_to_next_construct(&mut self) {
+        let mut depth: i32 = 0;
+        loop {
+            match self.peek() {
+                Token::Eof => break,
+                Token::LBrace => {
+                    depth += 1;
+                    self.advance();
+                }
+                Token::RBrace => {
+                    if depth <= 0 {
+                        // Consume the closing brace that ends the broken construct
+                        self.advance();
+                        break;
+                    }
+                    depth -= 1;
+                    self.advance();
+                }
+                _ => {
+                    if depth == 0 && self.is_construct_keyword() {
+                        // Found a new top-level keyword; stop here (don't consume it).
+                        break;
+                    }
+                    self.advance();
+                }
+            }
+        }
+    }
+
+    /// Parse the file with error recovery at construct boundaries.
+    fn parse_file_recovering(
+        &mut self,
+        max_errors: usize,
+    ) -> Result<(Vec<RawConstruct>, Vec<ElabError>), ElabError> {
+        let mut constructs = Vec::new();
+        let mut errors = Vec::new();
+
+        while self.peek() != &Token::Eof {
+            match self.parse_construct() {
+                Ok(c) => {
+                    constructs.push(c);
+                }
+                Err(e) => {
+                    errors.push(e);
+                    if errors.len() >= max_errors {
+                        break;
+                    }
+                    // Recover: skip to next construct boundary
+                    self.recover_to_next_construct();
+                }
+            }
+        }
+
+        Ok((constructs, errors))
+    }
+}
+
+// ──────────────────────────────────────────────
+// Tests
+// ──────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer;
+
+    /// Helper: lex + parse_recovering for a source string.
+    fn lex_and_parse_recovering(
+        src: &str,
+        filename: &str,
+    ) -> Result<(Vec<RawConstruct>, Vec<ElabError>), ElabError> {
+        let tokens = lexer::lex(src, filename)?;
+        parse_recovering(&tokens, filename, DEFAULT_MAX_ERRORS)
+    }
+
+    #[test]
+    fn multi_error_reports_both_construct_errors() {
+        // Two facts that lex fine but each is missing a required field.
+        // The parser should recover after the first broken fact
+        // and report an error for the second broken fact too.
+        let src = r#"
+fact bad_fact_1 {
+    source: "s1"
+}
+
+fact bad_fact_2 {
+    type: Int
+}
+"#;
+        let result = lex_and_parse_recovering(src, "test.tenor");
+
+        match result {
+            Ok((constructs, errors)) => {
+                // Both constructs should produce errors (missing 'type' and missing 'source')
+                assert!(
+                    errors.len() >= 2,
+                    "Expected at least 2 errors, got {}: {:?}",
+                    errors.len(),
+                    errors
+                );
+                assert!(
+                    errors[0].message.contains("missing"),
+                    "First error: {}",
+                    errors[0].message
+                );
+                assert!(
+                    errors[1].message.contains("missing"),
+                    "Second error: {}",
+                    errors[1].message
+                );
+                // No valid constructs should have been produced
+                assert_eq!(constructs.len(), 0, "No valid constructs expected");
+            }
+            Err(e) => {
+                panic!("Expected Ok with errors, got fatal Err: {:?}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn fatal_lexer_error_aborts_immediately() {
+        // An unterminated string is a fatal lexer error -- parse_recovering
+        // never gets called because lex() itself returns Err.
+        let src = "fact foo {\n    source: \"unterminated\n}\n";
+        let tokens = lexer::lex(src, "fatal.tenor");
+        assert!(tokens.is_err(), "Lexer should reject unterminated string");
+    }
+
+    #[test]
+    fn one_valid_one_invalid_parses_the_valid_one() {
+        let src = r#"
+fact valid_fact {
+    type: Bool
+    source: "input"
+}
+
+fact invalid_fact {
+    type: Bool
+}
+"#;
+        let (constructs, errors) =
+            lex_and_parse_recovering(src, "mixed.tenor").expect("should not be fatal");
+        assert_eq!(constructs.len(), 1, "One valid construct expected");
+        assert!(!errors.is_empty(), "At least one error expected");
+        // The valid fact should be the one that parsed correctly
+        match &constructs[0] {
+            RawConstruct::Fact { id, .. } => {
+                assert_eq!(id, "valid_fact");
+            }
+            other => panic!("Expected Fact, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn no_errors_returns_empty_error_vec() {
+        let src = r#"
+fact good_fact {
+    type: Bool
+    source: "input"
+}
+"#;
+        let (constructs, errors) =
+            lex_and_parse_recovering(src, "good.tenor").expect("should not be fatal");
+        assert_eq!(constructs.len(), 1);
+        assert!(errors.is_empty(), "No errors expected for valid input");
+    }
+
+    #[test]
+    fn max_errors_limit_stops_collection() {
+        // Create a source with many broken constructs to test the limit.
+        let mut src = String::new();
+        for i in 0..20 {
+            // Each fact is missing 'source' field -- will error out.
+            src.push_str(&format!("fact broken_{} {{ type: Bool }}\n", i));
+        }
+        let tokens = lexer::lex(&src, "limit.tenor").expect("lex should succeed");
+        let (_, errors) = parse_recovering(&tokens, "limit.tenor", 5).expect("should not be fatal");
+        assert_eq!(
+            errors.len(),
+            5,
+            "Should stop at max_errors=5, got {}",
+            errors.len()
+        );
+    }
 }
