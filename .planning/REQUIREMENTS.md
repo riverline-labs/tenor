@@ -6,7 +6,7 @@
 
 ## Platform Hardening
 
-- [ ] **HARD-01**: Shared interchange deserialization library replaces triplicated parsing in eval, analyze, and codegen
+- [x] **HARD-01**: Shared interchange deserialization library replaces triplicated parsing in eval, analyze, and codegen
 - [ ] **HARD-02**: explain.rs uses typed interchange structs instead of untyped JSON traversal with silent fallbacks
 - [x] **HARD-03**: All expect() calls in pass5_validate.rs and pass3_types.rs replaced with proper error propagation
 - [x] **HARD-04**: Parser recovers from first error and reports multiple diagnostics per parse
@@ -32,7 +32,7 @@
 - [ ] **HARD-24**: tenor diff CLI integration tested end-to-end
 - [ ] **HARD-25**: explain.rs Markdown format output tested
 - [ ] **HARD-26**: S3a admissibility has negative test cases
-- [ ] **HARD-27**: Interchange schema formalized as shared library (prerequisite for Rust and Go SDKs in Phase 24)
+- [x] **HARD-27**: Interchange schema formalized as shared library (prerequisite for Rust and Go SDKs in Phase 24)
 
 ## Agent Skill Examples
 

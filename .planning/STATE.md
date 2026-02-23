@@ -5,7 +5,7 @@
 Phase: 18 (Platform Hardening)
 Plan: 7 of 9
 Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-02 (core hardening: panic-free passes, O(1) cycle detection, string allocation reduction)
+Last activity: 2026-02-23 — Completed 18-01 (interchange crate: shared typed deserialization replacing triplicated parsing)
 
 ## Project Reference
 
@@ -47,3 +47,5 @@ None.
 - All expect()/unwrap() removed from pass3/4/5 (ElabError propagation)
 - Import cycle detection uses O(1) HashSet (parallel to Vec for error reporting)
 - pass6_serialize uses static key constants and ins() helper for reduced allocations
+- tenor-interchange crate provides single-source typed deserialization for interchange JSON bundles
+- eval, analyze, codegen all delegate to tenor_interchange::from_interchange() for initial parsing
