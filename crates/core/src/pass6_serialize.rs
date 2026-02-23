@@ -834,15 +834,12 @@ fn serialize_step(id: &str, step: &RawStep, fact_types: &HashMap<String, RawType
             ..
         } => {
             let mut m = Map::new();
-            m.insert(
-                "condition".to_owned(),
-                serialize_expr(condition, fact_types),
-            );
-            m.insert("id".to_owned(), json!(id));
-            m.insert("if_false".to_owned(), serialize_step_target(if_false));
-            m.insert("if_true".to_owned(), serialize_step_target(if_true));
-            m.insert("kind".to_owned(), json!("BranchStep"));
-            m.insert("persona".to_owned(), json!(persona));
+            ins(&mut m, "condition", serialize_expr(condition, fact_types));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, "if_false", serialize_step_target(if_false));
+            ins(&mut m, "if_true", serialize_step_target(if_true));
+            ins(&mut m, K_KIND, json!("BranchStep"));
+            ins(&mut m, "persona", json!(persona));
             Value::Object(m)
         }
         RawStep::HandoffStep {
@@ -852,11 +849,11 @@ fn serialize_step(id: &str, step: &RawStep, fact_types: &HashMap<String, RawType
             ..
         } => {
             let mut m = Map::new();
-            m.insert("from_persona".to_owned(), json!(from_persona));
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("HandoffStep"));
-            m.insert("next".to_owned(), json!(next));
-            m.insert("to_persona".to_owned(), json!(to_persona));
+            ins(&mut m, "from_persona", json!(from_persona));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("HandoffStep"));
+            ins(&mut m, "next", json!(next));
+            ins(&mut m, "to_persona", json!(to_persona));
             Value::Object(m)
         }
         RawStep::SubFlowStep {
@@ -867,15 +864,12 @@ fn serialize_step(id: &str, step: &RawStep, fact_types: &HashMap<String, RawType
             ..
         } => {
             let mut m = Map::new();
-            m.insert("flow".to_owned(), json!(flow));
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("SubFlowStep"));
-            m.insert(
-                "on_failure".to_owned(),
-                serialize_failure_handler(on_failure),
-            );
-            m.insert("on_success".to_owned(), serialize_step_target(on_success));
-            m.insert("persona".to_owned(), json!(persona));
+            ins(&mut m, "flow", json!(flow));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("SubFlowStep"));
+            ins(&mut m, "on_failure", serialize_failure_handler(on_failure));
+            ins(&mut m, "on_success", serialize_step_target(on_success));
+            ins(&mut m, "persona", json!(persona));
             Value::Object(m)
         }
         RawStep::ParallelStep { branches, join, .. } => {
@@ -883,10 +877,11 @@ fn serialize_step(id: &str, step: &RawStep, fact_types: &HashMap<String, RawType
                 .iter()
                 .map(|b| {
                     let mut bm = Map::new();
-                    bm.insert("entry".to_owned(), json!(b.entry));
-                    bm.insert("id".to_owned(), json!(b.id));
-                    bm.insert(
-                        "steps".to_owned(),
+                    ins(&mut bm, "entry", json!(b.entry));
+                    ins(&mut bm, K_ID, json!(b.id));
+                    ins(
+                        &mut bm,
+                        "steps",
                         serialize_steps(&b.steps, &b.entry, fact_types),
                     );
                     Value::Object(bm)
@@ -894,19 +889,19 @@ fn serialize_step(id: &str, step: &RawStep, fact_types: &HashMap<String, RawType
                 .collect();
             let mut join_m = Map::new();
             if let Some(t) = &join.on_all_success {
-                join_m.insert("on_all_success".to_owned(), serialize_step_target(t));
+                ins(&mut join_m, "on_all_success", serialize_step_target(t));
             }
             if let Some(h) = &join.on_any_failure {
-                join_m.insert("on_any_failure".to_owned(), serialize_failure_handler(h));
+                ins(&mut join_m, "on_any_failure", serialize_failure_handler(h));
             }
             if let Some(t) = &join.on_all_complete {
-                join_m.insert("on_all_complete".to_owned(), serialize_step_target(t));
+                ins(&mut join_m, "on_all_complete", serialize_step_target(t));
             }
             let mut m = Map::new();
-            m.insert("branches".to_owned(), Value::Array(branches_arr));
-            m.insert("id".to_owned(), json!(id));
-            m.insert("join".to_owned(), Value::Object(join_m));
-            m.insert("kind".to_owned(), json!("ParallelStep"));
+            ins(&mut m, "branches", Value::Array(branches_arr));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, "join", Value::Object(join_m));
+            ins(&mut m, K_KIND, json!("ParallelStep"));
             Value::Object(m)
         }
     }
@@ -970,10 +965,10 @@ fn serialize_system(
     // Per spec Section 12.5, triggers is always present as a field
 
     // id
-    m.insert("id".to_owned(), json!(id));
+    ins(&mut m, K_ID, json!(id));
 
     // kind
-    m.insert("kind".to_owned(), json!("System"));
+    ins(&mut m, K_KIND, json!("System"));
 
     // members: sorted by member id (lex order for canonical output)
     let mut sorted_members: Vec<(&String, &String)> =
@@ -983,15 +978,15 @@ fn serialize_system(
         .iter()
         .map(|(mid, path)| {
             let mut mm = Map::new();
-            mm.insert("id".to_owned(), json!(mid));
-            mm.insert("path".to_owned(), json!(path));
+            ins(&mut mm, K_ID, json!(mid));
+            ins(&mut mm, "path", json!(path));
             Value::Object(mm)
         })
         .collect();
-    m.insert("members".to_owned(), Value::Array(members_arr));
+    ins(&mut m, "members", Value::Array(members_arr));
 
     // provenance
-    m.insert("provenance".to_owned(), serialize_prov(prov));
+    ins(&mut m, K_PROVENANCE, serialize_prov(prov));
 
     // shared_entities: sorted by entity id, contracts sorted within each entry
     let mut sorted_entities: Vec<(&String, &Vec<String>)> =
@@ -1003,12 +998,12 @@ fn serialize_system(
             let mut sorted_cs: Vec<&str> = contracts.iter().map(String::as_str).collect();
             sorted_cs.sort_unstable();
             let mut em = Map::new();
-            em.insert("contracts".to_owned(), json!(sorted_cs));
-            em.insert("entity".to_owned(), json!(eid));
+            ins(&mut em, "contracts", json!(sorted_cs));
+            ins(&mut em, "entity", json!(eid));
             Value::Object(em)
         })
         .collect();
-    m.insert("shared_entities".to_owned(), Value::Array(entities_arr));
+    ins(&mut m, "shared_entities", Value::Array(entities_arr));
 
     // shared_personas: sorted by persona id, contracts sorted within each entry
     let mut sorted_personas: Vec<(&String, &Vec<String>)> =
@@ -1020,15 +1015,15 @@ fn serialize_system(
             let mut sorted_cs: Vec<&str> = contracts.iter().map(String::as_str).collect();
             sorted_cs.sort_unstable();
             let mut pm = Map::new();
-            pm.insert("contracts".to_owned(), json!(sorted_cs));
-            pm.insert("persona".to_owned(), json!(pid));
+            ins(&mut pm, "contracts", json!(sorted_cs));
+            ins(&mut pm, "persona", json!(pid));
             Value::Object(pm)
         })
         .collect();
-    m.insert("shared_personas".to_owned(), Value::Array(personas_arr));
+    ins(&mut m, "shared_personas", Value::Array(personas_arr));
 
     // tenor
-    m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
+    ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
 
     // triggers: sorted by (source_contract, source_flow, target_contract, target_flow)
     let mut sorted_triggers: Vec<&RawTrigger> = triggers.iter().collect();
@@ -1043,16 +1038,16 @@ fn serialize_system(
         .iter()
         .map(|t| {
             let mut tm = Map::new();
-            tm.insert("on".to_owned(), json!(t.on));
-            tm.insert("persona".to_owned(), json!(t.persona));
-            tm.insert("source_contract".to_owned(), json!(t.source_contract));
-            tm.insert("source_flow".to_owned(), json!(t.source_flow));
-            tm.insert("target_contract".to_owned(), json!(t.target_contract));
-            tm.insert("target_flow".to_owned(), json!(t.target_flow));
+            ins(&mut tm, "on", json!(t.on));
+            ins(&mut tm, "persona", json!(t.persona));
+            ins(&mut tm, "source_contract", json!(t.source_contract));
+            ins(&mut tm, "source_flow", json!(t.source_flow));
+            ins(&mut tm, "target_contract", json!(t.target_contract));
+            ins(&mut tm, "target_flow", json!(t.target_flow));
             Value::Object(tm)
         })
         .collect();
-    m.insert("triggers".to_owned(), Value::Array(triggers_arr));
+    ins(&mut m, "triggers", Value::Array(triggers_arr));
 
     Value::Object(m)
 }
