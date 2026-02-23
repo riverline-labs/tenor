@@ -70,7 +70,7 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 
 ### Active
 
-See [REQUIREMENTS.md](REQUIREMENTS.md) — 24 requirements across phases 18-24.
+See [REQUIREMENTS.md](REQUIREMENTS.md) — 24 requirements across phases 1-7.
 
 ### Out of Scope
 

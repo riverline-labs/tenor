@@ -2,24 +2,20 @@
 
 ## Current Position
 
-Phase: 18 (Platform Hardening)
-Plan: 9 of 9 -- COMPLETE
-Status: Phase complete
-Last activity: 2026-02-23 — Completed 18-09 (test coverage gaps + SystemContract coordinator design)
+Phase: 1 (Agent Skill Examples)
+Status: Not started
+Last activity: 2026-02-23 — Completed prior milestone work (Platform Hardening)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** A contract authored in TenorDSL must be statically verifiable, evaluable against facts, and usable by agents and developers — the full lifecycle from specification to execution with provenance at every step.
-**Current focus:** Platform & Ecosystem — phases 18-24
+**Current focus:** Platform & Ecosystem — phases 1-7
 
 ## Completed
 
-- v0.9 Core (Phases 1-5.1) — shipped 2026-02-22
-- v1.0 System Construct + Documentation (Phases 12-14) — shipped 2026-02-22
-- Agent Tooling (Phases 14.1-17) — shipped 2026-02-23
-- Platform Hardening (Phase 18) — shipped 2026-02-23
+All prior milestones shipped (v0.9 Core, v1.0 System Construct, Agent Tooling, Platform Hardening).
 
 ## Pending Todos
 
@@ -61,4 +57,4 @@ None.
 - diff CLI has 6 e2e tests (identical bundles, additions, breaking changes, error handling)
 - Flow error-path conformance fixture exercises FailureHandler::Escalate with 4-step escalation trace
 - S3a admissibility negative tests verify dead states have no admissible operations
-- SystemContract coordinator design documented (docs/system-contract-coordinator.md) targeting Phase 25
+- SystemContract coordinator design documented (docs/system-contract-coordinator.md) targeting Phase 7
