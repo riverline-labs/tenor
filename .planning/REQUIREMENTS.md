@@ -11,10 +11,10 @@
 - [x] **HARD-03**: All expect() calls in pass5_validate.rs and pass3_types.rs replaced with proper error propagation
 - [x] **HARD-04**: Parser recovers from first error and reports multiple diagnostics per parse
 - [x] **HARD-05**: tenor-core file I/O factored behind a trait so elaborate() works without filesystem (WASM prerequisite)
-- [ ] **HARD-06**: libc dependency in serve.rs isolated from tenor-core and tenor-eval crate graph
+- [x] **HARD-06**: libc dependency in serve.rs isolated from tenor-core and tenor-eval crate graph
 - [x] **HARD-07**: spec_sections dead code in ambiguity testing removed or wired through
-- [ ] **HARD-08**: HTTP stack replaced with production-grade framework (axum or actix-web) with TLS and concurrent request handling
-- [ ] **HARD-09**: Unsafe signal handling in serve.rs replaced with ctrlc or signal-hook
+- [x] **HARD-08**: HTTP stack replaced with production-grade framework (axum or actix-web) with TLS and concurrent request handling
+- [x] **HARD-09**: Unsafe signal handling in serve.rs replaced with ctrlc or signal-hook
 - [ ] **HARD-10**: Elaborate endpoint validates user content before writing to temp files
 - [ ] **HARD-11**: Auth, CORS, and rate limiting added to all HTTP endpoints
 - [ ] **HARD-12**: SystemContract coordinator designed for cross-contract triggers and shared entity state

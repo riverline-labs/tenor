@@ -5,7 +5,7 @@
 Phase: 18 (Platform Hardening)
 Plan: 8 of 9
 Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-04 (evaluator runtime optimization: HashMap indexes, BTreeMap stratum eval, clone-free flow)
+Last activity: 2026-02-23 — Completed 18-06 (axum + tokio HTTP server, libc removal, optional TLS)
 
 ## Project Reference
 
@@ -52,3 +52,5 @@ None.
 - Contract type has HashMap indexes for O(1) lookups; use Contract::new() and get_* methods
 - Stratum evaluation uses BTreeMap index (O(n) vs previous O(k*n))
 - Flow failure handling uses std::mem::take() instead of deep clones
+- HTTP server uses axum + tokio (replaced tiny_http + libc); optional TLS via axum-server + rustls
+- libc removed from CLI crate -- tenor-core and tenor-eval have zero libc in production builds
