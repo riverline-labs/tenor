@@ -126,7 +126,6 @@ pub fn load_test_cases(
             contract_source,
             facts,
             expected_verdicts,
-            spec_sections: vec![], // Populated at runtime by prompt builder
         });
     }
 

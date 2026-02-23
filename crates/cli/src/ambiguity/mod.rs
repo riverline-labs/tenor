@@ -22,10 +22,6 @@ pub struct AmbiguityTestCase {
     pub facts: serde_json::Value,
     /// Sorted list of expected verdict IDs.
     pub expected_verdicts: Vec<String>,
-    /// Relevant spec section text extracted from TENOR.md.
-    /// Populated during fixture loading for future spec-targeted prompting.
-    #[allow(dead_code)] // Loaded for future use in spec-section-targeted prompt construction
-    pub spec_sections: Vec<String>,
 }
 
 /// The result of running one ambiguity test case through the LLM.

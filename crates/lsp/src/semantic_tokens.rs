@@ -10,31 +10,17 @@ use std::path::Path;
 use tenor_core::lexer::{self, Spanned, Token};
 
 /// Index into TOKEN_TYPES for each semantic category.
-/// All indices are defined for completeness even if not yet referenced
-/// in every code path -- they match the TOKEN_TYPES array order.
-#[allow(dead_code)]
 const TK_KEYWORD: u32 = 0;
-#[allow(dead_code)]
 const TK_TYPE: u32 = 1;
-#[allow(dead_code)]
 const TK_VARIABLE: u32 = 2;
-#[allow(dead_code)]
 const TK_PROPERTY: u32 = 3;
-#[allow(dead_code)]
-const TK_ENUM_MEMBER: u32 = 4;
-#[allow(dead_code)]
+// TK_ENUM_MEMBER (4) reserved in TOKEN_TYPES legend but not yet emitted
 const TK_FUNCTION: u32 = 5;
-#[allow(dead_code)]
 const TK_CLASS: u32 = 6;
-#[allow(dead_code)]
 const TK_NAMESPACE: u32 = 7;
-#[allow(dead_code)]
 const TK_STRING: u32 = 8;
-#[allow(dead_code)]
 const TK_NUMBER: u32 = 9;
-#[allow(dead_code)]
-const TK_COMMENT: u32 = 10;
-#[allow(dead_code)]
+// TK_COMMENT (10) reserved in TOKEN_TYPES legend but not yet emitted
 const TK_OPERATOR: u32 = 11;
 
 /// Semantic token types registered with the client.

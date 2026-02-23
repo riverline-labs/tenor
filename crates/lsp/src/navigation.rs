@@ -711,14 +711,12 @@ fn _index_type_refs(
 }
 
 /// Get the word at the given position (for use by hover and completion modules).
-#[allow(dead_code)]
 pub(crate) fn get_word_at_position(content: &str, position: Position) -> Option<String> {
     word_at_position(content, position)
 }
 
 /// Get the construct context at the given position (what kind of construct body are we in?).
 /// Returns the construct keyword (e.g., "rule", "operation", "entity") or None if at top level.
-#[allow(dead_code)]
 pub(crate) fn get_construct_context(content: &str, position: Position) -> Option<String> {
     let lines: Vec<&str> = content.lines().collect();
     let target_line = position.line as usize;
@@ -764,7 +762,6 @@ pub(crate) fn get_construct_context(content: &str, position: Position) -> Option
 
 /// Get the field context within a construct body at the given position.
 /// Returns the field keyword (e.g., "when", "precondition", "effects") or None.
-#[allow(dead_code)]
 pub(crate) fn get_field_context(content: &str, position: Position) -> Option<String> {
     let lines: Vec<&str> = content.lines().collect();
     let target_line = position.line as usize;
