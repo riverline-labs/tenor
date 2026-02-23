@@ -7,7 +7,7 @@
 ## Platform Hardening
 
 - [x] **HARD-01**: Shared interchange deserialization library replaces triplicated parsing in eval, analyze, and codegen
-- [ ] **HARD-02**: explain.rs uses typed interchange structs instead of untyped JSON traversal with silent fallbacks
+- [x] **HARD-02**: explain.rs uses typed interchange structs instead of untyped JSON traversal with silent fallbacks
 - [x] **HARD-03**: All expect() calls in pass5_validate.rs and pass3_types.rs replaced with proper error propagation
 - [x] **HARD-04**: Parser recovers from first error and reports multiple diagnostics per parse
 - [x] **HARD-05**: tenor-core file I/O factored behind a trait so elaborate() works without filesystem (WASM prerequisite)

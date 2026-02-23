@@ -4,7 +4,7 @@
 
 | Phase | Status |
 |-------|--------|
-| 18. Platform Hardening | 6/9 | In Progress|  | Not started |
+| 18. Platform Hardening | 7/9 | In Progress|  | Not started |
 | 20. AI Authoring Assistant | Not started |
 | 21. Embedded Evaluator | Not started |
 | 22. Hosted Evaluator Service | Not started |
@@ -18,16 +18,16 @@
 **Goal**: Fix all blocking concerns identified by codebase mapping — shared interchange library, typed explain.rs, error recovery in parser, WASM-ready I/O abstraction, production HTTP stack, security hardening, SystemContract coordinator design, indexed lookups, LSP tests, and conformance fixture gaps.
 **Requirements**: HARD-01 through HARD-27
 **Depends on**: Phase 17 (complete)
-**Plans:** 6/9 plans executed
+**Plans:** 7/9 plans executed
 
 Plans:
-- [ ] 18-01-PLAN.md — Shared interchange deserialization library (HARD-01, HARD-27)
-- [ ] 18-02-PLAN.md — Core error hardening: expect removal, HashSet cycles, string alloc reduction (HARD-03, HARD-22, HARD-23)
+- [x] 18-01-PLAN.md — Shared interchange deserialization library (HARD-01, HARD-27)
+- [x] 18-02-PLAN.md — Core error hardening: expect removal, HashSet cycles, string alloc reduction (HARD-03, HARD-22, HARD-23)
 - [x] 18-03-PLAN.md — Parser error recovery + WASM I/O trait (HARD-04, HARD-05)
-- [ ] 18-04-PLAN.md — Eval performance: HashMap indexes, stratum indexing, flow clone elimination (HARD-13, HARD-17, HARD-18)
-- [ ] 18-05-PLAN.md — Cleanup: dead code, duplicates, version constants, configurable limits (HARD-07, HARD-15, HARD-16, HARD-19, HARD-21)
-- [ ] 18-06-PLAN.md — Production HTTP stack with axum + tokio (HARD-06, HARD-08, HARD-09)
-- [ ] 18-07-PLAN.md — Typed explain.rs rewrite (HARD-02)
+- [x] 18-04-PLAN.md — Eval performance: HashMap indexes, stratum indexing, flow clone elimination (HARD-13, HARD-17, HARD-18)
+- [x] 18-05-PLAN.md — Cleanup: dead code, duplicates, version constants, configurable limits (HARD-07, HARD-15, HARD-16, HARD-19, HARD-21)
+- [x] 18-06-PLAN.md — Production HTTP stack with axum + tokio (HARD-06, HARD-08, HARD-09)
+- [x] 18-07-PLAN.md — Typed explain.rs rewrite (HARD-02)
 - [ ] 18-08-PLAN.md — HTTP security: input validation, CORS, rate limiting, auth (HARD-10, HARD-11)
 - [ ] 18-09-PLAN.md — Test coverage gaps + SystemContract design (HARD-12, HARD-14, HARD-20, HARD-24, HARD-25, HARD-26)
 

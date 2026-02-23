@@ -5,7 +5,7 @@
 Phase: 18 (Platform Hardening)
 Plan: 8 of 9
 Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-06 (axum + tokio HTTP server, libc removal, optional TLS)
+Last activity: 2026-02-23 — Completed 18-07 (typed explain.rs rewrite using tenor-interchange)
 
 ## Project Reference
 
@@ -54,3 +54,4 @@ None.
 - Flow failure handling uses std::mem::take() instead of deep clones
 - HTTP server uses axum + tokio (replaced tiny_http + libc); optional TLS via axum-server + rustls
 - libc removed from CLI crate -- tenor-core and tenor-eval have zero libc in production builds
+- explain.rs uses typed tenor-interchange structs (from_interchange + InterchangeConstruct variants) instead of raw JSON traversal
