@@ -2,9 +2,9 @@
 
 ## Current Position
 
-Phase: 1 (Agent Skill Examples)
+Phase: 2 (AI Authoring Assistant)
 Status: Not started
-Last activity: 2026-02-23 — Completed prior milestone work (Platform Hardening)
+Last activity: 2026-02-23 — Completed Phase 1 (Agent Skill Examples)
 
 ## Project Reference
 
@@ -16,6 +16,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Completed
 
 All prior milestones shipped (v0.9 Core, v1.0 System Construct, Agent Tooling, Platform Hardening).
+Phase 1: Agent Skill Examples (SKEX-01 through SKEX-04) — 4 reference implementations shipped.
 
 ## Pending Todos
 
@@ -53,6 +54,10 @@ None.
 - libc removed from CLI crate -- tenor-core and tenor-eval have zero libc in production builds
 - explain.rs uses typed tenor-interchange structs (from_interchange + InterchangeConstruct variants) instead of raw JSON traversal
 - HTTP server hardened: input validation (size, null bytes, import escape, filename), CORS via tower-http, per-IP rate limiting (60 req/min), optional API key auth via TENOR_API_KEY env var
+- `tenor agent <file>` interactive REPL with fact management, evaluation, flow execution, and explain integration
+- Express middleware generates REST routes from contract operations with SDK error-to-HTTP-status mapping
+- Slack bot uses Bolt Socket Mode for slash commands (/tenor-list, /tenor-eval with modal, /tenor-explain)
+- Audit agent walks verdict provenance chains, builds fact coverage matrices, detects compliance gaps (orphan_fact, shallow_provenance, single_rule_dependency)
 - LSP unit tests cover navigation (goto-definition, find-references, document-symbols), completion, and hover via direct function calls
 - diff CLI has 6 e2e tests (identical bundles, additions, breaking changes, error handling)
 - Flow error-path conformance fixture exercises FailureHandler::Escalate with 4-step escalation trace

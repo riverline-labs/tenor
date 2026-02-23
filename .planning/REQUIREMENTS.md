@@ -6,10 +6,10 @@
 
 ## Agent Skill Examples
 
-- [ ] **SKEX-01**: `tenor agent` CLI tool turns any contract into an interactive shell
-- [ ] **SKEX-02**: Express middleware reference implementation generates routes from operations
-- [ ] **SKEX-03**: Slack bot reference implementation for contract interaction via chat
-- [ ] **SKEX-04**: Audit agent reference implementation generates compliance reports from provenance chains
+- [x] **SKEX-01**: `tenor agent` CLI tool turns any contract into an interactive shell
+- [x] **SKEX-02**: Express middleware reference implementation generates routes from operations
+- [x] **SKEX-03**: Slack bot reference implementation for contract interaction via chat
+- [x] **SKEX-04**: Audit agent reference implementation generates compliance reports from provenance chains
 
 ## AI Authoring Assistant
 
@@ -63,7 +63,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKEX-01 through SKEX-04 | Phase 1 | Not started |
+| SKEX-01 through SKEX-04 | Phase 1 | Complete |
 | AUTH-01 through AUTH-03 | Phase 2 | Not started |
 | WASM-01 through WASM-05 | Phase 3 | Not started |
 | HOST-01 through HOST-03 | Phase 4 | Not started |
@@ -71,7 +71,7 @@
 | RSDK-01 through RSDK-03 | Phase 6 | Not started |
 | MPTY-01 through MPTY-03 | Phase 7 | Not started |
 
-**Coverage:** 24 requirements, 0 complete
+**Coverage:** 24 requirements, 4 complete
 
 ---
 *Last updated: 2026-02-23*

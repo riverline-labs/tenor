@@ -4,7 +4,7 @@
 
 | Phase | Status |
 |-------|--------|
-| 1. Agent Skill Examples | Not started |
+| 1. Agent Skill Examples | Complete |
 | 2. AI Authoring Assistant | Not started |
 | 3. Embedded Evaluator | Not started |
 | 4. Hosted Evaluator Service | Not started |
@@ -20,10 +20,10 @@
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — `tenor agent` interactive CLI REPL (SKEX-01)
-- [ ] 01-02-PLAN.md — Express middleware reference implementation (SKEX-02)
-- [ ] 01-03-PLAN.md — Slack bot reference implementation (SKEX-03)
-- [ ] 01-04-PLAN.md — Audit agent reference implementation (SKEX-04)
+- [x] 01-01-PLAN.md — `tenor agent` interactive CLI REPL (SKEX-01)
+- [x] 01-02-PLAN.md — Express middleware reference implementation (SKEX-02)
+- [x] 01-03-PLAN.md — Slack bot reference implementation (SKEX-03)
+- [x] 01-04-PLAN.md — Audit agent reference implementation (SKEX-04)
 
 ### Phase 2: AI Authoring Assistant
 **Goal**: A Tenor contract authoring guide designed to be used with any AI assistant. Includes prompt templates that give an AI assistant sufficient context to help author Tenor contracts, example conversations demonstrating three suggested workflows (autonomous: describe and walk away; collaborative: human steers, AI executes; reviewed: AI summarizes contract in plain language for business approval), and guidance on when to ask questions versus make decisions. Deliverable is documentation in the repo — markdown files, not software.
