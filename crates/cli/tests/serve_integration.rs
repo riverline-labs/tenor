@@ -327,3 +327,89 @@ fn not_found_returns_404() {
     let json: serde_json::Value = serde_json::from_str(&body).expect("valid JSON");
     assert_eq!(json["error"], "not found");
 }
+
+#[test]
+fn elaborate_oversized_source_returns_400() {
+    let port = next_port();
+    let mut child = start_server(port, &[]);
+
+    // Create a source string that exceeds 1MB
+    let big_source = "x".repeat(1024 * 1024 + 1);
+    let body = serde_json::json!({"source": big_source}).to_string();
+    let (status, resp_body) = http_post(port, "/elaborate", &body);
+    child.kill().ok();
+    child.wait().ok();
+
+    assert_eq!(status, 400, "oversized source should be rejected");
+    let json: serde_json::Value = serde_json::from_str(&resp_body).expect("valid JSON");
+    assert_eq!(json["error"], "source content exceeds maximum size");
+}
+
+#[test]
+fn elaborate_path_traversal_filename_sanitized() {
+    let port = next_port();
+    let mut child = start_server(port, &[]);
+
+    // A filename with path traversal should be sanitized, and elaboration
+    // should still proceed with the default filename (source.tenor).
+    let body = r#"{"source": "fact ok {\n  type: Bool\n  source: \"x\"\n}", "filename": "../../../etc/passwd"}"#;
+    let (status, resp_body) = http_post(port, "/elaborate", body);
+    child.kill().ok();
+    child.wait().ok();
+
+    // The request should succeed (filename is sanitized to source.tenor)
+    // or fail with an elaboration error -- not a server error or path traversal
+    assert!(
+        status == 200 || status == 400,
+        "should not be server error, got status {} body: {}",
+        status,
+        resp_body
+    );
+    // If it's a 400, it should be an elaboration error, not a path error
+    if status == 400 {
+        let json: serde_json::Value = serde_json::from_str(&resp_body).expect("valid JSON");
+        let error = json["error"].as_str().unwrap_or("");
+        assert!(
+            !error.contains("passwd"),
+            "error should not reference the traversal path"
+        );
+    }
+}
+
+#[test]
+fn elaborate_import_escape_returns_400() {
+    let port = next_port();
+    let mut child = start_server(port, &[]);
+
+    let body = r#"{"source": "import \"../../../etc/passwd\"\nfact ok {\n  type: Bool\n  source: \"x\"\n}"}"#;
+    let (status, resp_body) = http_post(port, "/elaborate", body);
+    child.kill().ok();
+    child.wait().ok();
+
+    assert_eq!(
+        status, 400,
+        "import escape should be rejected, body: {}",
+        resp_body
+    );
+    let json: serde_json::Value = serde_json::from_str(&resp_body).expect("valid JSON");
+    assert_eq!(json["error"], "import paths must not escape sandbox");
+}
+
+#[test]
+fn elaborate_null_byte_returns_400() {
+    let port = next_port();
+    let mut child = start_server(port, &[]);
+
+    let body = r#"{"source": "fact ok {\n  type: Bool\n  source: \"x\"\n}\u0000"}"#;
+    let (status, resp_body) = http_post(port, "/elaborate", body);
+    child.kill().ok();
+    child.wait().ok();
+
+    assert_eq!(
+        status, 400,
+        "null byte should be rejected, body: {}",
+        resp_body
+    );
+    let json: serde_json::Value = serde_json::from_str(&resp_body).expect("valid JSON");
+    assert_eq!(json["error"], "source content must not contain null bytes");
+}

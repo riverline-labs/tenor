@@ -29,6 +29,9 @@ use super::explain;
 /// Maximum request body size: 10 MB.
 const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
 
+/// Maximum source content size for the elaborate endpoint: 1 MB.
+const MAX_SOURCE_SIZE: usize = 1024 * 1024;
+
 /// Application state shared across request handlers.
 struct AppState {
     /// Loaded contract bundles keyed by bundle ID.
@@ -257,6 +260,42 @@ async fn handle_get_operations(
     (StatusCode::OK, Json(response)).into_response()
 }
 
+/// Sanitize a filename for use in a temp directory.
+///
+/// Rejects filenames with path separators or `..` components.
+/// Returns `source.tenor` for invalid or missing filenames.
+fn sanitize_filename(raw: Option<&str>) -> String {
+    let name = match raw {
+        Some(n) if !n.is_empty() => n,
+        _ => return "source.tenor".to_string(),
+    };
+
+    // Reject path separators and parent directory references
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return "source.tenor".to_string();
+    }
+
+    name.to_string()
+}
+
+/// Check if an import path would escape the sandbox directory.
+///
+/// Scans source text for `import` directives whose paths contain
+/// parent-directory traversals (`..`). This is a fast pre-check before
+/// writing to disk; pass1_bundle.rs performs full canonicalization later.
+fn has_escaping_imports(source: &str) -> bool {
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("import") {
+            // Check for .. in the import path
+            if rest.contains("..") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// POST /elaborate
 async fn handle_elaborate(Json(parsed): Json<serde_json::Value>) -> impl IntoResponse {
     let source = match parsed.get("source").and_then(|v| v.as_str()) {
@@ -266,11 +305,37 @@ async fn handle_elaborate(Json(parsed): Json<serde_json::Value>) -> impl IntoRes
         }
     };
 
-    let filename = parsed
-        .get("filename")
-        .and_then(|v| v.as_str())
-        .unwrap_or("input.tenor")
-        .to_string();
+    // --- Input validation (before any disk I/O) ---
+
+    // 1. Content size validation
+    if source.len() > MAX_SOURCE_SIZE {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "source content exceeds maximum size",
+        )
+        .into_response();
+    }
+
+    // 2. Null byte rejection
+    if source.contains('\0') {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "source content must not contain null bytes",
+        )
+        .into_response();
+    }
+
+    // 3. Import injection prevention
+    if has_escaping_imports(&source) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "import paths must not escape sandbox",
+        )
+        .into_response();
+    }
+
+    // 4. Filename sanitization
+    let filename = sanitize_filename(parsed.get("filename").and_then(|v| v.as_str()));
 
     let result = tokio::task::spawn_blocking(move || {
         let tmp_dir = tempfile::tempdir()?;
