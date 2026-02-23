@@ -4,7 +4,7 @@
 
 | Phase | Status |
 |-------|--------|
-| 18. Platform Hardening | 9/9 | Complete   | 2026-02-23 | Not started |
+| 18. Platform Hardening | 9/9 | Complete    | 2026-02-23 | Not started |
 | 20. AI Authoring Assistant | Not started |
 | 21. Embedded Evaluator | Not started |
 | 22. Hosted Evaluator Service | Not started |
