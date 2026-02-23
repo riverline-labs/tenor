@@ -9,13 +9,13 @@
 //! verdicts evaluated during flow steps reflect the state at flow initiation,
 //! NOT the current entity state.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::operation::{execute_operation, EffectRecord, EntityStateMap};
 use crate::predicate::{eval_pred, EvalContext};
 use crate::provenance::ProvenanceCollector;
 use crate::types::{
-    Contract, EvalError, FactSet, FailureHandler, Flow, FlowStep, StepTarget, VerdictSet,
+    Contract, EvalError, FactSet, FailureHandler, Flow, FlowStep, Operation, StepTarget, VerdictSet,
 };
 
 // ──────────────────────────────────────────────
@@ -91,7 +91,7 @@ enum BranchOutcome {
 fn handle_failure(
     handler: &FailureHandler,
     step_id: &str,
-    contract: &Contract,
+    op_index: &HashMap<&str, &Operation>,
     snapshot: &Snapshot,
     entity_states: &mut EntityStateMap,
     steps_executed: &mut Vec<StepRecord>,
@@ -107,16 +107,14 @@ fn handle_failure(
         FailureHandler::Compensate { steps, then } => {
             // Execute compensation steps in order per spec Section 11.3
             for comp_step in steps {
-                let comp_op = contract
-                    .operations
-                    .iter()
-                    .find(|o| o.id == comp_step.op)
-                    .ok_or_else(|| EvalError::DeserializeError {
+                let comp_op = op_index.get(comp_step.op.as_str()).ok_or_else(|| {
+                    EvalError::DeserializeError {
                         message: format!(
                             "compensation operation '{}' not found in contract",
                             comp_step.op
                         ),
-                    })?;
+                    }
+                })?;
 
                 match execute_operation(
                     comp_op,
@@ -210,6 +208,7 @@ pub fn execute_flow(
     contract: &Contract,
     snapshot: &Snapshot,
     entity_states: &mut EntityStateMap,
+    max_steps: Option<usize>,
 ) -> Result<FlowResult, EvalError> {
     let mut steps_executed = Vec::new();
     let mut entity_changes_all = Vec::new();
@@ -221,11 +220,18 @@ pub fn execute_flow(
         .map(|s| (step_id(s).to_string(), s))
         .collect();
 
+    // Build operation index for O(1) lookup (replaces O(n) linear scans)
+    let op_index: HashMap<&str, &Operation> = contract
+        .operations
+        .iter()
+        .map(|o| (o.id.as_str(), o))
+        .collect();
+
     // Start at entry step
     let mut current_step_id = flow.entry.clone();
 
     // Max steps to prevent infinite loops
-    let max_steps = 1000;
+    let max_steps = max_steps.unwrap_or(1000);
     let mut step_count = 0;
 
     loop {
@@ -254,14 +260,13 @@ pub fn execute_flow(
                 outcomes,
                 on_failure,
             } => {
-                // Find the operation in the contract
-                let operation = contract
-                    .operations
-                    .iter()
-                    .find(|o| o.id == *op)
-                    .ok_or_else(|| EvalError::DeserializeError {
-                        message: format!("operation '{}' not found in contract", op),
-                    })?;
+                // Find the operation in the contract (O(1) via index)
+                let operation =
+                    op_index
+                        .get(op.as_str())
+                        .ok_or_else(|| EvalError::DeserializeError {
+                            message: format!("operation '{}' not found in contract", op),
+                        })?;
 
                 // Execute the operation against the FROZEN snapshot
                 match execute_operation(
@@ -314,7 +319,7 @@ pub fn execute_flow(
                         match handle_failure(
                             on_failure,
                             id,
-                            contract,
+                            &op_index,
                             snapshot,
                             entity_states,
                             &mut steps_executed,
@@ -400,7 +405,7 @@ pub fn execute_flow(
                     })?;
 
                 // Sub-flows INHERIT the parent snapshot (spec E5)
-                match execute_flow(sub_flow, contract, snapshot, entity_states) {
+                match execute_flow(sub_flow, contract, snapshot, entity_states, None) {
                     Ok(sub_result) => {
                         entity_changes_all.extend(sub_result.entity_state_changes);
                         steps_executed.push(StepRecord {
@@ -433,7 +438,7 @@ pub fn execute_flow(
                         match handle_failure(
                             on_failure,
                             id,
-                            contract,
+                            &op_index,
                             snapshot,
                             entity_states,
                             &mut steps_executed,
@@ -493,8 +498,13 @@ pub fn execute_flow(
                         steps: branch.steps.clone(),
                     };
 
-                    match execute_flow(&branch_flow, contract, snapshot, &mut branch_entity_states)
-                    {
+                    match execute_flow(
+                        &branch_flow,
+                        contract,
+                        snapshot,
+                        &mut branch_entity_states,
+                        None,
+                    ) {
                         Ok(branch_result) => {
                             branch_outcomes.push(BranchOutcome::Success {
                                 branch_id: branch.id.clone(),
@@ -597,7 +607,7 @@ pub fn execute_flow(
                         match handle_failure(
                             handler,
                             id,
-                            contract,
+                            &op_index,
                             snapshot,
                             entity_states,
                             &mut steps_executed,
@@ -771,7 +781,7 @@ mod tests {
         let mut entity_states = EntityStateMap::new();
         entity_states.insert("order".to_string(), "pending".to_string());
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states).unwrap();
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "order_approved");
         assert_eq!(result.steps_executed.len(), 1);
         assert_eq!(result.steps_executed[0].step_type, "operation");
@@ -824,7 +834,7 @@ mod tests {
         };
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states).unwrap();
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "valid_path");
         assert_eq!(result.steps_executed[0].result, "true");
     }
@@ -857,7 +867,7 @@ mod tests {
         };
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states).unwrap();
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "invalid_path");
         assert_eq!(result.steps_executed[0].result, "false");
     }
@@ -973,7 +983,7 @@ mod tests {
         let mut entity_states = EntityStateMap::new();
         entity_states.insert("order".to_string(), "pending".to_string());
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states).unwrap();
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
 
         // CRITICAL ASSERTION: The branch must use the FROZEN verdict
         // Even though the operation changed entity state to "rejected",
@@ -1106,7 +1116,8 @@ mod tests {
         let mut entity_states = EntityStateMap::new();
         entity_states.insert("order".to_string(), "approved".to_string());
 
-        let result = execute_flow(&parent_flow, &contract, &snapshot, &mut entity_states).unwrap();
+        let result =
+            execute_flow(&parent_flow, &contract, &snapshot, &mut entity_states, None).unwrap();
 
         // Sub-flow should have seen "parent_verdict" from the inherited snapshot
         assert_eq!(result.outcome, "parent_success");
@@ -1187,7 +1198,7 @@ mod tests {
         let mut entity_states = EntityStateMap::new();
         entity_states.insert("order".to_string(), "draft".to_string());
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states).unwrap();
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "failure_handled");
     }
 
@@ -1281,7 +1292,7 @@ mod tests {
         let mut entity_states = EntityStateMap::new();
         entity_states.insert("order".to_string(), "draft".to_string());
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states).unwrap();
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "submitted_valid");
         assert_eq!(result.steps_executed.len(), 2);
         assert_eq!(entity_states.get("order").unwrap(), "submitted");
@@ -1369,7 +1380,7 @@ mod tests {
 
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states);
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None);
         assert!(result.is_err());
         match result.unwrap_err() {
             EvalError::FlowError { flow_id, message } => {
@@ -1381,6 +1392,119 @@ mod tests {
                 );
             }
             other => panic!("expected FlowError, got {:?}", other),
+        }
+    }
+
+    // ──────────────────────────────────────
+    // Configurable max_steps parameter test
+    // ──────────────────────────────────────
+
+    #[test]
+    fn configurable_max_steps_triggers_at_custom_limit() {
+        // A circular flow: step_a -> step_b -> step_a
+        // With max_steps=5, should fail after 5 steps.
+        let operation_a = Operation {
+            id: "op_a".to_string(),
+            allowed_personas: vec!["admin".to_string()],
+            precondition: Predicate::Literal {
+                value: Value::Bool(true),
+                type_spec: bool_type(),
+            },
+            effects: vec![],
+            error_contract: vec![],
+            outcomes: vec!["done".to_string()],
+        };
+
+        let operation_b = Operation {
+            id: "op_b".to_string(),
+            allowed_personas: vec!["admin".to_string()],
+            precondition: Predicate::Literal {
+                value: Value::Bool(true),
+                type_spec: bool_type(),
+            },
+            effects: vec![],
+            error_contract: vec![],
+            outcomes: vec!["done".to_string()],
+        };
+
+        let flow = Flow {
+            id: "custom_limit_flow".to_string(),
+            snapshot: "at_initiation".to_string(),
+            entry: "step_a".to_string(),
+            steps: vec![
+                FlowStep::OperationStep {
+                    id: "step_a".to_string(),
+                    op: "op_a".to_string(),
+                    persona: "admin".to_string(),
+                    outcomes: {
+                        let mut m = BTreeMap::new();
+                        m.insert(
+                            "done".to_string(),
+                            StepTarget::StepRef("step_b".to_string()),
+                        );
+                        m
+                    },
+                    on_failure: FailureHandler::Terminate {
+                        outcome: "error".to_string(),
+                    },
+                },
+                FlowStep::OperationStep {
+                    id: "step_b".to_string(),
+                    op: "op_b".to_string(),
+                    persona: "admin".to_string(),
+                    outcomes: {
+                        let mut m = BTreeMap::new();
+                        m.insert(
+                            "done".to_string(),
+                            StepTarget::StepRef("step_a".to_string()),
+                        );
+                        m
+                    },
+                    on_failure: FailureHandler::Terminate {
+                        outcome: "error".to_string(),
+                    },
+                },
+            ],
+        };
+
+        let contract =
+            make_contract_with(vec![], vec![operation_a, operation_b], vec![flow.clone()]);
+
+        let snapshot = Snapshot {
+            facts: FactSet::new(),
+            verdicts: VerdictSet::new(),
+        };
+
+        // With max_steps=5, should fail
+        let mut entity_states = EntityStateMap::new();
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, Some(5));
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            EvalError::FlowError { flow_id, message } => {
+                assert_eq!(flow_id, "custom_limit_flow");
+                assert!(
+                    message.contains("5"),
+                    "error should mention the custom limit 5, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected FlowError, got {:?}", other),
+        }
+
+        // With None (default 1000), the same flow would also eventually fail
+        // but at step 1000 -- just verify it returns a FlowError
+        let mut entity_states2 = EntityStateMap::new();
+        let result2 = execute_flow(&flow, &contract, &snapshot, &mut entity_states2, None);
+        assert!(result2.is_err());
+        match result2.unwrap_err() {
+            EvalError::FlowError { message, .. } => {
+                assert!(
+                    message.contains("1000"),
+                    "default limit should be 1000, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected FlowError with default limit, got {:?}", other),
         }
     }
 }

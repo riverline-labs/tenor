@@ -28,6 +28,20 @@ pub fn load_bundle(root: &Path) -> Result<(Vec<RawConstruct>, String), ElabError
         .to_string_lossy()
         .to_string();
 
+    // Canonicalize the root directory once for sandbox boundary checks.
+    // All imported files must resolve to paths within this directory.
+    let sandbox_root = root_dir.canonicalize().map_err(|e| {
+        ElabError::new(
+            1,
+            None,
+            None,
+            None,
+            &root.to_string_lossy(),
+            0,
+            format!("cannot canonicalize root directory: {}", e),
+        )
+    })?;
+
     let mut visited: HashSet<PathBuf> = HashSet::new();
     let mut stack: Vec<PathBuf> = Vec::new();
     let mut all_constructs: Vec<RawConstruct> = Vec::new();
@@ -35,6 +49,7 @@ pub fn load_bundle(root: &Path) -> Result<(Vec<RawConstruct>, String), ElabError
     load_file(
         &root,
         &root_dir,
+        &sandbox_root,
         &mut visited,
         &mut stack,
         &mut all_constructs,
@@ -85,6 +100,7 @@ fn check_cross_file_dups(constructs: &[RawConstruct]) -> Result<(), ElabError> {
 fn load_file(
     path: &Path,
     base_dir: &Path,
+    sandbox_root: &Path,
     visited: &mut HashSet<PathBuf>,
     stack: &mut Vec<PathBuf>,
     out: &mut Vec<RawConstruct>,
@@ -165,8 +181,25 @@ fn load_file(
                 prov,
             } => {
                 let resolved = base_dir.join(import_path);
-                let import_base = resolved.parent().unwrap_or(Path::new(".")).to_owned();
-                if !resolved.exists() {
+
+                // Sandbox check: canonicalize the resolved path (fail closed)
+                // and verify it stays within the contract root directory.
+                let canon_import = resolved.canonicalize().map_err(|_| {
+                    ElabError::new(
+                        1,
+                        None,
+                        None,
+                        Some("import"),
+                        &prov.file,
+                        prov.line,
+                        format!(
+                            "import resolution failed: cannot resolve path '{}'",
+                            import_path
+                        ),
+                    )
+                })?;
+
+                if !canon_import.starts_with(sandbox_root) {
                     return Err(ElabError::new(
                         1,
                         None,
@@ -174,41 +207,45 @@ fn load_file(
                         Some("import"),
                         &prov.file,
                         prov.line,
-                        format!("import resolution failed: file not found: {}", import_path),
+                        format!(
+                            "import '{}' escapes the contract root directory",
+                            import_path
+                        ),
                     ));
                 }
-                if let Ok(canon_import) = resolved.canonicalize() {
-                    if stack.contains(&canon_import) {
-                        let cycle: Vec<String> = stack
-                            .iter()
-                            .map(|p| {
-                                p.file_name()
-                                    .unwrap_or_default()
-                                    .to_string_lossy()
-                                    .to_string()
-                            })
-                            .collect();
-                        let target = resolved
-                            .file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string();
-                        return Err(ElabError::new(
-                            1,
-                            None,
-                            None,
-                            Some("import"),
-                            &prov.file,
-                            prov.line,
-                            format!(
-                                "import cycle detected: {} \u{2192} {}",
-                                cycle.join(" \u{2192} "),
-                                target
-                            ),
-                        ));
-                    }
+
+                if stack.contains(&canon_import) {
+                    let cycle: Vec<String> = stack
+                        .iter()
+                        .map(|p| {
+                            p.file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string()
+                        })
+                        .collect();
+                    let target = resolved
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    return Err(ElabError::new(
+                        1,
+                        None,
+                        None,
+                        Some("import"),
+                        &prov.file,
+                        prov.line,
+                        format!(
+                            "import cycle detected: {} \u{2192} {}",
+                            cycle.join(" \u{2192} "),
+                            target
+                        ),
+                    ));
                 }
-                load_file(&resolved, &import_base, visited, stack, out)?;
+
+                let import_base = canon_import.parent().unwrap_or(Path::new(".")).to_owned();
+                load_file(&resolved, &import_base, sandbox_root, visited, stack, out)?;
             }
             _ => local.push(c),
         }

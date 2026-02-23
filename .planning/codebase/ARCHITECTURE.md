@@ -1,180 +1,178 @@
 # Architecture
 
-**Analysis Date:** 2026-02-21
+**Analysis Date:** 2026-02-22
 
 ## Pattern Overview
 
-**Overall:** Multi-stage compiler pipeline with a separate runtime evaluator
+**Overall:** Multi-crate pipeline compiler with a strict two-boundary design
 
 **Key Characteristics:**
-- The elaboration pipeline (tenor-core) is a pure transformation: `.tenor` DSL source → TenorInterchange JSON bundle. No runtime concerns enter the elaborator.
-- The evaluator (tenor-eval) is a separate crate that consumes only interchange JSON, never raw DSL. This enforces a strict boundary: the interchange format is the contract between compiler and runtime.
-- All crates are organized as a Cargo workspace. The CLI (`tenor-cli`) is the public surface that orchestrates both subsystems.
-- Four future crates (`analyze`, `codegen`, `lsp`) are registered in the workspace with stub `lib.rs` files; none contain implementation yet.
+- The `.tenor` DSL is compiled to a canonical TenorInterchange JSON bundle (the "interchange boundary"). All downstream consumers (evaluator, analyzer, codegen, LSP) operate on interchange JSON, never on raw AST.
+- The elaboration pipeline is a six-pass sequential compiler with hard pass-number attribution on every error.
+- Each crate is a separate library with a clean public API; `tenor-cli` is the only binary crate and acts as the integration layer.
+- Downstream crates (`tenor-eval`, `tenor-analyze`) deserialize interchange JSON into their own typed structs — they do NOT import from `tenor-core`.
 
-## Layers
+## Crates
 
-**DSL Parsing Layer (tenor-core, passes 0+1):**
-- Purpose: Convert `.tenor` source text to a raw construct list
-- Location: `crates/core/src/lexer.rs`, `crates/core/src/parser.rs`, `crates/core/src/pass1_bundle.rs`
-- Contains: `Token` enum, `Spanned` struct, `RawConstruct` AST enum tree
-- Depends on: filesystem (reads `.tenor` files), nothing else
-- Used by: elaboration orchestrator `crates/core/src/elaborate.rs`
+**`crates/core` (tenor-core):**
+- Purpose: The elaboration pipeline — `.tenor` source text to TenorInterchange JSON
+- Location: `crates/core/src/`
+- Contains: Lexer, parser, AST types, six pass modules, `elaborate()` top-level function
+- Depends on: `serde_json`, `serde`, `rust_decimal`
+- Used by: `tenor-cli`, `tenor-analyze` (via CLI only at runtime), `tenor-eval` (via CLI)
 
-**Elaboration Pipeline (tenor-core, passes 2-6):**
-- Purpose: Validate and transform the raw construct list into a canonical JSON bundle
-- Location: `crates/core/src/pass2_index.rs` through `crates/core/src/pass6_serialize.rs`
-- Contains: `Index`, `TypeEnv`, typed AST transformations, structural validation, JSON serialization
-- Depends on: AST types from `crates/core/src/ast.rs`, error type from `crates/core/src/error.rs`
-- Used by: `elaborate()` in `crates/core/src/elaborate.rs`, directly by conformance runner
+**`crates/cli` (tenor-cli):**
+- Purpose: Binary entry point — CLI command dispatch for all toolchain operations
+- Location: `crates/cli/src/`
+- Contains: `main.rs` (clap-based subcommand dispatch), `runner.rs` (conformance suite), `tap.rs` (TAP v14 output), `diff.rs`, `explain.rs`, ambiguity testing module
+- Depends on: `tenor-core`, `tenor-eval`, `tenor-analyze`, `clap`, `sha2`, `jsonschema`
 
-**Interchange Boundary:**
-- Purpose: The canonical JSON interchange format is the stable contract between elaborator and all downstream consumers
-- Location: `docs/interchange-schema.json` (JSON Schema), embedded via `include_str!` in `crates/cli/src/main.rs`
-- Constructs in the bundle are sorted: Facts → Entities → Personas → Rules (by stratum) → Operations → Flows
-
-**Evaluation Layer (tenor-eval):**
-- Purpose: Execute contract logic against a set of facts, producing verdicts with provenance
+**`crates/eval` (tenor-eval):**
+- Purpose: Contract runtime evaluation — facts + interchange bundle → verdicts + flow execution
 - Location: `crates/eval/src/`
-- Contains: `Contract` (deserialized from interchange), `FactSet`, `VerdictSet`, `VerdictInstance`, `Snapshot`, flow execution state machine
-- Depends on: interchange JSON only (not tenor-core types); `rust_decimal` for arithmetic
-- Used by: `cmd_eval` in `crates/cli/src/main.rs`
+- Contains: `types.rs` (runtime values, Contract, FactSet, VerdictSet), `assemble.rs` (fact assembly), `rules.rs` (stratified rule evaluation), `flow.rs` (flow execution engine), `operation.rs`, `predicate.rs`, `numeric.rs`, `provenance.rs`
+- Depends on: `serde_json`, `rust_decimal`
+- Used by: `tenor-cli`
 
-**CLI Layer (tenor-cli):**
-- Purpose: User-facing command dispatch; orchestrates elaboration, evaluation, diff, validation, conformance testing, AI ambiguity testing
-- Location: `crates/cli/src/main.rs`
-- Contains: clap-based `Cli` / `Commands` structs; `cmd_*` functions; `runner`, `diff`, `tap`, `ambiguity` submodules
-- Depends on: `tenor_core`, `tenor_eval`
+**`crates/analyze` (tenor-analyze):**
+- Purpose: Static analysis — eight analysis passes (S1-S8) on interchange bundles
+- Location: `crates/analyze/src/`
+- Contains: `bundle.rs` (interchange deserializer), `report.rs` (AnalysisReport), `s1_state_space.rs` through `s8_verdict_uniqueness.rs`
+- Depends on: `serde_json`, `serde`
+- Used by: `tenor-cli`
 
-**Stub Crates (future phases):**
-- `crates/analyze/src/lib.rs` — static analysis (Phase 4, not implemented)
-- `crates/codegen/src/lib.rs` — code generation (Phase 6, not implemented)
-- `crates/lsp/src/lib.rs` — Language Server Protocol (Phase 8, not implemented)
+**`crates/codegen` (tenor-codegen):**
+- Purpose: Code generation for TypeScript, Rust, Go targets (Phase 6, stub only)
+- Location: `crates/codegen/src/lib.rs`
+
+**`crates/lsp` (tenor-lsp):**
+- Purpose: Language Server Protocol implementation for IDE integration (Phase 8, stub only)
+- Location: `crates/lsp/src/lib.rs`
+
+## Core Elaboration Pipeline
+
+**Six-Pass Elaborator (`crates/core/src/elaborate.rs`):**
+
+| Pass | Module | Input → Output |
+|------|--------|----------------|
+| 0+1 | `pass1_bundle.rs` | Source text → parsed `Vec<RawConstruct>` + bundle ID; resolves imports, detects cycles, checks cross-file duplicate IDs |
+| 2 | `pass2_index.rs` | `Vec<RawConstruct>` → `Index`; construct lookup map by kind, duplicate ID detection within file |
+| 3 | `pass3_types.rs` | `Vec<RawConstruct>` + `Index` → `TypeEnv`; resolves `TypeDecl` records, detects type cycles |
+| 4 | `pass4_typecheck.rs` | `Vec<RawConstruct>` + `TypeEnv` → typed `Vec<RawConstruct>`; resolves `TypeRef` → concrete `BaseType`, type-checks expressions |
+| 5 | `pass5_validate.rs` | Typed constructs + `Index` → validation; structural checks on Entity, Rule, Operation, Flow, System |
+| 6 | `pass6_serialize.rs` | Validated constructs → `serde_json::Value`; canonical interchange JSON with sorted keys |
+
+Entry point: `tenor_core::elaborate::elaborate(root_path: &Path) -> Result<Value, ElabError>`
 
 ## Data Flow
 
-**Elaboration (DSL → Interchange JSON):**
+**DSL Compilation Flow:**
 
-1. CLI calls `tenor_core::elaborate::elaborate(root_path)` (`crates/core/src/elaborate.rs`)
-2. Pass 0+1 (`pass1_bundle::load_bundle`): reads root `.tenor` file, resolves `import` directives recursively (DFS), detects cycles, concatenates all `RawConstruct` values into a flat `Vec<RawConstruct>`
-3. Pass 2 (`pass2_index::build_index`): scans construct list, builds `Index` (per-kind HashMaps of id → Provenance), detects duplicate ids within and across files
-4. Pass 3 (`pass3_types::build_type_env`): resolves `TypeDecl` constructs into a `TypeEnv` (name → `RawType`), detects `TypeDecl` cycles
-5. Pass 4 (`pass4_typecheck::resolve_types` + `type_check_rules`): replaces all `RawType::TypeRef` nodes with concrete types; validates rule predicate expression types
-6. Pass 5 (`pass5_validate::validate` + `validate_operation_transitions`): structural checks — entity state machine validity, operation effect references, flow step graph validity, flow cycles, parallel branch entity conflicts
-7. Pass 6 (`pass6_serialize::serialize`): serializes the validated construct list to a `serde_json::Value` with lexicographically sorted keys and structured numeric values
-8. CLI prints the bundle as pretty-printed JSON to stdout
+1. CLI invokes `tenor_core::elaborate::elaborate(path)`
+2. Pass 0+1: `lexer::lex()` tokenizes each file; `parser::parse()` builds `Vec<RawConstruct>`; `pass1_bundle::load_bundle()` walks import graph recursively
+3. Pass 2: `pass2_index::build_index()` produces `Index` with per-kind `HashMap<String, Provenance>`
+4. Pass 3: `pass3_types::build_type_env()` produces `TypeEnv` = `HashMap<String, RawType>`
+5. Pass 4: `pass4_typecheck::resolve_types()` rewrites `TypeRef` nodes; `type_check_rules()` validates expression types
+6. Pass 5: `pass5_validate::validate()` + `validate_operation_transitions()` check structural invariants
+7. Pass 6: `pass6_serialize::serialize()` emits sorted-key JSON with structured numeric values
+8. CLI optionally wraps in TenorManifest envelope (SHA-256 etag in `main.rs::build_manifest()`)
 
-**Evaluation (Interchange JSON + Facts → Verdicts):**
+**Evaluation Flow:**
 
-1. CLI calls `tenor_eval::evaluate(bundle, facts)` (`crates/eval/src/lib.rs`)
-2. `Contract::from_interchange(bundle)`: deserializes interchange JSON into typed `Contract` struct
-3. `assemble::assemble_facts(contract, facts)`: validates and coerces each fact value against its declared type; applies defaults for missing optional facts
-4. `rules::eval_strata(contract, fact_set)`: iterates strata 0..max, evaluates each rule's predicate against `FactSet + VerdictSet`, accumulates `VerdictInstance` values with provenance
-5. Returns `EvalResult { verdicts: VerdictSet }`
+1. CLI reads interchange JSON bundle + facts JSON
+2. `tenor_eval::evaluate(bundle, facts)` or `tenor_eval::evaluate_flow(bundle, facts, flow_id, persona)`
+3. `Contract::from_interchange(bundle)` deserializes into eval-internal typed structs
+4. `assemble::assemble_facts()` validates and coerces fact values against declared types
+5. `rules::eval_strata()` evaluates rules in stratum order, accumulating `VerdictSet`
+6. (Flow mode) `Snapshot` is frozen; `flow::execute_flow()` walks the flow state machine using the frozen snapshot
 
-**Flow Execution (extends Evaluation):**
+**Analysis Flow:**
 
-1. CLI calls `tenor_eval::evaluate_flow(bundle, facts, flow_id, persona)`
-2. Runs steps 1-4 above to produce rules verdicts
-3. Creates an immutable `Snapshot { facts, verdicts }` — never mutated during flow execution (per spec Section 11.4)
-4. Initializes a mutable `EntityStateMap` from contract initial states
-5. `flow::execute_flow` walks the flow as a state machine: OperationStep, BranchStep, HandoffStep, SubFlowStep, ParallelStep, each updating `EntityStateMap` and recording `StepRecord` values
-6. Returns `FlowEvalResult { verdicts, flow_result }`
-
-**Conformance Testing:**
-
-1. CLI `cmd_test` calls `runner::run_suite(suite_dir)` (`crates/cli/src/runner.rs`)
-2. Runner discovers positive and negative fixture files, calls `elaborate::elaborate` on each `.tenor` file
-3. Positive tests: compares JSON output to `*.expected.json` using `json_equal` (normalizes number types)
-4. Negative tests: compares `ElabError::to_json_value()` to `*.expected-error.json`
-5. Results emitted in TAP v14 format via `crates/cli/src/tap.rs`
+1. CLI elaborates `.tenor` → interchange JSON
+2. `tenor_analyze::analyze(bundle)` or `analyze_selected(bundle, analyses)`
+3. `AnalysisBundle::from_interchange(bundle)` deserializes into analysis-internal typed structs
+4. S1-S8 analyses run in dependency order: S4 requires S3a; S6 requires S5; S7 requires S6
+5. `AnalysisReport::extract_findings()` aggregates warnings/infos from all analyses
 
 **State Management:**
-- All elaboration pass functions are stateless transformations: they take inputs and return outputs or errors
-- `ElabError` is the single error type across all passes; carries `pass` number, location, and message
-- Evaluation maintains mutable `EntityStateMap` during flow execution only; all other state is immutable
+- No global mutable state. All pipeline state is passed explicitly as function arguments.
+- `RawConstruct` is cloned through passes (derived `Clone`). Pass 4 consumes and returns the construct list.
+- Flow execution: `Snapshot` (facts + verdicts) is immutable. `EntityStateMap` is separately mutable.
 
 ## Key Abstractions
 
-**RawConstruct:**
-- Purpose: The unified AST node type; a Rust enum covering all Tenor language constructs
-- Location: `crates/core/src/ast.rs`
-- Pattern: One `Vec<RawConstruct>` threaded through all elaboration passes; passes destructure it with `match`
+**`RawConstruct` (`crates/core/src/ast.rs`):**
+- Purpose: Unified enum of all DSL construct variants produced by the parser
+- Variants: `Import`, `TypeDecl`, `Fact`, `Entity`, `Rule`, `Operation`, `Persona`, `Flow`, `System`
+- Pattern: All passes consume `&[RawConstruct]` or `Vec<RawConstruct>`
 
-**Index:**
-- Purpose: Fast O(1) construct lookup by kind and id; also carries `rule_verdicts` and `verdict_strata` maps
-- Location: `crates/core/src/pass2_index.rs`
-- Pattern: Built once in Pass 2, passed by reference to Passes 4 and 5
+**`ElabError` (`crates/core/src/error.rs`):**
+- Purpose: Structured elaboration error matching expected-error.json conformance format
+- Fields: `pass: u8`, `construct_kind`, `construct_id`, `field`, `file`, `line`, `message`
+- Constructor helpers: `ElabError::lex()`, `ElabError::parse()`, `ElabError::new()`
 
-**TypeEnv:**
-- Purpose: Maps `TypeDecl` names to fully-resolved `RawType` values; a `HashMap<String, RawType>`
-- Location: `crates/core/src/pass3_types.rs`
-- Pattern: Built in Pass 3, used in Pass 4 to rewrite `TypeRef` nodes
+**`Index` (`crates/core/src/pass2_index.rs`):**
+- Purpose: Fast construct lookup by kind and ID; maps verdict types to producing rules
+- Fields: per-kind `HashMap<String, Provenance>`, `rule_verdicts`, `verdict_strata`
 
-**ElabError:**
-- Purpose: Uniform error representation for all elaboration passes; serializes to the expected-error JSON format used in negative conformance fixtures
-- Location: `crates/core/src/error.rs`
-- Pattern: Carry `pass` (u8), `construct_kind`, `construct_id`, `field`, `file`, `line`, `message`; `to_json_value()` always includes all fields (nulls for missing)
+**`Contract` (`crates/eval/src/types.rs`):**
+- Purpose: Eval-internal deserialized view of an interchange bundle
+- Completely distinct from `tenor-core` types — deserialized from JSON, not from AST
 
-**Contract (eval):**
-- Purpose: Strongly-typed Rust representation of an interchange bundle for evaluation
-- Location: `crates/eval/src/types.rs`
-- Pattern: Deserialized from `serde_json::Value` via `Contract::from_interchange()`; entirely independent of tenor-core AST types
+**`AnalysisBundle` (`crates/analyze/src/bundle.rs`):**
+- Purpose: Analyze-internal deserialized view of an interchange bundle
+- Completely distinct from both `tenor-core` and `tenor-eval` types
 
-**Snapshot (eval):**
-- Purpose: Immutable freeze of `FactSet + VerdictSet` taken at flow initiation
-- Location: `crates/eval/src/flow.rs`
-- Pattern: Passed by reference throughout flow execution; entity state changes use a separate mutable `EntityStateMap`
+**Interchange JSON (TenorInterchange):**
+- Schema: `docs/interchange-schema.json`; manifest schema: `docs/manifest-schema.json`
+- Both embedded in `tenor-cli` binary via `include_str!`
+- All JSON keys sorted lexicographically within each object (enforced in Pass 6)
+- Bundle kind field values use `PascalCase` (`"Fact"`, `"Rule"`, `"Entity"`, etc.)
 
 ## Entry Points
 
-**`elaborate()` function:**
-- Location: `crates/core/src/elaborate.rs`
-- Triggers: CLI `elaborate` subcommand, conformance runner, tests
-- Responsibilities: Orchestrates passes 0-6; returns `Result<serde_json::Value, ElabError>`
+**CLI Binary (`crates/cli/src/main.rs`):**
+- Subcommands: `elaborate`, `validate`, `eval`, `test`, `diff`, `check`, `explain`, `generate` (stub), `ambiguity`
+- Global flags: `--output [text|json]`, `--quiet`
+- Error handling: all commands call `process::exit(1)` on failure
 
-**`evaluate()` function:**
-- Location: `crates/eval/src/lib.rs`
-- Triggers: CLI `eval` subcommand; integration tests in `crates/eval/src/lib.rs`
-- Responsibilities: Deserializes bundle, assembles facts, evaluates rules, returns `EvalResult`
+**Library Public API (`crates/core/src/lib.rs`):**
+- `elaborate::elaborate(root_path)` — full 6-pass pipeline
+- `pass1_bundle::load_bundle(root)` — parse and bundle (selective execution)
+- `pass2_index::build_index(constructs)` — indexing (selective execution)
+- `pass3_types::build_type_env(constructs, index)` — type env (selective execution)
+- `pass4_typecheck::resolve_types(constructs, type_env)` — type resolution (selective execution)
 
-**`evaluate_flow()` function:**
-- Location: `crates/eval/src/lib.rs`
-- Triggers: Test infrastructure, future CLI integration
-- Responsibilities: Full evaluation pipeline plus flow state machine execution
+**Eval Library (`crates/eval/src/lib.rs`):**
+- `evaluate(bundle, facts) -> Result<EvalResult, EvalError>`
+- `evaluate_flow(bundle, facts, flow_id, persona) -> Result<FlowEvalResult, EvalError>`
 
-**CLI `main()`:**
-- Location: `crates/cli/src/main.rs`
-- Triggers: `cargo run -p tenor-cli -- <subcommand>`
-- Responsibilities: Parses arguments via clap, dispatches to `cmd_elaborate`, `cmd_validate`, `cmd_eval`, `cmd_test`, `cmd_diff`, `cmd_ambiguity`; stub exits for `check`, `explain`, `generate`
-
-**`runner::run_suite()`:**
-- Location: `crates/cli/src/runner.rs`
-- Triggers: CLI `test` subcommand; CI pipeline
-- Responsibilities: Discovers conformance fixture files across all subdirectories, runs elaboration, compares output, emits TAP
+**Analyze Library (`crates/analyze/src/lib.rs`):**
+- `analyze(bundle) -> Result<AnalysisReport, AnalysisError>`
+- `analyze_selected(bundle, analyses) -> Result<AnalysisReport, AnalysisError>`
 
 ## Error Handling
 
-**Strategy:** All errors propagate as `Result<T, ElabError>` through the elaboration pipeline. The evaluator uses its own `EvalError` enum. The CLI maps errors to exit code 1 and prints structured JSON or text.
+**Strategy:** Result-returning functions throughout; `process::exit(1)` only at the CLI boundary.
 
 **Patterns:**
-- Elaboration: Early return `Err(ElabError)` from any pass; `elaborate()` unwraps each pass with `?`
-- `ElabError::new()` constructor takes pass number, optional construct context fields, file/line, message
-- `ElabError::lex()` and `ElabError::parse()` are convenience constructors for pass 0
-- Evaluation: `EvalError` enum with named fields per variant; `fmt::Display` implemented for human-readable messages
-- CLI: `process::exit(1)` on error; `process::exit(2)` for stub (not yet implemented) subcommands
-- Conformance: TAP `not ok` lines carry diff/mismatch details; test runner always runs all tests (no abort on first failure)
+- Elaboration: `Result<T, ElabError>` — first-error-wins; pipeline aborts on first failure
+- Evaluation: `Result<T, EvalError>` — enum of typed errors (MissingFact, TypeMismatch, Overflow, etc.)
+- Analysis: `Result<T, AnalysisError>` — InvalidBundle or MissingField
+- CLI: errors formatted as text or JSON depending on `--output` flag; stderr for errors, stdout for results
 
 ## Cross-Cutting Concerns
 
-**Logging:** None. No logging framework. Diagnostic output goes to `eprintln!` in the CLI layer only.
+**Serialization:** `serde_json` with `BTreeMap` used in AST and serialization for deterministic key ordering. Pass 6 sorts all construct arrays and JSON object keys explicitly.
 
-**Validation:** Structural validation is entirely the responsibility of Pass 5 (`pass5_validate.rs`). Type validation is Pass 4. The evaluator performs runtime type-checking during fact assembly.
+**Numeric Precision:** `rust_decimal` crate for all Decimal/Money types; literals preserved as strings through the pipeline until evaluated.
 
-**Authentication:** Not applicable. No network auth in the elaborator or evaluator. The `ambiguity` subcommand reads `ANTHROPIC_API_KEY` from the environment via `api::get_api_key()` in `crates/cli/src/ambiguity/api.rs`.
+**Import Resolution:** Multi-file bundles assembled via recursive file walking in `pass1_bundle.rs`. Import cycle detection uses a DFS stack. Paths resolved relative to importing file's directory.
 
-**Serialization:** `serde_json` is used throughout. The interchange format enforces lexicographically sorted JSON keys (implemented manually in Pass 6 using `serde_json::Map`). Numeric values use the structured `decimal_value` / `money_value` interchange format, not JSON numbers, for precision.
+**Conformance Testing:** TAP v14 protocol output via `crates/cli/src/tap.rs`. Suite runner in `crates/cli/src/runner.rs` discovers fixture pairs by convention (`.tenor` + `.expected.json` or `.expected-error.json`).
+
+**AI Ambiguity Testing:** `crates/cli/src/ambiguity/` module calls an external LLM API with the spec + DSL sample and checks whether the model correctly elaborates. Invoked via `tenor ambiguity` subcommand.
 
 ---
 
-*Architecture analysis: 2026-02-21*
+*Architecture analysis: 2026-02-22*

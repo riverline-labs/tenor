@@ -60,8 +60,8 @@
     - 19.6 Dry-Run Evaluation
     - 19.7 Executor Obligation Summary (E10-E14)
 20. Appendix A — Acknowledged Limitations
-21. Appendix C — Worked Example: Escrow Release Contract
-22. Appendix D — Glossary
+21. Appendix B — Worked Example: Escrow Release Contract
+22. Appendix C — Glossary
 
 ---
 
@@ -2541,7 +2541,7 @@ Cross-contract provenance traceability requires that all TriggerProvenance recor
 
 ---
 
-## 21. Appendix C — Worked Example: Escrow Release Contract
+## 21. Appendix B — Worked Example: Escrow Release Contract
 
 This appendix demonstrates a non-trivial Tenor contract covering two entities, monetary threshold rules, multi-persona authority, bounded quantification over line items, and a compensation flow. It is intended as a reference for:
 
@@ -3041,7 +3041,7 @@ This is the frozen verdict semantic commitment in concrete form.
 
 ---
 
-## 22. Appendix D — Glossary
+## 22. Appendix C — Glossary
 
 | Term | Definition |
 |------|------------|

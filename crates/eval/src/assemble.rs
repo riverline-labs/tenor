@@ -64,31 +64,28 @@ fn parse_and_typecheck(
 /// Valid Duration unit values per the spec DurationUnit enum.
 const VALID_DURATION_UNITS: &[&str] = &["seconds", "minutes", "hours", "days"];
 
-/// Check if a string matches ISO 8601 date format (YYYY-MM-DD).
-///
-/// Simple format check: 4 digits, dash, 2 digits, dash, 2 digits.
-/// Does NOT validate actual date correctness (e.g., month 13 would pass).
+/// Check if a string is a valid ISO 8601 date (YYYY-MM-DD) with calendar
+/// correctness. Rejects invalid dates like "2024-13-01" or "2023-02-29"
+/// (not a leap year). Uses the `time` crate for proven calendar logic.
 pub fn validate_date_format(s: &str) -> bool {
-    let bytes = s.as_bytes();
-    if bytes.len() != 10 {
-        return false;
-    }
-    // YYYY-MM-DD
-    bytes[0..4].iter().all(|b| b.is_ascii_digit())
-        && bytes[4] == b'-'
-        && bytes[5..7].iter().all(|b| b.is_ascii_digit())
-        && bytes[7] == b'-'
-        && bytes[8..10].iter().all(|b| b.is_ascii_digit())
+    use time::macros::format_description;
+    use time::Date;
+    let format = format_description!("[year]-[month]-[day]");
+    Date::parse(s, &format).is_ok()
 }
 
-/// Check if a string matches ISO 8601 DateTime format (YYYY-MM-DDT...).
-///
-/// Validates the date prefix is ISO 8601 and that a 'T' separator follows.
+/// Check if a string is a valid ISO 8601 DateTime (YYYY-MM-DDThh:mm:ss)
+/// with calendar and time correctness. Validates both the date and time
+/// portions. Timezone suffixes (Z, +00:00) are accepted by checking only
+/// the first 19 characters.
 pub fn validate_datetime_format(s: &str) -> bool {
-    if s.len() < 11 {
+    use time::macros::format_description;
+    use time::PrimitiveDateTime;
+    if s.len() < 19 {
         return false;
     }
-    validate_date_format(&s[..10]) && s.as_bytes()[10] == b'T'
+    let format = format_description!("[year]-[month]-[day]T[hour]:[minute]:[second]");
+    PrimitiveDateTime::parse(&s[..19], &format).is_ok()
 }
 
 /// Validate a parsed value against additional type constraints.
@@ -489,7 +486,7 @@ mod tests {
     }
 
     // ──────────────────────────────────────
-    // C8: Date format validation tests (B4 fix)
+    // Date validation tests (calendar-correct via `time` crate)
     // ──────────────────────────────────────
 
     #[test]
@@ -497,6 +494,8 @@ mod tests {
         assert!(super::validate_date_format("2024-01-15"));
         assert!(super::validate_date_format("2000-12-31"));
         assert!(super::validate_date_format("1999-06-01"));
+        assert!(super::validate_date_format("2024-02-29")); // leap year
+        assert!(super::validate_date_format("2023-12-31"));
     }
 
     #[test]
@@ -509,9 +508,26 @@ mod tests {
     }
 
     #[test]
+    fn validate_date_calendar_correctness() {
+        // Invalid month
+        assert!(!super::validate_date_format("2024-13-01"));
+        // Invalid day
+        assert!(!super::validate_date_format("2024-02-30"));
+        // Not a leap year
+        assert!(!super::validate_date_format("2023-02-29"));
+        // Wildly invalid
+        assert!(!super::validate_date_format("2024-99-99"));
+        // Month 00 invalid
+        assert!(!super::validate_date_format("2024-00-15"));
+        // Day 00 invalid
+        assert!(!super::validate_date_format("2024-01-00"));
+    }
+
+    #[test]
     fn validate_datetime_format_valid() {
         assert!(super::validate_datetime_format("2024-01-15T10:30:00Z"));
         assert!(super::validate_datetime_format("2024-01-15T00:00:00"));
+        assert!(super::validate_datetime_format("2024-01-15T10:30:00+05:00"));
     }
 
     #[test]
@@ -519,6 +535,18 @@ mod tests {
         assert!(!super::validate_datetime_format("2024-01-15"));
         assert!(!super::validate_datetime_format("2024-01-15 10:30:00"));
         assert!(!super::validate_datetime_format(""));
+    }
+
+    #[test]
+    fn validate_datetime_calendar_and_time_correctness() {
+        // Invalid date portion
+        assert!(!super::validate_datetime_format("2024-13-01T10:30:00"));
+        // Invalid hour
+        assert!(!super::validate_datetime_format("2024-01-15T25:00:00"));
+        // Invalid minute
+        assert!(!super::validate_datetime_format("2024-01-15T10:60:00"));
+        // Garbage after T
+        assert!(!super::validate_datetime_format("2024-01-15Tgarbage000"));
     }
 
     #[test]

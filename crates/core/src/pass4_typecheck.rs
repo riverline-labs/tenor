@@ -173,9 +173,14 @@ fn type_check_produce(
         let right_range = mul_range_from_term(right, fact_types);
         if let (Some((l_min, l_max)), Some((r_min, r_max))) = (left_range, right_range) {
             let products = [l_min * r_min, l_min * r_max, l_max * r_min, l_max * r_max];
-            // SAFETY: products has exactly 4 elements (all range endpoint products)
-            let prod_min = *products.iter().min().unwrap();
-            let prod_max = *products.iter().max().unwrap();
+            let prod_min = *products
+                .iter()
+                .min()
+                .expect("products array has exactly 4 elements");
+            let prod_max = *products
+                .iter()
+                .max()
+                .expect("products array has exactly 4 elements");
             if let RawType::Int {
                 min: pt_min,
                 max: pt_max,

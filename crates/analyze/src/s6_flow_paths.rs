@@ -11,10 +11,25 @@ use crate::s5_verdicts::S5Result;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Maximum number of paths to enumerate before truncation.
-const MAX_PATHS: usize = 10_000;
-/// Maximum recursion depth for path enumeration.
-const MAX_DEPTH: usize = 1_000;
+/// Configuration for flow path enumeration limits.
+///
+/// Allows callers to override the default limits for different resource
+/// constraints (e.g., embedded evaluator with tighter memory budgets).
+pub struct FlowPathConfig {
+    /// Maximum number of paths to enumerate before truncation.
+    pub max_paths: usize,
+    /// Maximum recursion depth for path enumeration.
+    pub max_depth: usize,
+}
+
+impl Default for FlowPathConfig {
+    fn default() -> Self {
+        Self {
+            max_paths: 10_000,
+            max_depth: 1_000,
+        }
+    }
+}
 
 /// A single step in an enumerated flow path.
 #[derive(Debug, Clone, Serialize)]
@@ -69,11 +84,20 @@ pub struct S6Result {
 
 /// S6 — Enumerate all possible execution paths through each Flow.
 pub fn analyze_flow_paths(bundle: &AnalysisBundle, s5: &S5Result) -> S6Result {
+    analyze_flow_paths_with_config(bundle, s5, &FlowPathConfig::default())
+}
+
+/// S6 — Enumerate all paths with configurable limits.
+pub fn analyze_flow_paths_with_config(
+    bundle: &AnalysisBundle,
+    s5: &S5Result,
+    config: &FlowPathConfig,
+) -> S6Result {
     let mut flows = BTreeMap::new();
     let mut total_paths = 0;
 
     for flow in &bundle.flows {
-        let result = enumerate_flow_paths(flow, s5);
+        let result = enumerate_flow_paths(flow, s5, config);
         total_paths += result.path_count;
         flows.insert(flow.id.clone(), result);
     }
@@ -131,7 +155,11 @@ fn analyze_cross_contract_triggers(bundle: &AnalysisBundle) -> Vec<CrossContract
 }
 
 /// Enumerate paths for a single flow.
-fn enumerate_flow_paths(flow: &crate::bundle::AnalysisFlow, _s5: &S5Result) -> FlowPathResult {
+fn enumerate_flow_paths(
+    flow: &crate::bundle::AnalysisFlow,
+    _s5: &S5Result,
+    config: &FlowPathConfig,
+) -> FlowPathResult {
     // Build step index: step_id -> step JSON
     let mut step_index: BTreeMap<String, &serde_json::Value> = BTreeMap::new();
     let mut all_step_ids = BTreeSet::new();
@@ -153,12 +181,12 @@ fn enumerate_flow_paths(flow: &crate::bundle::AnalysisFlow, _s5: &S5Result) -> F
     stack.push((flow.entry.clone(), Vec::new(), BTreeSet::new()));
 
     while let Some((current_step_id, current_path, visited)) = stack.pop() {
-        if paths.len() >= MAX_PATHS {
+        if paths.len() >= config.max_paths {
             truncated = true;
             break;
         }
 
-        if current_path.len() >= MAX_DEPTH {
+        if current_path.len() >= config.max_depth {
             // Record path as-is at max depth
             paths.push(FlowPath {
                 depth: current_path.len(),

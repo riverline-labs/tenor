@@ -4,16 +4,12 @@
 
 Tenor is a domain-specific language for expressing operational contracts — the rules, entities, operations, and flows that govern how decisions are made in complex business domains. The elaborator transforms `.tenor` source files into a canonical JSON interchange format through a six-pass pipeline. The evaluator executes contracts against fact sets with full provenance. Static analysis (S1-S8) verifies structural properties. The language specification is frozen at v1.0 with the System construct for multi-contract composition.
 
-## Current Milestone: Agent Tooling
+## Current State
 
-**Goal:** Ship a TypeScript SDK that lets agents interact with Tenor contracts through the proven Rust evaluator, then layer on codegen, IDE support, reference implementations, and embedded execution.
+**v1.0 shipped** — spec frozen, System construct complete, 5 domain contracts validated, full documentation.
+**Phase 14.1 complete** — tech debt, bugs, and hardening resolved before SDK work.
 
-**Target features:**
-- TypeScript Agent SDK (client to Rust evaluator service)
-- TypeScript code generation (optional optimization — typed interfaces and client bindings)
-- VS Code extension with Preview Agent Capabilities panel
-- Agent skill examples (CLI tool, Express middleware, Slack bot, audit agent)
-- Embedded evaluator (WASM-compiled Rust for browser/Node/edge)
+**Next milestone:** Agent Tooling (phases 15-19) — TypeScript SDK, codegen, VS Code extension, agent skill examples, embedded evaluator.
 
 ## Core Value
 
@@ -58,15 +54,12 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 - ✓ Language reference documentation — v1.0
 - ✓ Authoring guide with worked domain examples — v1.0
 - ✓ One-page explainer for decision makers — v1.0
+- ✓ All 5 domain contracts re-validated for v1.0 spec — v1.0
+- ✓ Multi-contract System scenario validated end-to-end — v1.0
 
 ### Active
 
-- [ ] TypeScript Agent SDK (client to Rust evaluator exposing agent skills)
-- [ ] Evaluator service mode (`tenor serve` or Docker)
-- [ ] TypeScript code generation (typed interfaces and client bindings from contracts)
-- [ ] VS Code extension (syntax highlighting, LSP, Preview Agent Capabilities)
-- [ ] Agent skill reference implementations (CLI tool, Express middleware, Slack bot, audit agent)
-- [ ] Embedded evaluator (WASM-compiled Rust for browser/Node/edge)
+(To be defined in next milestone — run `/gsd:new-milestone`)
 
 ### Out of Scope
 
@@ -79,11 +72,11 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 
 ## Context
 
-- Codebase: 24,543 LOC Rust across 6 crates (core, cli, eval, analyze, codegen, lsp)
+- Codebase: ~25,000 LOC Rust across 6 crates (core, cli, eval, analyze, codegen, lsp)
 - Spec: docs/TENOR.md, frozen at v1.0
-- Conformance: 72 tests (positive, negative, numeric, promotion, shorthand, cross-file, parallel, manifest, exists, effect-to-outcome)
+- Conformance: 73 tests (positive, negative, numeric, promotion, shorthand, cross-file, parallel, manifest, exists, effect-to-outcome, import_escape)
 - Domain contracts: 5 domains (SaaS, healthcare, supply chain, energy, trade finance) totaling 6,441 LOC
-- 384 Rust tests passing, all conformance passing
+- ~398 Rust tests passing, 73 conformance tests passing
 - The spec is the source of truth; the elaborator implements it
 - The evaluator handles full Rule/Operation/Flow evaluation with provenance tracking
 - Static analysis covers S1-S8 (entity states, rule reachability, domain coverage, authority topology, effect analysis, flow paths, complexity bounds, verdict uniqueness)
@@ -110,9 +103,12 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 | Domain validation before codegen | Real contracts surface spec gaps before committing to code generation | ✓ Good |
 | §18 Contract Discovery | Manifest format, etag semantics, discovery endpoint, cold-start protocol | ✓ Good |
 | v0.9 reframe | Spec complete for core language but lacks multi-contract composition; v1.0 requires System construct | ✓ Good |
+| System construct: CFFP Candidate A | Dedicated .tenor file with centralized member declaration; clearest semantics | ✓ Good |
+| AAP for spec quality | Assumption Audit Protocol surfaced hidden assumptions before v1.0 freeze | ✓ Good |
+| Logic vs operational conformance | §17.1.1 distinction clarifies what elaborator guarantees vs executor responsibilities | ✓ Good |
 | SDK-first over codegen-first | Client to proven Rust evaluator ships fast without reimplementing trust-critical logic | — Pending |
 | Defer Rust/Go codegen | TypeScript alone is sufficient for v1 tooling; focus on agent SDK | ✓ Good |
 | Embedded evaluator as planned phase | Air-gapped/regulated deployments need it; not contingent, just sequenced after SDK | — Pending |
 
 ---
-*Last updated: 2026-02-22 after M3 Agent Tooling milestone start*
+*Last updated: 2026-02-23 after Phase 14.1 (Tech Debt, Bugs & Hardening)*

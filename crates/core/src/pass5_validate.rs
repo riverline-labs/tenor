@@ -712,8 +712,20 @@ fn detect_step_cycle(
     while let Some(node) = queue.pop_front() {
         processed.insert(node);
         for &neighbor in adj.get(node).unwrap_or(&vec![]) {
-            // SAFETY: all neighbors were inserted into in_degree via or_insert(0) above
-            let deg = in_degree.get_mut(neighbor).unwrap();
+            let deg = in_degree.get_mut(neighbor).ok_or_else(|| {
+                ElabError::new(
+                    5,
+                    Some("Flow"),
+                    Some(flow_id),
+                    Some("steps"),
+                    &prov.file,
+                    prov.line,
+                    format!(
+                        "internal error: step neighbor '{}' not found in in_degree map",
+                        neighbor
+                    ),
+                )
+            })?;
             *deg -= 1;
             if *deg == 0 {
                 queue.push_back(neighbor);
@@ -824,8 +836,10 @@ fn dfs_flow_refs<'a>(
         }
         for (step_id, flow_line, ref_flow) in sub_refs {
             if in_path.contains(ref_flow) {
-                // SAFETY: ref_flow was just detected in in_path which is maintained in sync with path
-                let cycle_start = path.iter().position(|&s| s == ref_flow).unwrap();
+                let cycle_start = path
+                    .iter()
+                    .position(|&s| s == ref_flow)
+                    .expect("ref_flow must be in path when cycle detected via in_path");
                 let mut cycle_nodes: Vec<&str> = path[cycle_start..].to_vec();
                 cycle_nodes.push(ref_flow);
                 let cycle_str = cycle_nodes.join(" \u{2192} ");
@@ -1323,7 +1337,10 @@ fn trigger_dfs<'a>(
     if let Some(neighbors) = adj.get(&node) {
         for &neighbor in neighbors {
             if in_path.contains(&neighbor) {
-                let cycle_start = path.iter().position(|&n| n == neighbor).unwrap();
+                let cycle_start = path
+                    .iter()
+                    .position(|&n| n == neighbor)
+                    .expect("neighbor must be in path when back-edge detected via in_path");
                 let mut cycle_nodes: Vec<String> = path[cycle_start..]
                     .iter()
                     .map(|(c, f)| format!("{}.{}", c, f))
@@ -1349,4 +1366,141 @@ fn trigger_dfs<'a>(
     visited.insert(node);
     path.pop();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_prov() -> Provenance {
+        Provenance {
+            file: "test.tenor".to_string(),
+            line: 1,
+        }
+    }
+
+    fn test_failure_handler() -> RawFailureHandler {
+        RawFailureHandler::Terminate {
+            outcome: "fail".to_string(),
+        }
+    }
+
+    #[test]
+    fn detect_step_cycle_in_degree_missing_neighbor() {
+        // Construct a flow with steps that reference each other, exercising
+        // the in_degree lookup. The normal code path populates in_degree for
+        // all neighbors via or_insert(0), so the ok_or_else should never fire
+        // in practice. This test verifies a simple acyclic flow works correctly.
+        let mut steps = BTreeMap::new();
+        let mut outcomes1 = BTreeMap::new();
+        outcomes1.insert(
+            "ok".to_string(),
+            RawStepTarget::StepRef("s2".to_string(), 2),
+        );
+        steps.insert(
+            "s1".to_string(),
+            RawStep::OperationStep {
+                op: "op1".to_string(),
+                persona: "admin".to_string(),
+                outcomes: outcomes1,
+                on_failure: Some(test_failure_handler()),
+                line: 2,
+            },
+        );
+        steps.insert(
+            "s2".to_string(),
+            RawStep::OperationStep {
+                op: "op2".to_string(),
+                persona: "admin".to_string(),
+                outcomes: BTreeMap::new(),
+                on_failure: Some(test_failure_handler()),
+                line: 3,
+            },
+        );
+        let prov = test_prov();
+        // Should succeed -- no cycle
+        assert!(detect_step_cycle("test_flow", "s1", &steps, &prov).is_ok());
+    }
+
+    #[test]
+    fn detect_step_cycle_finds_cycle() {
+        // Two steps that point to each other => cycle
+        let mut steps = BTreeMap::new();
+        let mut outcomes1 = BTreeMap::new();
+        outcomes1.insert(
+            "ok".to_string(),
+            RawStepTarget::StepRef("s2".to_string(), 2),
+        );
+        steps.insert(
+            "s1".to_string(),
+            RawStep::OperationStep {
+                op: "op1".to_string(),
+                persona: "admin".to_string(),
+                outcomes: outcomes1,
+                on_failure: Some(test_failure_handler()),
+                line: 2,
+            },
+        );
+        let mut outcomes2 = BTreeMap::new();
+        outcomes2.insert(
+            "ok".to_string(),
+            RawStepTarget::StepRef("s1".to_string(), 3),
+        );
+        steps.insert(
+            "s2".to_string(),
+            RawStep::OperationStep {
+                op: "op2".to_string(),
+                persona: "admin".to_string(),
+                outcomes: outcomes2,
+                on_failure: Some(test_failure_handler()),
+                line: 3,
+            },
+        );
+        let prov = test_prov();
+        let err = detect_step_cycle("test_flow", "s1", &steps, &prov).unwrap_err();
+        assert_eq!(err.pass, 5);
+        assert!(err.message.contains("cycle detected"));
+    }
+
+    #[test]
+    fn trigger_acyclicity_detects_cycle() {
+        // A -> B -> A triggers form a cycle
+        let triggers = vec![
+            RawTrigger {
+                source_contract: "c1".to_string(),
+                source_flow: "f1".to_string(),
+                on: "success".to_string(),
+                target_contract: "c2".to_string(),
+                target_flow: "f2".to_string(),
+                persona: "p".to_string(),
+            },
+            RawTrigger {
+                source_contract: "c2".to_string(),
+                source_flow: "f2".to_string(),
+                on: "success".to_string(),
+                target_contract: "c1".to_string(),
+                target_flow: "f1".to_string(),
+                persona: "p".to_string(),
+            },
+        ];
+        let prov = test_prov();
+        let err = validate_trigger_acyclicity("sys1", &triggers, &prov).unwrap_err();
+        assert_eq!(err.pass, 5);
+        assert!(err.message.contains("trigger cycle detected"));
+    }
+
+    #[test]
+    fn trigger_acyclicity_no_cycle() {
+        // A -> B (no cycle)
+        let triggers = vec![RawTrigger {
+            source_contract: "c1".to_string(),
+            source_flow: "f1".to_string(),
+            on: "success".to_string(),
+            target_contract: "c2".to_string(),
+            target_flow: "f2".to_string(),
+            persona: "p".to_string(),
+        }];
+        let prov = test_prov();
+        assert!(validate_trigger_acyclicity("sys1", &triggers, &prov).is_ok());
+    }
 }

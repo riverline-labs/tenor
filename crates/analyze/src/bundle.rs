@@ -557,6 +557,7 @@ fn parse_system(obj: &serde_json::Value) -> Result<AnalysisSystem, AnalysisError
 mod tests {
     use super::*;
     use serde_json::json;
+    use tenor_core::TENOR_BUNDLE_VERSION;
 
     fn make_bundle(constructs: Vec<serde_json::Value>) -> serde_json::Value {
         json!({
@@ -564,7 +565,7 @@ mod tests {
             "id": "test",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.0.0"
+            "tenor_version": TENOR_BUNDLE_VERSION
         })
     }
 

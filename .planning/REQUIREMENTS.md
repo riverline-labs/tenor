@@ -1,93 +1,44 @@
-# Requirements: Tenor
+# Requirements: Tenor — Agent Tooling
 
+**Milestone:** Agent Tooling
 **Defined:** 2026-02-22
 **Core Value:** A contract authored in TenorDSL must be statically verifiable, evaluable against facts, and usable by agents and developers — the full lifecycle from specification to execution with provenance at every step.
 
-## v1.0 Requirements (Complete)
+## TypeScript Agent SDK
 
-All 24 requirements shipped 2026-02-22. See [MILESTONES.md](MILESTONES.md) for details.
+- [x] **SDK-01**: TypeScript SDK connects to Rust evaluator running as a service
+- [x] **SDK-02**: SDK exposes core agent skills: getOperations, invoke, explain
+- [x] **SDK-03**: Evaluator available via `tenor serve` CLI command (local process)
+- [x] **SDK-04**: Evaluator available via Docker image (`tenor/evaluator`)
+- [x] **SDK-05**: SDK documentation is explicit: the SDK is a client, the evaluator is the trusted core
 
-### System Construct
+## TypeScript Code Generation
 
-- [x] **SYS-01**: System construct declares member contracts that compose together
-- [x] **SYS-02**: Shared persona identity is expressible — the same actor across contracts is formally declared
-- [x] **SYS-03**: Cross-contract flow triggers are expressible — completion of a flow in one contract can initiate a flow in another
-- [x] **SYS-04**: Cross-contract entity relationships are expressible — an entity in one contract can be declared as the same entity in another
-- [x] **SYS-05**: System construct has formal syntax, semantics, and interchange representation in docs/TENOR.md (CFFP-derived)
-- [x] **SYS-06**: Elaborator validates System constructs (Pass 5) and serializes to interchange JSON (Pass 6)
-- [x] **SYS-07**: Interchange JSON Schema extended to validate System construct documents
-- [x] **SYS-08**: Conformance suite covers System construct elaboration (positive and negative tests)
+- [x] **CGEN-01**: Generate typed interfaces from interchange bundles
+- [x] **CGEN-02**: Generate typed client bindings from interchange bundles
+- [x] **CGEN-03**: Generated code provides IDE autocompletion and compile-time type checking
 
-### Static Analysis Extensions
+## VS Code Extension
 
-- [x] **ANLZ-09**: S4 authority topology extended for cross-contract persona analysis within a System
-- [x] **ANLZ-10**: S6 flow path enumeration extended for cross-contract flow trigger analysis within a System
-- [x] **ANLZ-11**: `tenor check` reports cross-contract analysis findings for System constructs
+- [x] **DEVX-01**: VS Code syntax highlighting for .tenor files
+- [x] **DEVX-02**: Inline error diagnostics via LSP
+- [x] **DEVX-03**: Check-on-save
+- [x] **DEVX-04**: Preview Agent Capabilities panel — shows what an agent would see when reading the contract
 
-### Executor Obligations
+## Agent Skill Examples
 
-- [x] **EXEC-01**: Executor obligations defined for cross-contract snapshot coordination within a System
-- [x] **EXEC-02**: Executor obligations defined for cross-contract persona resolution within a System
+- [ ] **SKEX-01**: `tenor agent` CLI tool turns any contract into an interactive shell
+- [ ] **SKEX-02**: Express middleware reference implementation generates routes from operations
+- [ ] **SKEX-03**: Slack bot reference implementation for contract interaction via chat
+- [ ] **SKEX-04**: Audit agent reference implementation generates compliance reports from provenance chains
 
-### Spec Quality
+## Embedded Evaluator
 
-- [x] **SPEC-09**: AAP run on the complete v1.0 spec — all hidden assumptions surfaced and fragility characterized
-- [x] **SPEC-10**: AAP findings resolved or documented as acknowledged limitations before v1.0 freeze
-
-### Domain Re-validation
-
-- [x] **DOMN-10**: SaaS subscription contract re-implemented for v1.0 spec
-- [x] **DOMN-11**: Healthcare prior auth contract re-implemented for v1.0 spec
-- [x] **DOMN-12**: Supply chain inspection contract re-implemented for v1.0 spec
-- [x] **DOMN-13**: Energy procurement contract re-implemented for v1.0 spec
-- [x] **DOMN-14**: Trade finance contract re-implemented for v1.0 spec
-- [x] **DOMN-15**: At least one multi-contract System scenario validated end-to-end
-
-### Documentation
-
-- [x] **DEVX-05**: Language reference documents every construct including System
-- [x] **DEVX-06**: Authoring guide with worked domain examples
-- [x] **DEVX-07**: Executor implementation guide for System composition
-
-## Agent Tooling Requirements
-
-Requirements for the Agent Tooling milestone. Each maps to roadmap phases 15-19.
-
-### TypeScript Agent SDK
-
-- **SDK-01**: TypeScript SDK connects to Rust evaluator running as a service
-- **SDK-02**: SDK exposes core agent skills: getOperations, invoke, explain
-- **SDK-03**: Evaluator available via `tenor serve` CLI command (local process)
-- **SDK-04**: Evaluator available via Docker image (`tenor/evaluator`)
-- **SDK-05**: SDK documentation is explicit: the SDK is a client, the evaluator is the trusted core
-
-### TypeScript Code Generation
-
-- **CGEN-01**: Generate typed interfaces from interchange bundles
-- **CGEN-02**: Generate typed client bindings from interchange bundles
-- **CGEN-03**: Generated code provides IDE autocompletion and compile-time type checking
-
-### VS Code Extension
-
-- **DEVX-01**: VS Code syntax highlighting for .tenor files
-- **DEVX-02**: Inline error diagnostics via LSP
-- **DEVX-03**: Check-on-save
-- **DEVX-04**: Preview Agent Capabilities panel — shows what an agent would see when reading the contract
-
-### Agent Skill Examples
-
-- **SKEX-01**: `tenor agent` CLI tool turns any contract into an interactive shell
-- **SKEX-02**: Express middleware reference implementation generates routes from operations
-- **SKEX-03**: Slack bot reference implementation for contract interaction via chat
-- **SKEX-04**: Audit agent reference implementation generates compliance reports from provenance chains
-
-### Embedded Evaluator
-
-- **WASM-01**: Rust evaluator compiles to WASM
-- **WASM-02**: WASM evaluator runs in browser environments
-- **WASM-03**: WASM evaluator runs in Node.js
-- **WASM-04**: WASM evaluator runs in edge environments (Cloudflare Workers, Deno Deploy)
-- **WASM-05**: Embedded evaluator produces identical results to native Rust evaluator
+- [ ] **WASM-01**: Rust evaluator compiles to WASM
+- [ ] **WASM-02**: WASM evaluator runs in browser environments
+- [ ] **WASM-03**: WASM evaluator runs in Node.js
+- [ ] **WASM-04**: WASM evaluator runs in edge environments (Cloudflare Workers, Deno Deploy)
+- [ ] **WASM-05**: Embedded evaluator produces identical results to native Rust evaluator
 
 ## Deferred
 
@@ -103,21 +54,6 @@ Requirements for the Agent Tooling milestone. Each maps to roadmap phases 15-19.
 
 ## Traceability
 
-Which phases cover which requirements.
-
-### v1.0 (Complete)
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| SYS-01 through SYS-08 | Phase 12 | Complete |
-| ANLZ-09 through ANLZ-11 | Phase 12 | Complete |
-| EXEC-01, EXEC-02 | Phase 12 | Complete |
-| SPEC-09, SPEC-10 | Phase 12.1 | Complete |
-| DOMN-10 through DOMN-15 | Phase 13 | Complete |
-| DEVX-05 through DEVX-07 | Phase 14 | Complete |
-
-### Agent Tooling
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SDK-01 through SDK-05 | Phase 15 | Not started |
@@ -126,10 +62,8 @@ Which phases cover which requirements.
 | SKEX-01 through SKEX-04 | Phase 18 | Not started |
 | WASM-01 through WASM-05 | Phase 19 | Not started |
 
-**Coverage:**
-- v1.0 requirements: 24 total, 24 complete
-- Agent Tooling requirements: 22 total, 0 complete
+**Coverage:** 22 requirements, 0 complete
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after Agent Tooling milestone opened*
+*Last updated: 2026-02-22 after v1.0 milestone archival*

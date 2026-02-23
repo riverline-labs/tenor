@@ -1,27 +1,30 @@
 # External Integrations
 
-**Analysis Date:** 2026-02-21
+**Analysis Date:** 2026-02-22
 
 ## APIs & External Services
 
 **AI / LLM:**
-- Anthropic Messages API - Used by the `ambiguity` CLI subcommand to test whether an LLM can unambiguously evaluate Tenor contracts against fact sets and produce correct verdicts
-  - SDK/Client: `ureq` 3.2.0 (synchronous HTTP, no official Anthropic Rust SDK used)
+- Anthropic Claude API — used exclusively by the `ambiguity` subcommand to test whether an LLM can evaluate Tenor contracts and produce the same verdicts as the reference elaborator
+  - SDK/Client: `ureq` 3.2.0 (raw HTTP, no official Anthropic Rust SDK)
   - Endpoint: `https://api.anthropic.com/v1/messages`
-  - API Version header: `anthropic-version: 2023-06-01`
+  - API version header: `anthropic-version: 2023-06-01`
+  - Default model: `claude-sonnet-4-5-20250514` (overridable via `--model` flag)
   - Auth: `ANTHROPIC_API_KEY` environment variable
-  - Default model: `claude-sonnet-4-5-20250514` (overridable via `--model` CLI flag)
   - Implementation: `crates/cli/src/ambiguity/api.rs`
-  - Retry logic: exponential backoff (3 retries, starting 1000ms) on 429, 500, 503 responses
+  - Retry policy: 3 retries with exponential backoff (starting 1000ms, doubling) on HTTP 429/500/502/503 and network errors
 
 ## Data Storage
 
 **Databases:**
-- None — no database used anywhere in the codebase
+- None — no database of any kind
 
 **File Storage:**
-- Local filesystem only — contracts read from `.tenor` files, interchange JSON written to stdout or read from disk
-- Conformance suite fixtures stored as files under `conformance/`
+- Local filesystem only
+  - Source files: `.tenor` files read from user-specified paths
+  - Interchange bundles: `.json` files read/written to user-specified paths
+  - Conformance suite: `conformance/` directory tree read by `cargo run -p tenor-cli -- test conformance`
+  - Schema files: embedded at compile time (not read at runtime)
 
 **Caching:**
 - None
@@ -29,41 +32,47 @@
 ## Authentication & Identity
 
 **Auth Provider:**
-- None — the tool is a local CLI; no user authentication
-- The only auth is the `ANTHROPIC_API_KEY` env var for the AI ambiguity testing subcommand (see above)
+- None — the CLI has no user authentication
+- The only credential in the system is `ANTHROPIC_API_KEY` for the AI ambiguity testing subcommand (optional, feature degrades gracefully when absent)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None — errors are printed to stderr and exit codes signal failure
+- None — no error reporting service integrated
 
 **Logs:**
-- `eprintln!` to stderr for errors and informational messages; no structured logging library
+- `stderr` only — errors and diagnostic messages go to stderr; structured output goes to stdout
+- No log framework (no `tracing`, `log`, `env_logger`)
+- TAP v14 format output for conformance and ambiguity test runs (implemented in `crates/cli/src/tap.rs`)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Not deployed as a service; distributed as a compiled binary
+- No deployment target — this is a CLI toolchain, not a hosted service
 
 **CI Pipeline:**
 - GitHub Actions — `.github/workflows/ci.yml`
-- Triggers: push and PR to `main` and `v1` branches
+- Triggers: push/PR to `main` and `v1` branches
 - Runner: `ubuntu-latest`
-- Steps:
+- Steps (in order):
   1. `cargo build --workspace`
-  2. `cargo run -p tenor-cli -- test conformance` (conformance suite, 55 tests)
+  2. `cargo run -p tenor-cli -- test conformance` (conformance suite)
   3. `cargo test --workspace` (schema validation + unit tests)
   4. `cargo fmt --all -- --check`
   5. `cargo clippy --workspace -- -D warnings`
-- Build caching: `Swatinem/rust-cache@v2`
+- Rust toolchain action: `dtolnay/rust-toolchain@stable`
+- Build cache: `Swatinem/rust-cache@v2`
 
 ## Environment Configuration
 
 **Required env vars:**
-- `ANTHROPIC_API_KEY` - Only required for `tenor ambiguity` subcommand; the command skips gracefully (exits 0 with message) if not set
+- None for normal operation (`elaborate`, `validate`, `eval`, `test`, `diff`, `check`, `explain`)
+
+**Optional env vars:**
+- `ANTHROPIC_API_KEY` — enables `tenor ambiguity` subcommand; the command skips gracefully with an informational message if absent
 
 **Secrets location:**
-- No secrets files committed; API key sourced from environment only
+- No secrets committed to repo; `ANTHROPIC_API_KEY` is a runtime environment variable only
 
 ## Webhooks & Callbacks
 
@@ -71,8 +80,16 @@
 - None
 
 **Outgoing:**
-- None — the only outbound HTTP is the Anthropic API call in `crates/cli/src/ambiguity/api.rs`, which is user-initiated via CLI command
+- None (the Anthropic API call from `tenor ambiguity` is a user-initiated CLI invocation, not a webhook)
+
+## JSON Schema Registry
+
+**Schema $id URIs** (used for `$ref` resolution, not live network calls):
+- `https://tenor-lang.org/schemas/interchange/v1.0.0` — interchange bundle schema in `docs/interchange-schema.json`
+- `https://tenor-lang.org/schemas/manifest/v1.1.0` — manifest envelope schema in `docs/manifest-schema.json`
+
+These URIs are registered in-process at validation time via `jsonschema::options().with_resource(...)`. No live network requests are made to `tenor-lang.org` at runtime.
 
 ---
 
-*Integration audit: 2026-02-21*
+*Integration audit: 2026-02-22*

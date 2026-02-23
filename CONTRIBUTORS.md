@@ -26,5 +26,3 @@ This project uses protocols from the [Interpretive Adjudiciation Protocols](http
 - **[CFFP](https://github.com/riverline-labs/iap)** (Constraint-First Formalization Protocol) — invariant declaration, candidate formalisms, pressure testing via counterexamples, canonical form selection. Used for all construct additions (persona, outcome typing, shared types, migration semantics).
 - **[ADP](https://github.com/riverline-labs/iap)** (Adversarial Design Protocol) — design space mapping before formalization. Used to arrive at the §18 Contract Discovery & Agent Orientation design (Phase 3.4).
 - **[RCP](https://github.com/riverline-labs/iap)** (Reconciliation Protocol) — verifies consistency across multiple protocol run outputs. Used to reconcile §18 design decisions with existing spec commitments.
-
-See `docs/TENOR.md` §21 (Appendix B — Model Convergence Record) for the formal record of where AI contributors converged, diverged, and how divergences were resolved under pressure.

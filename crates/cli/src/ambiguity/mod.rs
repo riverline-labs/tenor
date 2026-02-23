@@ -40,11 +40,8 @@ pub struct AmbiguityResult {
 
 /// Result of running the full ambiguity suite.
 pub struct AmbiguityRunResult {
-    #[allow(dead_code)] // Public API: available for callers to inspect suite totals
     pub total: usize,
-    #[allow(dead_code)] // Public API: available for callers to inspect match count
     pub matches: usize,
-    #[allow(dead_code)] // Public API: available for callers to inspect mismatch count
     pub mismatches: usize,
     /// Hard errors: API failures after all retries, missing files, parse errors.
     /// LLM verdict mismatches are NOT hard errors.

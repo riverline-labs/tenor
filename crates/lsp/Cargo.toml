@@ -6,3 +6,8 @@ description = "Tenor Language Server Protocol implementation"
 
 [dependencies]
 tenor-core = { path = "../core" }
+tenor-analyze = { path = "../analyze" }
+lsp-server = { workspace = true }
+lsp-types = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }

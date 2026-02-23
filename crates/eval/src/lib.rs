@@ -99,7 +99,7 @@ pub fn evaluate_flow(
 
     // Execute the flow
     let mut flow_result =
-        flow::execute_flow(target_flow, &contract, &snapshot, &mut entity_states)?;
+        flow::execute_flow(target_flow, &contract, &snapshot, &mut entity_states, None)?;
 
     // Per spec Section 11.4: initiating_persona is recorded for provenance.
     // Flow-level persona authorization is delegated to step-level Operation

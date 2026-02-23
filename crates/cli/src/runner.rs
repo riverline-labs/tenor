@@ -1,6 +1,5 @@
 use crate::tap::Tap;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 /// Conformance suite runner.
 ///
@@ -253,17 +252,7 @@ fn run_manifest_test(tenor_path: &Path, expected_path: &Path, name: &str, tap: &
 
     match elaborate::elaborate(tenor_path) {
         Ok(bundle) => {
-            // Build manifest envelope (self-contained, same logic as main.rs)
-            let canonical = serde_json::to_string(&bundle)
-                .unwrap_or_else(|e| panic!("serialization error computing etag: {}", e));
-            let hash = Sha256::digest(canonical.as_bytes());
-            let etag = format!("{:x}", hash);
-
-            let mut map = serde_json::Map::new();
-            map.insert("bundle".to_string(), bundle);
-            map.insert("etag".to_string(), Value::String(etag));
-            map.insert("tenor".to_string(), Value::String("1.1".to_string()));
-            let manifest = Value::Object(map);
+            let manifest = crate::manifest::build_manifest(bundle);
 
             if json_equal(&manifest, &expected_json) {
                 tap.ok(&test_name);

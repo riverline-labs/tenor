@@ -432,17 +432,219 @@ fn explain_invalid_json_exits_1() {
 }
 
 // ──────────────────────────────────────────────
-// 9. Stub subcommands
+// 8b. Explain section completeness (drift detection)
+// ──────────────────────────────────────────────
+
+/// Verify that explain terminal output contains all expected sections
+/// with non-empty content. If a section silently disappears due to
+/// interchange format drift, this test will catch it.
+#[test]
+fn explain_terminal_sections_present_and_nonempty() {
+    let output = tenor()
+        .args(["explain", "domains/saas/saas_subscription.tenor"])
+        .output()
+        .expect("explain failed");
+
+    assert!(output.status.success(), "explain should exit 0");
+    let stdout = String::from_utf8(output.stdout).expect("invalid UTF-8");
+
+    // All four sections must be present
+    assert!(
+        stdout.contains("CONTRACT SUMMARY"),
+        "missing CONTRACT SUMMARY section"
+    );
+    assert!(
+        stdout.contains("DECISION FLOW NARRATIVE"),
+        "missing DECISION FLOW NARRATIVE section"
+    );
+    assert!(
+        stdout.contains("FACT INVENTORY"),
+        "missing FACT INVENTORY section"
+    );
+    assert!(
+        stdout.contains("RISK / COVERAGE NOTES"),
+        "missing RISK / COVERAGE NOTES section"
+    );
+
+    // Contract summary has content (entity, persona, rule, operation counts)
+    assert!(
+        stdout.contains("Name:"),
+        "CONTRACT SUMMARY missing Name line"
+    );
+    assert!(
+        stdout.contains("Entities:"),
+        "CONTRACT SUMMARY missing Entities line"
+    );
+    assert!(
+        stdout.contains("Personas:"),
+        "CONTRACT SUMMARY missing Personas line"
+    );
+    assert!(
+        stdout.contains("Rules:"),
+        "CONTRACT SUMMARY missing Rules line"
+    );
+    assert!(
+        stdout.contains("Operations:"),
+        "CONTRACT SUMMARY missing Operations line"
+    );
+    assert!(
+        stdout.contains("Facts:"),
+        "CONTRACT SUMMARY missing Facts line"
+    );
+    assert!(
+        stdout.contains("Flows:"),
+        "CONTRACT SUMMARY missing Flows line"
+    );
+
+    // Flow narrative has flow content
+    assert!(
+        stdout.contains("Flow:"),
+        "DECISION FLOW NARRATIVE has no flow entries"
+    );
+    assert!(
+        stdout.contains("Entry point:"),
+        "DECISION FLOW NARRATIVE missing Entry point"
+    );
+
+    // Fact inventory has table content
+    assert!(
+        stdout.contains("FACT") && stdout.contains("TYPE") && stdout.contains("SOURCE"),
+        "FACT INVENTORY missing table header"
+    );
+
+    // Risk coverage has analysis results
+    assert!(
+        stdout.contains("[ok]") || stdout.contains("[!!]"),
+        "RISK / COVERAGE NOTES has no analysis results"
+    );
+}
+
+/// Verify that explain markdown output contains all expected sections
+/// with proper markdown formatting.
+#[test]
+fn explain_markdown_sections_present_and_nonempty() {
+    let output = tenor()
+        .args([
+            "explain",
+            "domains/saas/saas_subscription.tenor",
+            "--format",
+            "markdown",
+        ])
+        .output()
+        .expect("explain failed");
+
+    assert!(
+        output.status.success(),
+        "explain --format markdown should exit 0"
+    );
+    let stdout = String::from_utf8(output.stdout).expect("invalid UTF-8");
+
+    // All four sections as markdown headers
+    assert!(
+        stdout.contains("## CONTRACT SUMMARY"),
+        "missing ## CONTRACT SUMMARY"
+    );
+    assert!(
+        stdout.contains("## DECISION FLOW NARRATIVE"),
+        "missing ## DECISION FLOW NARRATIVE"
+    );
+    assert!(
+        stdout.contains("## FACT INVENTORY"),
+        "missing ## FACT INVENTORY"
+    );
+    assert!(
+        stdout.contains("## RISK / COVERAGE NOTES"),
+        "missing ## RISK / COVERAGE NOTES"
+    );
+
+    // Markdown-specific formatting: backtick-quoted names, table
+    assert!(
+        stdout.contains('`'),
+        "markdown output should contain backtick-quoted identifiers"
+    );
+    assert!(
+        stdout.contains("| Fact |"),
+        "FACT INVENTORY should use markdown table"
+    );
+    assert!(
+        stdout.contains("|---"),
+        "FACT INVENTORY should have markdown table separator"
+    );
+
+    // Markdown risk section uses checkbox syntax
+    assert!(
+        stdout.contains("- [x]") || stdout.contains("- [ ]"),
+        "RISK / COVERAGE NOTES should use markdown checkbox syntax"
+    );
+}
+
+// ──────────────────────────────────────────────
+// 9. Generate subcommand
 // ──────────────────────────────────────────────
 
 #[test]
-fn generate_exits_2_not_implemented() {
+fn generate_typescript_from_json_exits_0() {
+    let dir = tempfile::tempdir().expect("temp dir");
     tenor()
-        .args(["generate", "bundle.json", "--target", "typescript"])
+        .args([
+            "generate",
+            "typescript",
+            "conformance/positive/operation_basic.expected.json",
+            "--out",
+            dir.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Generated TypeScript"));
+}
+
+#[test]
+fn generate_typescript_from_tenor_exits_0() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    tenor()
+        .args([
+            "generate",
+            "typescript",
+            "conformance/positive/operation_basic.tenor",
+            "--out",
+            dir.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Generated TypeScript"));
+}
+
+#[test]
+fn generate_typescript_nonexistent_file_exits_1() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    tenor()
+        .args([
+            "generate",
+            "typescript",
+            "nonexistent.json",
+            "--out",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
-        .code(2)
-        .stderr(predicate::str::contains("not yet implemented"));
+        .code(1);
+}
+
+#[test]
+fn generate_typescript_unsupported_type_exits_1() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    tenor()
+        .args([
+            "generate",
+            "typescript",
+            "README.md",
+            "--out",
+            dir.path().to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("unsupported input file type"));
 }
 
 // ──────────────────────────────────────────────

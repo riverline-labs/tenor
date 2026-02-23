@@ -75,10 +75,13 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
     bundle.insert("constructs".to_owned(), Value::Array(result));
     bundle.insert("id".to_owned(), Value::String(bundle_id.to_owned()));
     bundle.insert("kind".to_owned(), Value::String("Bundle".to_owned()));
-    bundle.insert("tenor".to_owned(), Value::String("1.0".to_owned()));
+    bundle.insert(
+        "tenor".to_owned(),
+        Value::String(crate::TENOR_VERSION.to_owned()),
+    );
     bundle.insert(
         "tenor_version".to_owned(),
-        Value::String("1.1.0".to_owned()),
+        Value::String(crate::TENOR_BUNDLE_VERSION.to_owned()),
     );
     Value::Object(bundle)
 }
@@ -125,7 +128,7 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             m.insert("kind".to_owned(), json!("Fact"));
             m.insert("provenance".to_owned(), serialize_prov(prov));
             m.insert("source".to_owned(), serialize_source(source));
-            m.insert("tenor".to_owned(), json!("1.0"));
+            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
             m.insert("type".to_owned(), serialize_type(type_));
             Value::Object(m)
         }
@@ -147,7 +150,7 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             }
             m.insert("provenance".to_owned(), serialize_prov(prov));
             m.insert("states".to_owned(), json!(states));
-            m.insert("tenor".to_owned(), json!("1.0"));
+            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
             let t_arr: Vec<Value> = transitions
                 .iter()
                 .map(|(f, to, _)| {
@@ -185,7 +188,7 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             m.insert("kind".to_owned(), json!("Rule"));
             m.insert("provenance".to_owned(), serialize_prov(prov));
             m.insert("stratum".to_owned(), json!(stratum));
-            m.insert("tenor".to_owned(), json!("1.0"));
+            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::Operation {
@@ -225,7 +228,7 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
                 serialize_expr(precondition, fact_types),
             );
             m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("tenor".to_owned(), json!("1.0"));
+            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::Flow {
@@ -246,7 +249,7 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
                 "steps".to_owned(),
                 serialize_steps(steps, entry, fact_types),
             );
-            m.insert("tenor".to_owned(), json!("1.0"));
+            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::Persona { id, prov } => {
@@ -254,7 +257,7 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             m.insert("id".to_owned(), json!(id));
             m.insert("kind".to_owned(), json!("Persona"));
             m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("tenor".to_owned(), json!("1.0"));
+            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::System {
@@ -1011,7 +1014,7 @@ fn serialize_system(
     m.insert("shared_personas".to_owned(), Value::Array(personas_arr));
 
     // tenor
-    m.insert("tenor".to_owned(), json!("1.0"));
+    m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
 
     // triggers: sorted by (source_contract, source_flow, target_contract, target_flow)
     let mut sorted_triggers: Vec<&RawTrigger> = triggers.iter().collect();

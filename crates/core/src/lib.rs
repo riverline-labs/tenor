@@ -18,6 +18,11 @@
 //! Individual pass entry functions are also re-exported for selective
 //! pipeline execution.
 
+/// Tenor spec version used in per-construct `"tenor"` fields (e.g., "1.0").
+pub const TENOR_VERSION: &str = "1.0";
+/// Tenor interchange bundle version (semver, e.g., "1.1.0").
+pub const TENOR_BUNDLE_VERSION: &str = "1.1.0";
+
 pub mod ast;
 pub mod elaborate;
 pub mod error;

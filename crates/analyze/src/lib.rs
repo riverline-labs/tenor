@@ -28,7 +28,7 @@ pub use s2_reachability::{ReachabilityResult, S2Result};
 pub use s3a_admissibility::{AdmissibilityKey, S3aResult};
 pub use s4_authority::{AuthorityMap, CrossContractAuthority, S4Result, TransitionAuthority};
 pub use s5_verdicts::{S5Result, VerdictTypeInfo};
-pub use s6_flow_paths::{CrossContractFlowPath, FlowPathResult, S6Result};
+pub use s6_flow_paths::{CrossContractFlowPath, FlowPathConfig, FlowPathResult, S6Result};
 pub use s7_complexity::{FlowDepthBound, PredicateComplexity, S7Result};
 pub use s8_verdict_uniqueness::S8Result;
 
@@ -179,13 +179,14 @@ pub fn analyze_selected(
 mod tests {
     use super::*;
     use serde_json::json;
+    use tenor_core::TENOR_BUNDLE_VERSION;
 
     fn make_test_bundle() -> serde_json::Value {
         json!({
             "id": "test_bundle",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.0.0",
+            "tenor_version": TENOR_BUNDLE_VERSION,
             "constructs": [
                 {
                     "id": "Order",

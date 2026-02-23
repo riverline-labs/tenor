@@ -1,0 +1,9 @@
+version: "3.8"
+services:
+  evaluator:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./domains:/contracts:ro
+    command: ["/contracts/saas/saas_subscription.tenor"]

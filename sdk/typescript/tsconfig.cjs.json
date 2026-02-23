@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "strict": true,
+    "esModuleInterop": true,
+    "declaration": false,
+    "outDir": "dist/cjs",
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "lib": ["ES2022"],
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests"]
+}
