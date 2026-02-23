@@ -1,238 +1,273 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-02-22
+**Analysis Date:** 2026-02-23
 
 ## Tech Debt
 
-**Stub CLI command — `generate` is unimplemented:**
-- Issue: The `generate` subcommand is dispatched via `stub_not_implemented("generate", ...)`, exits with code 2, and produces no output.
-- Files: `crates/cli/src/main.rs:177-178`, `crates/codegen/src/lib.rs` (placeholder doc comment only)
-- Impact: Codegen (Phase 6) is not functional. Any caller of `tenor generate` receives a runtime error.
-- Fix approach: Implement `tenor-codegen` crate and wire up `cmd_generate` in `main.rs`.
+**Triplicated interchange JSON deserialization across crates:**
+- Issue: Three crates independently deserialize the same interchange JSON into different Rust struct hierarchies: `tenor-eval` (`crates/eval/src/types.rs` -- `Contract`, `TypeSpec`, `Predicate`, etc.), `tenor-analyze` (`crates/analyze/src/bundle.rs` -- `AnalysisEntity`, `AnalysisFact`, etc.), and `tenor-codegen` (`crates/codegen/src/bundle.rs` -- `CodegenFact`, `CodegenEntity`, `TypeInfo`, etc.). Each has its own `from_interchange()` parser with its own error handling. Any interchange format change must be synchronized across all three.
+- Files: `crates/eval/src/types.rs:314-361`, `crates/analyze/src/bundle.rs:1-774`, `crates/codegen/src/bundle.rs:126-365`
+- Impact: Tripled maintenance burden on interchange schema changes. Drift between crates means one crate may silently handle a field that another ignores. The `explain.rs` module is even worse -- it uses raw `serde_json::Value` traversal with no typed deserialization at all.
+- Fix approach: Extract a shared `tenor-interchange` crate (or add shared types to `tenor-core`) that provides typed deserialization from interchange JSON. All downstream crates consume these shared types.
 
-**Placeholder crates with no implementation:**
-- Issue: `crates/codegen/src/lib.rs` and `crates/lsp/src/lib.rs` contain only a doc comment pointing to a future phase. No structs, functions, or public API exist.
-- Files: `crates/codegen/src/lib.rs`, `crates/lsp/src/lib.rs`
-- Impact: Phases 6 (code generation) and 8 (LSP) cannot be used.
-- Fix approach: Implement per published phase plans.
-
-**Duplicated manifest/etag logic in two places:**
-- Issue: `build_manifest` and `compute_etag` are defined in `crates/cli/src/main.rs:191-208` and then reimplemented inline in `crates/cli/src/runner.rs:257-265`. Any change to manifest format must be made in both places.
-- Files: `crates/cli/src/main.rs:191`, `crates/cli/src/runner.rs:257`
-- Impact: Conformance tests can diverge from CLI output if the two implementations drift.
-- Fix approach: Extract `build_manifest` and `compute_etag` into a shared module (e.g., `crates/cli/src/manifest.rs`) and use it from both `main.rs` and `runner.rs`.
+**Duplicated manifest/etag logic:**
+- Issue: `build_manifest` and `compute_etag` exist in `crates/cli/src/manifest.rs` and are also inlined in `crates/cli/src/runner.rs`. The runner reimplements etag computation for conformance tests.
+- Files: `crates/cli/src/manifest.rs`, `crates/cli/src/runner.rs`
+- Impact: Manifest format changes must be made in two places or conformance tests diverge from CLI output.
+- Fix approach: Have `runner.rs` import from `manifest.rs` directly.
 
 **Hardcoded version strings scattered across codebase:**
-- Issue: `"1.0"` and `"1.1.0"` are hard-coded as string literals in 9+ locations in `pass6_serialize.rs`, and the manifest `"tenor"` field is separately hard-coded to `"1.1"` in `main.rs` and `runner.rs`. When the protocol version advances, every site must be found and updated manually.
-- Files: `crates/core/src/pass6_serialize.rs:78,80,128,150,188,228,249,257,1014`, `crates/cli/src/main.rs:206`, `crates/cli/src/runner.rs:265`
-- Impact: Version bumps are error-prone; tests checking `"tenor_version": "1.0.0"` in `crates/analyze/src/bundle.rs:567` and `crates/analyze/src/lib.rs:188` may break on a protocol update.
-- Fix approach: Define a single `TENOR_BUNDLE_VERSION` and `TENOR_MANIFEST_VERSION` constant in `crates/core` and reference them from all serialization and test fixture helpers.
+- Issue: `"1.0"` and `"1.1.0"` are hard-coded as string literals in `pass6_serialize.rs`, and the manifest `"tenor"` field is separately hard-coded in `main.rs` and `runner.rs`. When the protocol version advances, every site must be found and updated manually.
+- Files: `crates/core/src/pass6_serialize.rs` (multiple locations), `crates/cli/src/main.rs`, `crates/cli/src/runner.rs`
+- Impact: Version bumps are error-prone.
+- Fix approach: A `TENOR_BUNDLE_VERSION` constant exists in `crates/core/src/lib.rs`. Verify all serialization sites reference it.
 
-**Stale `"tenor_version": "1.0.0"` in analyze-crate test helpers:**
-- Issue: `make_bundle()` in `crates/analyze/src/bundle.rs:567` and `crates/analyze/src/lib.rs:188` creates test bundles with `"tenor_version": "1.0.0"`, while the elaborator now emits `"1.1.0"`. If schema validation is ever enabled in those tests, they will fail.
-- Files: `crates/analyze/src/bundle.rs:561-568`, `crates/analyze/src/lib.rs:185-194`
-- Impact: Silent inconsistency; likely to cause failures when schema validation is tightened.
-- Fix approach: Update test helpers to use the current version constant.
+**`explain.rs` uses untyped JSON traversal with 75+ silent fallbacks:**
+- Issue: `crates/cli/src/explain.rs` (1,478 lines) traverses interchange JSON using raw `.get()`, `.as_str()`, `.as_array()` etc. with `.unwrap_or("")` or `.unwrap_or_default()` fallbacks throughout. If the interchange format changes a key name, sections silently disappear from explain output with no error.
+- Files: `crates/cli/src/explain.rs`
+- Impact: Any interchange format evolution silently breaks the explain feature.
+- Fix approach: Use the same typed deserialization as `tenor-eval` or a shared interchange crate.
 
-**`spec_sections` field loaded but never consumed:**
-- Issue: `AmbiguityTestCase.spec_sections` in `crates/cli/src/ambiguity/mod.rs:27-28` is annotated `#[allow(dead_code)] // Loaded for future use` and is never read after population. This is future-intent dead code.
+**`spec_sections` field loaded but never consumed in ambiguity testing:**
+- Issue: `AmbiguityTestCase.spec_sections` in `crates/cli/src/ambiguity/mod.rs:27-28` is annotated `#[allow(dead_code)]` and never read after population.
 - Files: `crates/cli/src/ambiguity/mod.rs:27`, `crates/cli/src/ambiguity/fixtures.rs`
-- Impact: Spec-targeted prompting cannot function until this is wired through.
-- Fix approach: Either remove the field until the feature is ready, or implement spec-section injection into prompts.
+- Impact: Spec-targeted prompting cannot function until wired through.
+- Fix approach: Either remove the field or implement spec-section injection into prompts.
 
-**`AmbiguityRunResult` public fields are all `#[allow(dead_code)]`:**
-- Issue: Three of four fields on `AmbiguityRunResult` (`total`, `matches`, `mismatches`) are suppressed with dead-code allows. The struct is returned from `run_ambiguity_suite` but the caller in `cmd_ambiguity` only checks `hard_errors`.
-- Files: `crates/cli/src/ambiguity/mod.rs:43-51`, `crates/cli/src/main.rs:758-778`
-- Impact: Match/mismatch stats are computed but never surfaced in the CLI exit code or summary.
-- Fix approach: Use the counts to set a non-zero exit code when mismatches exceed a threshold, or at minimum print a summary line.
+**Multiple `#[allow(dead_code)]` annotations in LSP crate:**
+- Issue: `crates/lsp/src/semantic_tokens.rs` has 12 `#[allow(dead_code)]` annotations on semantic token type constants. `crates/lsp/src/navigation.rs` has 3 `#[allow(dead_code)]` on struct fields. This suggests features that were defined but not fully integrated.
+- Files: `crates/lsp/src/semantic_tokens.rs:15-37`, `crates/lsp/src/navigation.rs:714-767`
+- Impact: Dead code adds cognitive overhead and may mask actual integration gaps.
+- Fix approach: Wire unused token types into the semantic token provider or remove them.
 
 ---
 
 ## Known Bugs
 
-**Date format validation accepts structurally valid but semantically invalid dates:**
-- Symptoms: `"2024-99-99"` passes `validate_date_format` in the evaluator because the check only tests digit positions and separators, not calendar correctness (month 1-12, day 1-31).
-- Files: `crates/eval/src/assemble.rs:71-81` (comment says "Does NOT validate actual date correctness")
-- Trigger: Provide `"2024-13-45"` as a `Date` fact; it will be accepted without error.
-- Workaround: None currently; validation would require adding a date-parsing dependency or inline calendar logic.
+**Date format validation accepts semantically invalid dates:**
+- Symptoms: `"2024-99-99"` passes `validate_date_format` in the evaluator because the check only tests digit positions and separators, not calendar correctness.
+- Files: `crates/eval/src/assemble.rs` (comment says "Does NOT validate actual date correctness")
+- Trigger: Provide `"2024-13-45"` as a `Date` fact; it is accepted without error.
+- Workaround: The `time` crate is already a dependency of `tenor-eval` and can parse dates properly.
 
-**DateTime validation only checks the `T` separator, not the time portion:**
-- Symptoms: `validate_datetime_format` at `crates/eval/src/assemble.rs:87-91` accepts any string matching `YYYY-MM-DDT` followed by arbitrary characters, including `"2024-01-15Tgarbage"`.
-- Files: `crates/eval/src/assemble.rs:84-92`
+**DateTime validation only checks the `T` separator:**
+- Symptoms: `validate_datetime_format` accepts any string matching `YYYY-MM-DDT` followed by arbitrary characters, including `"2024-01-15Tgarbage"`.
+- Files: `crates/eval/src/assemble.rs`
 - Trigger: Provide any Date-valid prefix plus `T` plus any suffix.
-- Workaround: None.
+- Workaround: Use `time` crate's ISO 8601 parsing to validate the full datetime.
 
 ---
 
 ## Security Considerations
 
-**Anthropic API key transmitted in HTTP request headers:**
-- Risk: The API key from `ANTHROPIC_API_KEY` is sent as an `x-api-key` header in cleartext HTTP calls to `api.anthropic.com`. No TLS pinning is applied — ureq defaults to system roots.
-- Files: `crates/cli/src/ambiguity/api.rs:104-108`
-- Current mitigation: ureq uses HTTPS by default; system TLS is in use.
-- Recommendations: This is acceptable for a developer CLI tool. Document that the key must be scoped to ambiguity testing and never used in production pipelines.
+**`unsafe` block in serve.rs for signal handling:**
+- Risk: `crates/cli/src/serve.rs:96-106` uses an `unsafe` block to install C signal handlers via `libc::signal()`. The signal handler writes to an `AtomicBool` which is safe, but the `unsafe` block itself is the only one in the codebase and uses raw function pointer casts.
+- Files: `crates/cli/src/serve.rs:96-110`
+- Current mitigation: The signal handler only performs an atomic store, which is async-signal-safe.
+- Recommendations: Consider using the `ctrlc` crate or `signal-hook` for safe signal handling, especially before the hosted service milestone.
 
-**Import path traversal is not restricted to a sandbox directory:**
-- Risk: A `.tenor` file can contain `import "../../../etc/passwd"` (or any absolute or `..`-relative path). The elaborator will attempt to read and parse any file the invoking user can access.
-- Files: `crates/core/src/pass1_bundle.rs:167` (`base_dir.join(import_path)` with no prefix check)
-- Current mitigation: Import paths are limited by OS filesystem permissions of the invoking process. The tool is a CLI intended to be run by the contract author, so this is low risk in the current use case.
-- Recommendations: If tenor-core is ever embedded in a server or multi-tenant environment, add a `jail_to_dir` check that rejects any resolved path outside the root contract's directory.
+**HTTP server has no authentication, rate limiting, or CORS:**
+- Risk: `tenor serve` exposes `/elaborate`, `/evaluate`, and `/explain` endpoints on `0.0.0.0` with no authentication, no rate limiting, and no CORS headers. Any network-accessible caller can elaborate arbitrary `.tenor` source, evaluate arbitrary contracts, and consume CPU.
+- Files: `crates/cli/src/serve.rs:33-90`
+- Current mitigation: Designed as a local development tool. Docker mounts contracts read-only.
+- Recommendations: For the Hosted Evaluator Service milestone, this server architecture needs complete rework: add API key authentication, request rate limiting, CORS configuration, and input size validation beyond the 10MB body limit.
 
-**Hardcoded model name in ambiguity testing:**
-- Risk: `DEFAULT_MODEL = "claude-sonnet-4-5-20250514"` in `crates/cli/src/ambiguity/api.rs:12` is a snapshot model version. If Anthropic deprecates this model, the ambiguity suite silently breaks for anyone not passing `--model`.
-- Files: `crates/cli/src/ambiguity/api.rs:12`
-- Current mitigation: `--model` flag allows override.
-- Recommendations: Use a non-dated alias like `claude-sonnet-4-5` as default, or document the specific model requirement in the CLI help text.
+**Single-threaded request handling in serve.rs:**
+- Risk: The HTTP server handles one request at a time in a loop (`handle_request(request, &state)` on line 86). A slow elaboration or evaluation blocks all other requests. A malicious client sending a large contract with deeply nested constructs could cause a denial of service.
+- Files: `crates/cli/src/serve.rs:74-87`
+- Current mitigation: Only designed for local use.
+- Recommendations: For hosted service, switch to an async runtime (tokio + axum/actix-web) or at minimum spawn requests on threads.
+
+**Elaborate endpoint writes user-supplied content to temp files:**
+- Risk: The `/elaborate` POST handler writes user-supplied `source` content to a temp file on disk (`crates/cli/src/serve.rs:340-357`), then calls the elaborator on it. The elaborator's import resolution could follow `import` directives in the user-supplied content to read other files on the server.
+- Files: `crates/cli/src/serve.rs:324-378`
+- Current mitigation: The import sandbox in `pass1_bundle.rs:202` restricts imports to the contract root directory, which is the temp directory in this case.
+- Recommendations: Validate that the sandbox restriction actually prevents escape from the temp directory. Add explicit input sanitization.
+
+**Import path sandbox relies on canonicalization:**
+- Risk: Import path traversal protection in `crates/core/src/pass1_bundle.rs:202` uses `canon_import.starts_with(sandbox_root)` after canonicalization. This is sound on Unix but symlink resolution behavior can vary across platforms.
+- Files: `crates/core/src/pass1_bundle.rs:185-215`
+- Current mitigation: Canonicalization resolves symlinks before the check, which is correct behavior.
+- Recommendations: Add conformance tests specifically exercising import escape attempts (the `import_escape` fixture appears to exist).
 
 ---
 
 ## Performance Bottlenecks
 
 **O(k * n) stratum rule evaluation:**
-- Problem: `eval_strata` in `crates/eval/src/rules.rs:29-41` iterates all rules once to find `max_stratum`, then performs a full linear scan of all rules per stratum. For k strata and n rules, this is O(k * n) total rule traversals.
-- Files: `crates/eval/src/rules.rs:29-41`
-- Cause: `contract.rules` is a `Vec<Rule>` with no stratum index. A `BTreeMap<u32, Vec<&Rule>>` precomputed once would eliminate the repeated scans.
-- Improvement path: Build the stratum map once in `eval_strata` (same approach `pass6_serialize.rs` already uses).
-
-**O(n) operation lookup per flow step:**
-- Problem: Inside `execute_flow`'s hot loop, every `OperationStep` performs a linear scan of `contract.operations` via `.iter().find(|o| o.id == *op)`.
-- Files: `crates/eval/src/flow.rs:258-264`
-- Cause: `Contract.operations` is a plain `Vec<Operation>`. Contracts with many operations and long flows will do O(steps * operations) work.
-- Improvement path: Pre-index `contract.operations` into a `HashMap<&str, &Operation>` before entering the step loop — the same pattern already used for `step_index` at `flow.rs:218-222`.
-
-**O(n) operation lookup during compensation:**
-- Problem: Compensation steps in `handle_failure` also call `contract.operations.iter().find(...)` at `crates/eval/src/flow.rs:111-113`, outside the main step loop but on a cold path without the step-level index.
-- Files: `crates/eval/src/flow.rs:110-113`
-- Improvement path: Share the same operation index built for the main step loop.
+- Problem: `eval_strata` in `crates/eval/src/rules.rs` iterates all rules once to find `max_stratum`, then performs a full linear scan per stratum.
+- Files: `crates/eval/src/rules.rs`
+- Cause: `contract.rules` is a `Vec<Rule>` with no stratum index.
+- Improvement path: Build a `BTreeMap<u32, Vec<&Rule>>` once at the start of evaluation.
 
 **Frequent deep clones in flow execution:**
-- Problem: `handle_failure` clones the entire `steps_executed` and `entity_changes_all` vectors when producing intermediate `FlowResult` values (e.g., `flow.rs:103-104`). This is called on every `Terminate` failure handler.
+- Problem: `handle_failure` in `crates/eval/src/flow.rs:101-106` clones entire `steps_executed` and `entity_changes_all` vectors when producing intermediate `FlowResult` values.
 - Files: `crates/eval/src/flow.rs:101-106`
 - Cause: `FlowResult` owns its vectors, so intermediate returns must clone.
-- Improvement path: Collect results in a shared accumulator and only build `FlowResult` at return sites, passing references or using `Arc`.
+- Improvement path: Collect results in a shared accumulator and only build `FlowResult` at return sites.
 
 **Linear import cycle detection using `Vec::contains`:**
-- Problem: `stack.contains(&canon)` in `pass1_bundle.rs` at lines 104 and 181 is O(n) where n is the current import stack depth. For deep import trees this is called on each import, making cycle detection O(depth^2).
-- Files: `crates/core/src/pass1_bundle.rs:104`, `crates/core/src/pass1_bundle.rs:181`
-- Cause: `stack` is a `Vec<PathBuf>` used as a set.
-- Improvement path: Maintain a parallel `HashSet<PathBuf>` for O(1) membership tests alongside the existing `visited` set.
+- Problem: `stack.contains(&canon)` in `pass1_bundle.rs:120,217` is O(n) where n is import stack depth.
+- Files: `crates/core/src/pass1_bundle.rs:120`, `crates/core/src/pass1_bundle.rs:217`
+- Improvement path: Maintain a parallel `HashSet<PathBuf>` for O(1) membership tests.
 
-**Excessive string allocations in `pass6_serialize.rs`:**
-- Problem: `pass6_serialize.rs` contains 184 `.to_owned()` or `.to_string()` calls in production (not test) code; the serializer reconstructs owned `String` values for every field at every construct on every elaboration invocation.
+**Excessive string allocations in pass6_serialize.rs:**
+- Problem: The serializer reconstructs owned `String` values for every field at every construct on every elaboration invocation. The 1,044-line file is allocation-heavy.
 - Files: `crates/core/src/pass6_serialize.rs`
-- Cause: `serde_json::Map` requires `String` keys; no caching or intern strategy is used.
-- Improvement path: Low priority for CLI use. For library embedding, consider `Arc<str>` or Cow-based keys.
+- Improvement path: Low priority for CLI use. For WASM embedding, consider `Cow<'_, str>` or string interning.
 
 ---
 
 ## Fragile Areas
 
-**`pass5_validate.rs` — multiple `unwrap()` calls with SAFETY comments that depend on invariants maintained by caller:**
-- Files: `crates/core/src/pass5_validate.rs:716`, `crates/core/src/pass5_validate.rs:828`, `crates/core/src/pass5_validate.rs:1326`
-- Why fragile: Each `unwrap()` has a `// SAFETY:` comment stating the precondition (e.g., "all neighbors were inserted into `in_degree`"). If a future refactor changes the construction of `in_degree` or `path`, the assumption silently breaks and the elaborator panics on user input.
-- Safe modification: Replace each with an `expect("...")` that includes the invariant text, or better, return a proper `ElabError` rather than panicking.
-- Test coverage: Covered by negative conformance tests for cycles, but no unit tests directly exercise the unwrap sites.
+**`pass5_validate.rs` -- `expect()` calls that depend on caller-maintained invariants:**
+- Files: `crates/core/src/pass5_validate.rs:842`, `crates/core/src/pass5_validate.rs:1343`
+- Why fragile: Each `.expect()` has a safety comment stating the precondition. If a refactor changes the data structure construction, the elaborator panics on user input instead of returning an error.
+- Safe modification: Replace with proper `ElabError` returns.
+- Test coverage: Covered by negative conformance tests for cycles, but no unit tests directly exercise the expect sites.
 
-**`pass3_types.rs` — `unwrap()` on `in_stack.iter().position()` assumes cycle detection is always reliable:**
-- Files: `crates/core/src/pass3_types.rs:47`, `crates/core/src/pass3_types.rs:52`, `crates/core/src/pass3_types.rs:54`, `crates/core/src/pass3_types.rs:84`
-- Why fragile: `decls.get(back_edge_name.as_str()).unwrap()` will panic if the back-edge name computed from `in_stack` is not present in `decls`. This invariant holds as long as the recursive DFS only adds items that are in `decls`, but would break if the entry logic changes.
-- Safe modification: Replace with a proper error return.
+**`pass3_types.rs` -- `expect()` on `in_stack.iter().position()` in cycle detection:**
+- Files: `crates/core/src/pass3_types.rs:49`, `crates/core/src/pass3_types.rs:55`, `crates/core/src/pass3_types.rs:98`
+- Why fragile: These expect calls depend on the recursive DFS only adding items that are in `decls`. The invariant is currently upheld but not enforced by types.
+- Safe modification: Replace with error returns.
 
-**`pass4_typecheck.rs` — `unwrap()` on min/max of an always-4-element array:**
-- Files: `crates/core/src/pass4_typecheck.rs:177-178`
-- Why fragile: `products.iter().min().unwrap()` depends on `products` being non-empty. The array literal at line 175 has exactly 4 elements, making this safe today. Any refactor that extracts that code into a helper without preserving the invariant will panic.
-- Safe modification: Use `products.iter().copied().min().expect("products is non-empty array")`.
+**`pass4_typecheck.rs` -- `expect()` on min/max of a hardcoded 4-element array:**
+- Files: `crates/core/src/pass4_typecheck.rs:179`, `crates/core/src/pass4_typecheck.rs:183`
+- Why fragile: `products.iter().min().expect(...)` depends on `products` being non-empty. Safe today because the array literal has exactly 4 elements, but would break if the logic is refactored.
+- Safe modification: Use `.copied().min().expect("products is non-empty")` or return an error.
 
-**`explain.rs` — untyped JSON traversal with silent `unwrap_or` fallbacks:**
-- Files: `crates/cli/src/explain.rs`
-- Why fragile: 75 `.as_str()`, `.as_array()`, `.as_object()` etc. calls return `Option` and fall back to empty strings or empty vecs via `.unwrap_or(...)` or `.unwrap_or_default()`. If the interchange format changes a key name or type, the explain output silently drops entire sections without error.
-- Safe modification: Deserialize the interchange bundle into a typed Rust struct before passing to `explain`, using the same typed deserialization already used by `tenor-eval`.
-- Test coverage: CLI integration tests check for non-empty output; they will not catch dropped sections.
+**Flow step limit of 1000 is a hardcoded constant:**
+- Files: `crates/eval/src/flow.rs:234`
+- Why fragile: `let max_steps = max_steps.unwrap_or(1000)` -- the function accepts `Option<usize>` but the default is a magic number. Legitimate multi-step flows could hit this limit unexpectedly.
+- Safe modification: Make the default configurable or document it clearly.
 
-**Flow step limit of 1000 is a magic number with no configuration:**
-- Files: `crates/eval/src/flow.rs:228`
-- Why fragile: The limit is a local variable initialized at execution time (`let max_steps = 1000`). There is no way for callers to configure a different limit. Legitimate multi-step flows with many loop-backs would fail unexpectedly.
-- Safe modification: Accept an optional `max_steps: Option<usize>` parameter in `execute_flow`, defaulting to 1000.
+**Parser has no error recovery -- first error aborts:**
+- Files: `crates/core/src/parser.rs:1-1598`
+- Why fragile: The parser is a single-pass recursive descent parser that returns `Result<_, ElabError>` on the first error. Users get one error message per invocation, making iterative fixing painful. The LSP diagnostics module has to work around this.
+- Safe modification: Add error recovery at construct boundaries (skip to next `}` or next keyword after an error). This is important for LSP quality.
 
 ---
 
 ## Scaling Limits
 
-**Path enumeration in S6 analysis caps at 10,000 paths and 1,000 depth:**
+**Path enumeration in S6 analysis caps at 10,000 paths:**
 - Current capacity: Up to 10,000 distinct paths, 1,000 step depth per flow.
-- Limit: At `MAX_PATHS = 10_000` the enumeration truncates; `FlowPathResult.truncated` is set true. Analysis results for complex flows are incomplete.
+- Limit: At `MAX_PATHS = 10_000` the enumeration truncates and `FlowPathResult.truncated` is set.
 - Files: `crates/analyze/src/s6_flow_paths.rs:15-17`
-- Scaling path: Make `MAX_PATHS` and `MAX_DEPTH` configurable via the analysis API or CLI flags.
+- Scaling path: Make limits configurable via analysis API or CLI flags.
 
-**`Contract` uses `Vec` for all collections — no indexed access:**
+**`Contract` uses `Vec` for all collections -- no indexed access:**
 - Current capacity: Works well for contracts with tens to low hundreds of constructs.
-- Limit: For very large contracts (hundreds of rules, operations, flows), any pattern requiring lookup by ID (e.g., operation lookup per flow step) degrades to O(n).
+- Limit: Lookup by ID degrades to O(n) for operations, flows, and rules.
 - Files: `crates/eval/src/types.rs:300-307`
-- Scaling path: Add pre-built `HashMap`s in `Contract` for operations, flows, and rules indexed by ID; populate them in `from_interchange`.
+- Scaling path: Add `HashMap` indexes in `Contract`, populated in `from_interchange`.
 
 ---
 
 ## Dependencies at Risk
 
-**`ureq` v3 with non-standard error format parsing:**
-- Risk: `crates/cli/src/ambiguity/api.rs:163-178` parses ureq error strings by scanning for 3-digit HTTP status codes in the error message text. This parsing is fragile against any ureq version that changes its error formatting.
-- Impact: Retry logic silently stops working if ureq reformats errors — all API failures would appear as non-retryable.
-- Files: `crates/cli/src/ambiguity/api.rs:159-195`
-- Migration plan: Once ureq provides a structured error type with a `status()` method (or if switching to `reqwest`), replace the string scan with a typed check.
+**`ureq` v3 error format parsing is fragile:**
+- Risk: `crates/cli/src/ambiguity/api.rs` parses ureq error strings by scanning for 3-digit HTTP status codes in the error message text. This parsing breaks if ureq changes its error formatting.
+- Impact: Retry logic silently stops working.
+- Files: `crates/cli/src/ambiguity/api.rs`
+- Migration plan: Switch to structured error type when available.
 
-**`jsonschema` v0.42 compiled into CLI binary for runtime schema validation:**
-- Risk: `jsonschema` is a large dependency used only for `tenor validate` and the schema validation test suite. Version pinned at `0.42` with no flexibility.
-- Impact: If `jsonschema` releases a breaking API change, schema validation tests fail without changes to caller code.
-- Files: `Cargo.toml` (workspace), `crates/cli/src/main.rs`, `crates/core/tests/schema_validation.rs`
-- Migration plan: Low urgency. Monitor for API changes; the `validate` command is not performance-critical.
+**`libc` dependency limits WASM portability:**
+- Risk: `libc` is used only in `crates/cli/src/serve.rs` for signal handling. It is a CLI-only dependency. However, `tenor-cli` depends on all other crates via `Cargo.toml`. If the crate graph is not carefully managed, the `libc` dependency could leak into WASM compilation paths.
+- Impact: Blocks the Embedded Evaluator (WASM) milestone if not isolated.
+- Files: `crates/cli/Cargo.toml:19` (libc dependency), `crates/cli/src/serve.rs:96-106`
+- Migration plan: Ensure `tenor-core` and `tenor-eval` remain free of libc/OS dependencies. They currently are clean -- `tenor-core` uses only `serde`/`serde_json` and `std::path`/`std::fs` (only in `pass1_bundle.rs`). `tenor-eval` has no filesystem or OS calls.
+
+**`tiny_http` is synchronous and single-threaded:**
+- Risk: `tiny_http` v0.12 is a simple synchronous HTTP server. It does not support concurrent request handling, TLS, or HTTP/2. It is suitable for local development but not for the Hosted Evaluator Service.
+- Impact: The hosted service milestone requires replacing the entire HTTP stack.
+- Files: `crates/cli/src/serve.rs` (entire file, 521 lines)
+- Migration plan: Replace with `axum` or `actix-web` for the hosted service. Keep `tiny_http` for the local `tenor serve` command if desired.
 
 ---
 
 ## Missing Critical Features
 
-**No unit tests in `tenor-core` source files:**
-- Problem: The `crates/core/src/` directory has zero `#[test]` functions. All testing of the elaborator pipeline is done via file-based conformance tests in `conformance/`. Individual pass functions have no isolated unit tests.
-- Files: `crates/core/src/pass1_bundle.rs`, `crates/core/src/pass2_index.rs`, `crates/core/src/pass3_types.rs`, `crates/core/src/pass4_typecheck.rs`, `crates/core/src/pass5_validate.rs`, `crates/core/src/pass6_serialize.rs`
-- Blocks: Debugging regressions in individual pass logic requires running the full conformance suite.
+**No WASM compilation target tested or configured:**
+- Problem: The Platform & Ecosystem milestone targets an Embedded Evaluator compiled to WASM. Currently, no `wasm32` target is configured, no WASM-specific feature flags exist, and the build has not been tested under `wasm32-unknown-unknown` or `wasm32-wasi`. The `tenor-core` crate uses `std::fs::read_to_string` and `std::path::Path::canonicalize` in `pass1_bundle.rs`, which are not available in browser WASM.
+- Files: `crates/core/src/pass1_bundle.rs:154` (filesystem read), `crates/core/src/elaborate.rs:18` (takes `&Path`)
+- Blocks: Embedded Evaluator (WASM for browser/Node/edge).
+- Fix approach: Factor `pass1_bundle.rs` file I/O behind a trait or feature flag. The evaluator (`tenor-eval`) already consumes interchange JSON without filesystem access, so it is closer to WASM-ready. The elaborator would need a `source_provider` abstraction.
 
-**Negative test coverage is thin for most passes:**
-- Problem: Pass 0 has 2 negative tests, Pass 1 has 5, Pass 2 has 4, Pass 3 has 2, Pass 4 has 6. Pass 5 has 24 — the most complete. Edge cases in the lexer, import resolver, type-checker, and serializer are exercised only through the positive conformance suite.
-- Files: `conformance/negative/pass0/`, `conformance/negative/pass1/`, `conformance/negative/pass2/`, `conformance/negative/pass3/`, `conformance/negative/pass4/`
-- Risk: A change to pass logic that introduces a new error case or removes an existing one may go undetected.
+**No multi-party execution runtime:**
+- Problem: The System construct is elaborated and validated, but there is no runtime that can execute cross-contract triggers, shared entity state, or shared persona identity across multiple evaluator instances.
+- Files: System elaboration in `crates/core/src/pass5_validate.rs` (validation only), no runtime in `crates/eval/`
+- Blocks: Multi-party Contract Execution milestone.
+- Fix approach: Design a System runtime coordinator that manages trigger dispatch and shared state.
 
-**`tenor-eval` has no error-path conformance fixtures for flow execution:**
-- Problem: The eval conformance suite (`conformance/eval/`) covers positive outcomes and numeric regressions. There are no fixtures that exercise `FlowError`, `OperationError::EntityNotFound`, or `FailureHandler::Escalate` paths from a file-based test.
-- Files: `conformance/eval/positive/`, `conformance/eval/numeric/`
-- Risk: Flow error-handling paths are tested only through in-source unit tests (`crates/eval/src/flow.rs`, `crates/eval/src/operation.rs`), which use `panic!` assertions that would hide error type changes.
+**No Rust or Go SDK:**
+- Problem: Only a TypeScript SDK exists (`sdk/typescript/`). The Platform & Ecosystem milestone targets Rust and Go Agent SDKs.
+- Files: `sdk/typescript/` (existing), no `sdk/rust/` or `sdk/go/`
+- Blocks: Rust and Go Agent SDK milestones.
 
 ---
 
 ## Test Coverage Gaps
 
-**`crates/core/src/lexer.rs` — no dedicated lexer tests:**
-- What's not tested: Unicode input, edge-case token sequences (e.g., consecutive operators, unterminated strings beyond the existing 2 pass-0 negative tests), all escape sequences.
-- Files: `crates/core/src/lexer.rs`
-- Risk: Lexer regressions surface only when a conformance test exercises the broken token path.
-- Priority: Medium.
+**`crates/core/src/` -- no inline unit tests for parser or lexer:**
+- What's not tested: The `crates/core/src/` directory has only 2 `#[cfg(test)]` modules (in `pass3_types.rs` and `pass5_validate.rs`). The parser (1,598 lines), lexer (419 lines), pass1_bundle (258 lines), pass2_index (190 lines), pass4_typecheck (403 lines), and pass6_serialize (1,044 lines) have zero inline unit tests. All testing is done via file-based conformance tests.
+- Files: `crates/core/src/parser.rs`, `crates/core/src/lexer.rs`, `crates/core/src/pass1_bundle.rs`, `crates/core/src/pass2_index.rs`, `crates/core/src/pass4_typecheck.rs`, `crates/core/src/pass6_serialize.rs`
+- Risk: Debugging individual pass regressions requires running the full conformance suite.
+- Priority: Medium. The conformance suite provides good coverage, but unit tests would improve development velocity.
 
-**`crates/cli/src/diff.rs` — diff logic tested internally but not via CLI integration:**
-- What's not tested: The `tenor diff` subcommand is not covered by `crates/cli/tests/cli_integration.rs`. Unit tests in `diff.rs` cover the logic, but CLI argument parsing, output format, and `--breaking` flag are untested end-to-end.
+**`crates/lsp/` -- zero unit tests:**
+- What's not tested: The entire LSP crate (2,711 lines across 8 files) has no `#[cfg(test)]` modules and no integration tests. Navigation (809 lines), agent capabilities (543 lines), semantic tokens (480 lines), completion (267 lines), and hover (80 lines) are untested.
+- Files: `crates/lsp/src/navigation.rs`, `crates/lsp/src/agent_capabilities.rs`, `crates/lsp/src/semantic_tokens.rs`, `crates/lsp/src/completion.rs`, `crates/lsp/src/hover.rs`, `crates/lsp/src/server.rs`
+- Risk: LSP features can silently break. Navigation and completion correctness is not verified.
+- Priority: High -- LSP is user-facing and affects developer experience.
+
+**`crates/cli/src/diff.rs` -- CLI integration not tested:**
+- What's not tested: The `tenor diff` subcommand is not covered by `crates/cli/tests/cli_integration.rs`. Internal unit tests exist but CLI argument parsing, output format, and `--breaking` flag are untested end-to-end.
 - Files: `crates/cli/src/diff.rs`, `crates/cli/tests/cli_integration.rs`
-- Risk: CLI surface changes (e.g., wrong exit code on breaking change) go undetected.
+- Risk: CLI surface changes go undetected.
 - Priority: Medium.
 
-**`crates/cli/src/explain.rs` — no tests for Markdown format output:**
-- What's not tested: `ExplainFormat::Markdown` produces different heading and bullet syntax than `ExplainFormat::Terminal`. There are no tests asserting Markdown-specific output structure.
+**`crates/cli/src/explain.rs` -- Markdown format output not tested:**
+- What's not tested: `ExplainFormat::Markdown` produces different syntax than `ExplainFormat::Terminal`. No tests assert Markdown-specific output.
 - Files: `crates/cli/src/explain.rs`
-- Risk: Silent formatting breakage in Markdown mode.
+- Risk: Silent formatting breakage.
 - Priority: Low.
 
-**`crates/analyze/` — S3a admissibility analysis has no negative test cases:**
-- What's not tested: Contracts where admissibility checks should fire (unreachable state predicates, missing fact references in preconditions).
+**`crates/analyze/` -- S3a admissibility has no negative test cases:**
+- What's not tested: Contracts where admissibility checks should fire (unreachable state predicates, missing fact references).
 - Files: `crates/analyze/src/s3a_admissibility.rs`, `crates/analyze/tests/analysis_tests.rs`
-- Risk: False-negative findings in admissibility analysis are not caught.
+- Risk: False-negative findings in admissibility analysis.
+- Priority: Medium.
+
+**Flow error-path conformance tests missing:**
+- What's not tested: No file-based conformance fixtures exercise `FlowError`, `OperationError::EntityNotFound`, or `FailureHandler::Escalate`. These paths are only covered by inline unit tests that use `panic!` assertions.
+- Files: `crates/eval/src/flow.rs`, `crates/eval/src/operation.rs`
+- Risk: Error handling path regressions go undetected by the conformance suite.
 - Priority: Medium.
 
 ---
 
-*Concerns audit: 2026-02-22*
+## Platform & Ecosystem Readiness
+
+**WASM compilation blockers in `tenor-core`:**
+- The elaborator entry point `elaborate()` in `crates/core/src/elaborate.rs:18` takes a `&Path` and `pass1_bundle.rs` reads files from disk. These are incompatible with `wasm32-unknown-unknown`.
+- `tenor-eval` is WASM-ready: it has no `std::fs`, no `std::path`, no `libc`, and no OS-specific code. It consumes `serde_json::Value` input.
+- `tenor-analyze` is also WASM-candidate: no filesystem dependencies.
+- Fix: For browser WASM, expose `tenor-eval` and `tenor-analyze` directly. For elaboration in WASM, factor file I/O in `pass1_bundle.rs` behind a trait that can accept in-memory sources.
+
+**Hosted service requires complete HTTP stack replacement:**
+- The current `serve.rs` (521 lines) uses `tiny_http` -- single-threaded, no TLS, no auth, no rate limiting. The Hosted Evaluator Service milestone requires: async runtime, concurrent request handling, authentication, rate limiting, TLS termination, structured logging, and metrics.
+- The `libc`-based signal handling and the `Mutex<ServeState>` pattern would need to be replaced entirely.
+- The evaluate endpoint clones the entire bundle JSON from the Mutex on every request (`crates/cli/src/serve.rs:402`), which is wasteful.
+
+**Multi-party execution has no runtime foundation:**
+- System construct elaboration and validation exist, but the evaluator has no concept of multi-contract execution, cross-contract triggers, or shared entity state synchronization.
+- The `Contract` type in `crates/eval/src/types.rs` represents a single contract. A `SystemContract` coordinator would need to manage multiple `Contract` instances, trigger dispatch, and entity state consistency.
+
+**SDK generation requires stable interchange schema:**
+- The interchange JSON schema at `docs/interchange-schema.json` is the contract between the Rust evaluator and client SDKs. Currently only TypeScript SDK exists. Rust and Go SDKs will need generated or hand-written types matching this schema.
+- The triplicated deserialization pattern (eval, analyze, codegen each parsing interchange independently) suggests the interchange types are not formalized as a shared library, which would be the natural base for SDK generation.
+
+---
+
+*Concerns audit: 2026-02-23*

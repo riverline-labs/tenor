@@ -337,9 +337,17 @@ fn handle_elaborate(body: &str) -> (u16, String) {
         .and_then(|v| v.as_str())
         .unwrap_or("input.tenor");
 
-    // Write to a temp file and elaborate
-    let tmp_dir = std::env::temp_dir();
-    let tmp_path = tmp_dir.join(filename);
+    // Write to a unique temp file and elaborate
+    let tmp_dir = match tempfile::tempdir() {
+        Ok(d) => d,
+        Err(e) => {
+            return (
+                500,
+                json_error(&format!("failed to create temp dir: {}", e)),
+            )
+        }
+    };
+    let tmp_path = tmp_dir.path().join(filename);
 
     if let Err(e) = std::fs::write(&tmp_path, source) {
         return (
@@ -349,9 +357,7 @@ fn handle_elaborate(body: &str) -> (u16, String) {
     }
 
     let result = tenor_core::elaborate::elaborate(&tmp_path);
-
-    // Clean up temp file
-    let _ = std::fs::remove_file(&tmp_path);
+    // tmp_dir is dropped here, cleaning up automatically
 
     match result {
         Ok(bundle) => (

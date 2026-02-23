@@ -4,12 +4,23 @@
 
 Tenor is a domain-specific language for expressing operational contracts — the rules, entities, operations, and flows that govern how decisions are made in complex business domains. The elaborator transforms `.tenor` source files into a canonical JSON interchange format through a six-pass pipeline. The evaluator executes contracts against fact sets with full provenance. Static analysis (S1-S8) verifies structural properties. The language specification is frozen at v1.0 with the System construct for multi-contract composition.
 
-## Current State
+## Current Milestone: Platform & Ecosystem
 
-**v1.0 shipped** — spec frozen, System construct complete, 5 domain contracts validated, full documentation.
-**Phase 14.1 complete** — tech debt, bugs, and hardening resolved before SDK work.
+**Goal:** Take Tenor from a working language with agent tooling to a production platform — reference implementations, embedded evaluator, hosted service, domain library, multi-language SDKs, and multi-party execution.
 
-**Next milestone:** Agent Tooling (phases 15-19) — TypeScript SDK, codegen, VS Code extension, agent skill examples, embedded evaluator.
+**Target features:**
+- Agent Skill Examples (CLI tool, Express middleware, Slack bot, audit agent)
+- AI Authoring Assistant (prompt templates, example workflows)
+- Embedded Evaluator (WASM for browser/Node/edge)
+- Hosted Evaluator Service (managed API endpoint)
+- Domain Contract Library (curated contracts, community framework)
+- Rust and Go Agent SDKs
+- Multi-party Contract Execution
+
+**Prior milestones shipped:**
+- v0.9 Core — spec, elaborator, evaluator, static analysis, domain validation
+- v1.0 System Construct — multi-contract composition, AAP audit, documentation
+- Agent Tooling — tech debt hardening, TypeScript SDK, codegen, VS Code extension
 
 ## Core Value
 
@@ -59,7 +70,7 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 
 ### Active
 
-(To be defined in next milestone — run `/gsd:new-milestone`)
+See [REQUIREMENTS.md](REQUIREMENTS.md) — 24 requirements across phases 18-24.
 
 ### Out of Scope
 
@@ -111,4 +122,4 @@ A contract authored in TenorDSL must be statically verifiable, evaluable against
 | Embedded evaluator as planned phase | Air-gapped/regulated deployments need it; not contingent, just sequenced after SDK | — Pending |
 
 ---
-*Last updated: 2026-02-23 after Phase 14.1 (Tech Debt, Bugs & Hardening)*
+*Last updated: 2026-02-23 after milestone Platform & Ecosystem started*

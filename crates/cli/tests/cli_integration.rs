@@ -6,6 +6,7 @@
 //! All tests set `current_dir` to the workspace root so that relative
 //! paths to conformance fixtures and test fixtures resolve correctly.
 
+use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serde_json;
@@ -26,7 +27,7 @@ fn workspace_root() -> PathBuf {
 
 /// Helper: create a Command for the `tenor` binary, rooted at workspace.
 fn tenor() -> Command {
-    let mut cmd = Command::cargo_bin("tenor").expect("binary exists");
+    let mut cmd = cargo_bin_cmd!("tenor");
     cmd.current_dir(workspace_root());
     cmd
 }
