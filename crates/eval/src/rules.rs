@@ -145,34 +145,31 @@ mod tests {
         }
     }
 
+    fn make_contract(rules: Vec<Rule>) -> Contract {
+        Contract::new(vec![], vec![], rules, vec![], vec![], vec![])
+    }
+
     #[test]
     fn eval_single_stratum_simple() {
         // Rule: when is_active = true => produce account_active = true
         let mut facts = FactSet::new();
         facts.insert("is_active".to_string(), Value::Bool(true));
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![make_rule(
-                "account_active",
-                0,
-                Predicate::Compare {
-                    left: Box::new(Predicate::FactRef("is_active".to_string())),
-                    op: "=".to_string(),
-                    right: Box::new(Predicate::Literal {
-                        value: Value::Bool(true),
-                        type_spec: bool_type(),
-                    }),
-                    comparison_type: None,
-                },
-                "account_active",
-                Value::Bool(true),
-            )],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![make_rule(
+            "account_active",
+            0,
+            Predicate::Compare {
+                left: Box::new(Predicate::FactRef("is_active".to_string())),
+                op: "=".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Bool(true),
+                    type_spec: bool_type(),
+                }),
+                comparison_type: None,
+            },
+            "account_active",
+            Value::Bool(true),
+        )]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 1);
@@ -187,28 +184,21 @@ mod tests {
         let mut facts = FactSet::new();
         facts.insert("is_active".to_string(), Value::Bool(false));
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![make_rule(
-                "account_active",
-                0,
-                Predicate::Compare {
-                    left: Box::new(Predicate::FactRef("is_active".to_string())),
-                    op: "=".to_string(),
-                    right: Box::new(Predicate::Literal {
-                        value: Value::Bool(true),
-                        type_spec: bool_type(),
-                    }),
-                    comparison_type: None,
-                },
-                "account_active",
-                Value::Bool(true),
-            )],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![make_rule(
+            "account_active",
+            0,
+            Predicate::Compare {
+                left: Box::new(Predicate::FactRef("is_active".to_string())),
+                op: "=".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Bool(true),
+                    type_spec: bool_type(),
+                }),
+                comparison_type: None,
+            },
+            "account_active",
+            Value::Bool(true),
+        )]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 0);
@@ -222,37 +212,30 @@ mod tests {
         let mut facts = FactSet::new();
         facts.insert("is_active".to_string(), Value::Bool(true));
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![
-                make_rule(
-                    "check_active",
-                    0,
-                    Predicate::Compare {
-                        left: Box::new(Predicate::FactRef("is_active".to_string())),
-                        op: "=".to_string(),
-                        right: Box::new(Predicate::Literal {
-                            value: Value::Bool(true),
-                            type_spec: bool_type(),
-                        }),
-                        comparison_type: None,
-                    },
-                    "account_active",
-                    Value::Bool(true),
-                ),
-                make_rule(
-                    "can_process",
-                    1,
-                    Predicate::VerdictPresent("account_active".to_string()),
-                    "order_processable",
-                    Value::Bool(true),
-                ),
-            ],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![
+            make_rule(
+                "check_active",
+                0,
+                Predicate::Compare {
+                    left: Box::new(Predicate::FactRef("is_active".to_string())),
+                    op: "=".to_string(),
+                    right: Box::new(Predicate::Literal {
+                        value: Value::Bool(true),
+                        type_spec: bool_type(),
+                    }),
+                    comparison_type: None,
+                },
+                "account_active",
+                Value::Bool(true),
+            ),
+            make_rule(
+                "can_process",
+                1,
+                Predicate::VerdictPresent("account_active".to_string()),
+                "order_processable",
+                Value::Bool(true),
+            ),
+        ]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 2);
@@ -272,37 +255,30 @@ mod tests {
         let mut facts = FactSet::new();
         facts.insert("is_active".to_string(), Value::Bool(false));
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![
-                make_rule(
-                    "check_active",
-                    0,
-                    Predicate::Compare {
-                        left: Box::new(Predicate::FactRef("is_active".to_string())),
-                        op: "=".to_string(),
-                        right: Box::new(Predicate::Literal {
-                            value: Value::Bool(true),
-                            type_spec: bool_type(),
-                        }),
-                        comparison_type: None,
-                    },
-                    "account_active",
-                    Value::Bool(true),
-                ),
-                make_rule(
-                    "can_process",
-                    1,
-                    Predicate::VerdictPresent("account_active".to_string()),
-                    "order_processable",
-                    Value::Bool(true),
-                ),
-            ],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![
+            make_rule(
+                "check_active",
+                0,
+                Predicate::Compare {
+                    left: Box::new(Predicate::FactRef("is_active".to_string())),
+                    op: "=".to_string(),
+                    right: Box::new(Predicate::Literal {
+                        value: Value::Bool(true),
+                        type_spec: bool_type(),
+                    }),
+                    comparison_type: None,
+                },
+                "account_active",
+                Value::Bool(true),
+            ),
+            make_rule(
+                "can_process",
+                1,
+                Predicate::VerdictPresent("account_active".to_string()),
+                "order_processable",
+                Value::Bool(true),
+            ),
+        ]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 0);
@@ -311,14 +287,7 @@ mod tests {
     #[test]
     fn eval_empty_rules() {
         let facts = FactSet::new();
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![]);
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 0);
     }
@@ -358,55 +327,48 @@ mod tests {
             variants: None,
         };
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![
-                make_rule(
-                    "check_active",
-                    0,
-                    Predicate::Compare {
-                        left: Box::new(Predicate::FactRef("is_active".to_string())),
-                        op: "=".to_string(),
-                        right: Box::new(Predicate::Literal {
-                            value: Value::Bool(true),
-                            type_spec: bool_type(),
-                        }),
-                        comparison_type: None,
-                    },
-                    "account_active",
-                    Value::Bool(true),
-                ),
-                Rule {
-                    id: "check_balance".to_string(),
-                    stratum: 0,
-                    condition: Predicate::Compare {
-                        left: Box::new(Predicate::FactRef("balance".to_string())),
-                        op: "<=".to_string(),
-                        right: Box::new(Predicate::FactRef("limit".to_string())),
-                        comparison_type: Some(ct),
-                    },
-                    produce: ProduceClause {
-                        verdict_type: "within_limit".to_string(),
-                        payload_type: bool_type(),
-                        payload_value: PayloadValue::Literal(Value::Bool(true)),
-                    },
+        let contract = make_contract(vec![
+            make_rule(
+                "check_active",
+                0,
+                Predicate::Compare {
+                    left: Box::new(Predicate::FactRef("is_active".to_string())),
+                    op: "=".to_string(),
+                    right: Box::new(Predicate::Literal {
+                        value: Value::Bool(true),
+                        type_spec: bool_type(),
+                    }),
+                    comparison_type: None,
                 },
-                make_rule(
-                    "can_process",
-                    1,
-                    Predicate::And {
-                        left: Box::new(Predicate::VerdictPresent("account_active".to_string())),
-                        right: Box::new(Predicate::VerdictPresent("within_limit".to_string())),
-                    },
-                    "order_processable",
-                    Value::Bool(true),
-                ),
-            ],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+                "account_active",
+                Value::Bool(true),
+            ),
+            Rule {
+                id: "check_balance".to_string(),
+                stratum: 0,
+                condition: Predicate::Compare {
+                    left: Box::new(Predicate::FactRef("balance".to_string())),
+                    op: "<=".to_string(),
+                    right: Box::new(Predicate::FactRef("limit".to_string())),
+                    comparison_type: Some(ct),
+                },
+                produce: ProduceClause {
+                    verdict_type: "within_limit".to_string(),
+                    payload_type: bool_type(),
+                    payload_value: PayloadValue::Literal(Value::Bool(true)),
+                },
+            },
+            make_rule(
+                "can_process",
+                1,
+                Predicate::And {
+                    left: Box::new(Predicate::VerdictPresent("account_active".to_string())),
+                    right: Box::new(Predicate::VerdictPresent("within_limit".to_string())),
+                },
+                "order_processable",
+                Value::Bool(true),
+            ),
+        ]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 3);
@@ -442,45 +404,38 @@ mod tests {
         facts.insert("a".to_string(), Value::Bool(true));
         facts.insert("b".to_string(), Value::Bool(true));
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![
-                make_rule(
-                    "rule_a",
-                    0,
-                    Predicate::Compare {
-                        left: Box::new(Predicate::FactRef("a".to_string())),
-                        op: "=".to_string(),
-                        right: Box::new(Predicate::Literal {
-                            value: Value::Bool(true),
-                            type_spec: bool_type(),
-                        }),
-                        comparison_type: None,
-                    },
-                    "verdict_a",
-                    Value::Bool(true),
-                ),
-                make_rule(
-                    "rule_b",
-                    0,
-                    Predicate::Compare {
-                        left: Box::new(Predicate::FactRef("b".to_string())),
-                        op: "=".to_string(),
-                        right: Box::new(Predicate::Literal {
-                            value: Value::Bool(true),
-                            type_spec: bool_type(),
-                        }),
-                        comparison_type: None,
-                    },
-                    "verdict_b",
-                    Value::Bool(true),
-                ),
-            ],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![
+            make_rule(
+                "rule_a",
+                0,
+                Predicate::Compare {
+                    left: Box::new(Predicate::FactRef("a".to_string())),
+                    op: "=".to_string(),
+                    right: Box::new(Predicate::Literal {
+                        value: Value::Bool(true),
+                        type_spec: bool_type(),
+                    }),
+                    comparison_type: None,
+                },
+                "verdict_a",
+                Value::Bool(true),
+            ),
+            make_rule(
+                "rule_b",
+                0,
+                Predicate::Compare {
+                    left: Box::new(Predicate::FactRef("b".to_string())),
+                    op: "=".to_string(),
+                    right: Box::new(Predicate::Literal {
+                        value: Value::Bool(true),
+                        type_spec: bool_type(),
+                    }),
+                    comparison_type: None,
+                },
+                "verdict_b",
+                Value::Bool(true),
+            ),
+        ]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 2);
@@ -493,28 +448,21 @@ mod tests {
         let mut facts = FactSet::new();
         facts.insert("x".to_string(), Value::Bool(true));
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![make_rule(
-                "r1",
-                0,
-                Predicate::Compare {
-                    left: Box::new(Predicate::FactRef("x".to_string())),
-                    op: "=".to_string(),
-                    right: Box::new(Predicate::Literal {
-                        value: Value::Bool(true),
-                        type_spec: bool_type(),
-                    }),
-                    comparison_type: None,
-                },
-                "test_verdict",
-                Value::Bool(true),
-            )],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![make_rule(
+            "r1",
+            0,
+            Predicate::Compare {
+                left: Box::new(Predicate::FactRef("x".to_string())),
+                op: "=".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Bool(true),
+                    type_spec: bool_type(),
+                }),
+                comparison_type: None,
+            },
+            "test_verdict",
+            Value::Bool(true),
+        )]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         let json = verdicts.to_json();
@@ -545,48 +493,41 @@ mod tests {
             variants: None,
         };
 
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![],
-            rules: vec![Rule {
-                id: "mul_rule".to_string(),
-                stratum: 0,
-                condition: Predicate::Compare {
-                    left: Box::new(Predicate::FactRef("x".to_string())),
-                    op: ">".to_string(),
-                    right: Box::new(Predicate::Literal {
-                        value: Value::Int(0),
-                        type_spec: TypeSpec {
-                            base: "Int".to_string(),
-                            precision: None,
-                            scale: None,
-                            currency: None,
-                            min: Some(0),
-                            max: Some(0),
-                            max_length: None,
-                            values: None,
-                            fields: None,
-                            element_type: None,
-                            unit: None,
-                            variants: None,
-                        },
-                    }),
-                    comparison_type: None,
-                },
-                produce: ProduceClause {
-                    verdict_type: "scaled_x".to_string(),
-                    payload_type: rt.clone(),
-                    payload_value: PayloadValue::Mul(crate::types::MulExpr {
-                        fact_ref: "x".to_string(),
-                        literal: 10,
-                        result_type: rt,
-                    }),
-                },
-            }],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+        let contract = make_contract(vec![Rule {
+            id: "mul_rule".to_string(),
+            stratum: 0,
+            condition: Predicate::Compare {
+                left: Box::new(Predicate::FactRef("x".to_string())),
+                op: ">".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Int(0),
+                    type_spec: TypeSpec {
+                        base: "Int".to_string(),
+                        precision: None,
+                        scale: None,
+                        currency: None,
+                        min: Some(0),
+                        max: Some(0),
+                        max_length: None,
+                        values: None,
+                        fields: None,
+                        element_type: None,
+                        unit: None,
+                        variants: None,
+                    },
+                }),
+                comparison_type: None,
+            },
+            produce: ProduceClause {
+                verdict_type: "scaled_x".to_string(),
+                payload_type: rt.clone(),
+                payload_value: PayloadValue::Mul(crate::types::MulExpr {
+                    fact_ref: "x".to_string(),
+                    literal: 10,
+                    result_type: rt,
+                }),
+            },
+        }]);
 
         let verdicts = eval_strata(&contract, &facts).unwrap();
         assert_eq!(verdicts.0.len(), 1);

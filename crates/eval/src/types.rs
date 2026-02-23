@@ -5,7 +5,7 @@
 //! canonical interchange format.
 
 use rust_decimal::Decimal;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 // ──────────────────────────────────────────────
@@ -304,6 +304,76 @@ pub struct Contract {
     pub operations: Vec<Operation>,
     pub flows: Vec<Flow>,
     pub personas: Vec<String>,
+    // HashMap indexes for O(1) lookups by ID
+    pub operation_index: HashMap<String, usize>,
+    pub flow_index: HashMap<String, usize>,
+    pub entity_index: HashMap<String, usize>,
+    pub fact_index: HashMap<String, usize>,
+}
+
+impl Contract {
+    /// Construct a Contract from its component Vecs, automatically building indexes.
+    pub fn new(
+        facts: Vec<FactDecl>,
+        entities: Vec<Entity>,
+        rules: Vec<Rule>,
+        operations: Vec<Operation>,
+        flows: Vec<Flow>,
+        personas: Vec<String>,
+    ) -> Self {
+        let operation_index: HashMap<String, usize> = operations
+            .iter()
+            .enumerate()
+            .map(|(i, op)| (op.id.clone(), i))
+            .collect();
+        let flow_index: HashMap<String, usize> = flows
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.id.clone(), i))
+            .collect();
+        let entity_index: HashMap<String, usize> = entities
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.id.clone(), i))
+            .collect();
+        let fact_index: HashMap<String, usize> = facts
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.id.clone(), i))
+            .collect();
+        Contract {
+            facts,
+            entities,
+            rules,
+            operations,
+            flows,
+            personas,
+            operation_index,
+            flow_index,
+            entity_index,
+            fact_index,
+        }
+    }
+
+    /// Look up an operation by ID in O(1) via the index.
+    pub fn get_operation(&self, id: &str) -> Option<&Operation> {
+        self.operation_index.get(id).map(|&i| &self.operations[i])
+    }
+
+    /// Look up a flow by ID in O(1) via the index.
+    pub fn get_flow(&self, id: &str) -> Option<&Flow> {
+        self.flow_index.get(id).map(|&i| &self.flows[i])
+    }
+
+    /// Look up an entity by ID in O(1) via the index.
+    pub fn get_entity(&self, id: &str) -> Option<&Entity> {
+        self.entity_index.get(id).map(|&i| &self.entities[i])
+    }
+
+    /// Look up a fact declaration by ID in O(1) via the index.
+    pub fn get_fact(&self, id: &str) -> Option<&FactDecl> {
+        self.fact_index.get(id).map(|&i| &self.facts[i])
+    }
 }
 
 impl Contract {
@@ -432,14 +502,9 @@ impl Contract {
             }
         }
 
-        Ok(Contract {
-            facts,
-            entities,
-            rules,
-            operations,
-            flows,
-            personas,
-        })
+        Ok(Contract::new(
+            facts, entities, rules, operations, flows, personas,
+        ))
     }
 }
 

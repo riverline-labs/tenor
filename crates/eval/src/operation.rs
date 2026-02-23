@@ -661,9 +661,9 @@ mod tests {
 
     #[test]
     fn init_entity_states_from_contract() {
-        let contract = Contract {
-            facts: vec![],
-            entities: vec![
+        let contract = Contract::new(
+            vec![],
+            vec![
                 Entity {
                     id: "order".to_string(),
                     states: vec!["draft".to_string(), "submitted".to_string()],
@@ -677,11 +677,11 @@ mod tests {
                     transitions: vec![],
                 },
             ],
-            rules: vec![],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        };
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
 
         let states = init_entity_states(&contract);
         assert_eq!(states.get("order").unwrap(), "draft");

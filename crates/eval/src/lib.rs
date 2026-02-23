@@ -88,11 +88,9 @@ pub fn evaluate_flow(
     // Initialize entity states
     let mut entity_states = operation::init_entity_states(&contract);
 
-    // Find the flow
+    // Find the flow (O(1) via HashMap index)
     let target_flow = contract
-        .flows
-        .iter()
-        .find(|f| f.id == flow_id)
+        .get_flow(flow_id)
         .ok_or_else(|| EvalError::DeserializeError {
             message: format!("flow '{}' not found in contract", flow_id),
         })?;

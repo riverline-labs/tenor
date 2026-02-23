@@ -195,14 +195,7 @@ mod tests {
     use std::str::FromStr;
 
     fn make_contract(facts: Vec<FactDecl>) -> Contract {
-        Contract {
-            facts,
-            entities: vec![],
-            rules: vec![],
-            operations: vec![],
-            flows: vec![],
-            personas: vec![],
-        }
+        Contract::new(facts, vec![], vec![], vec![], vec![], vec![])
     }
 
     fn bool_type() -> TypeSpec {

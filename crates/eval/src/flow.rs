@@ -395,14 +395,13 @@ pub fn execute_flow(
                 on_success,
                 on_failure,
             } => {
-                // Find the sub-flow in the contract
-                let sub_flow = contract
-                    .flows
-                    .iter()
-                    .find(|f| f.id == *sub_flow_id)
-                    .ok_or_else(|| EvalError::DeserializeError {
-                        message: format!("sub-flow '{}' not found in contract", sub_flow_id),
-                    })?;
+                // Find the sub-flow in the contract (O(1) via HashMap index)
+                let sub_flow =
+                    contract
+                        .get_flow(sub_flow_id)
+                        .ok_or_else(|| EvalError::DeserializeError {
+                            message: format!("sub-flow '{}' not found in contract", sub_flow_id),
+                        })?;
 
                 // Sub-flows INHERIT the parent snapshot (spec E5)
                 match execute_flow(sub_flow, contract, snapshot, entity_states, None) {
@@ -705,14 +704,14 @@ mod tests {
         operations: Vec<Operation>,
         flows: Vec<Flow>,
     ) -> Contract {
-        Contract {
-            facts: vec![],
+        Contract::new(
+            vec![],
             entities,
-            rules: vec![],
+            vec![],
             operations,
             flows,
-            personas: vec!["admin".to_string(), "system".to_string()],
-        }
+            vec!["admin".to_string(), "system".to_string()],
+        )
     }
 
     // ──────────────────────────────────────
