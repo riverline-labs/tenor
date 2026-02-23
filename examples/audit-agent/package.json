@@ -1,0 +1,14 @@
+{
+  "name": "@tenor-examples/audit-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node --experimental-strip-types src/cli.ts",
+    "audit": "node --experimental-strip-types src/cli.ts"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.0"
+  }
+}
