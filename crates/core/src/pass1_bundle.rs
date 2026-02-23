@@ -4,13 +4,26 @@ use crate::ast::*;
 use crate::error::ElabError;
 use crate::lexer;
 use crate::parser;
+use crate::source::{FileSystemProvider, SourceProvider};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Parse the root `.tenor` file and all transitive imports, returning
 /// the flat construct list and the bundle id (root file stem).
+///
+/// Uses the default [`FileSystemProvider`] for file I/O.
 pub fn load_bundle(root: &Path) -> Result<(Vec<RawConstruct>, String), ElabError> {
-    let root = root.canonicalize().map_err(|e| {
+    load_bundle_with_provider(root, &FileSystemProvider)
+}
+
+/// Parse the root `.tenor` file and all transitive imports using the given
+/// [`SourceProvider`] for file I/O, returning the flat construct list and
+/// the bundle id (root file stem).
+pub fn load_bundle_with_provider(
+    root: &Path,
+    provider: &dyn SourceProvider,
+) -> Result<(Vec<RawConstruct>, String), ElabError> {
+    let root = provider.canonicalize(root).map_err(|e| {
         ElabError::new(
             1,
             None,
@@ -30,7 +43,7 @@ pub fn load_bundle(root: &Path) -> Result<(Vec<RawConstruct>, String), ElabError
 
     // Canonicalize the root directory once for sandbox boundary checks.
     // All imported files must resolve to paths within this directory.
-    let sandbox_root = root_dir.canonicalize().map_err(|e| {
+    let sandbox_root = provider.canonicalize(&root_dir).map_err(|e| {
         ElabError::new(
             1,
             None,
@@ -44,14 +57,19 @@ pub fn load_bundle(root: &Path) -> Result<(Vec<RawConstruct>, String), ElabError
 
     let mut visited: HashSet<PathBuf> = HashSet::new();
     let mut stack: Vec<PathBuf> = Vec::new();
+    // Parallel HashSet for O(1) cycle detection lookups.
+    // The Vec `stack` is kept for ordered error message reporting.
+    let mut stack_set: HashSet<PathBuf> = HashSet::new();
     let mut all_constructs: Vec<RawConstruct> = Vec::new();
 
     load_file(
         &root,
         &root_dir,
         &sandbox_root,
+        provider,
         &mut visited,
         &mut stack,
+        &mut stack_set,
         &mut all_constructs,
     )?;
 
@@ -97,15 +115,18 @@ fn check_cross_file_dups(constructs: &[RawConstruct]) -> Result<(), ElabError> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_file(
     path: &Path,
     base_dir: &Path,
     sandbox_root: &Path,
+    provider: &dyn SourceProvider,
     visited: &mut HashSet<PathBuf>,
     stack: &mut Vec<PathBuf>,
+    stack_set: &mut HashSet<PathBuf>,
     out: &mut Vec<RawConstruct>,
 ) -> Result<(), ElabError> {
-    let canon = path.canonicalize().map_err(|e| {
+    let canon = provider.canonicalize(path).map_err(|e| {
         ElabError::new(
             1,
             None,
@@ -117,7 +138,8 @@ fn load_file(
         )
     })?;
 
-    if stack.contains(&canon) {
+    // O(1) cycle detection via parallel HashSet
+    if stack_set.contains(&canon) {
         let cycle: Vec<String> = stack
             .iter()
             .map(|p| {
@@ -151,7 +173,7 @@ fn load_file(
         return Ok(());
     }
 
-    let src = std::fs::read_to_string(path).map_err(|e| {
+    let src = provider.read_source(path).map_err(|e| {
         ElabError::new(
             1,
             None,
@@ -171,6 +193,7 @@ fn load_file(
     let tokens = lexer::lex(&src, &filename)?;
     let constructs = parser::parse(&tokens, &filename)?;
 
+    stack_set.insert(canon.clone());
     stack.push(canon.clone());
 
     let mut local: Vec<RawConstruct> = Vec::new();
@@ -180,11 +203,26 @@ fn load_file(
                 path: import_path,
                 prov,
             } => {
-                let resolved = base_dir.join(import_path);
+                let resolved = provider
+                    .resolve_import(base_dir, import_path)
+                    .map_err(|e| {
+                        ElabError::new(
+                            1,
+                            None,
+                            None,
+                            Some("import"),
+                            &prov.file,
+                            prov.line,
+                            format!(
+                                "import resolution failed: cannot resolve path '{}': {}",
+                                import_path, e
+                            ),
+                        )
+                    })?;
 
                 // Sandbox check: canonicalize the resolved path (fail closed)
                 // and verify it stays within the contract root directory.
-                let canon_import = resolved.canonicalize().map_err(|_| {
+                let canon_import = provider.canonicalize(&resolved).map_err(|_| {
                     ElabError::new(
                         1,
                         None,
@@ -214,7 +252,8 @@ fn load_file(
                     ));
                 }
 
-                if stack.contains(&canon_import) {
+                // O(1) cycle detection via parallel HashSet
+                if stack_set.contains(&canon_import) {
                     let cycle: Vec<String> = stack
                         .iter()
                         .map(|p| {
@@ -245,7 +284,16 @@ fn load_file(
                 }
 
                 let import_base = canon_import.parent().unwrap_or(Path::new(".")).to_owned();
-                load_file(&resolved, &import_base, sandbox_root, visited, stack, out)?;
+                load_file(
+                    &resolved,
+                    &import_base,
+                    sandbox_root,
+                    provider,
+                    visited,
+                    stack,
+                    stack_set,
+                    out,
+                )?;
             }
             _ => local.push(c),
         }
@@ -253,6 +301,7 @@ fn load_file(
     out.extend(local);
 
     stack.pop();
+    stack_set.remove(&canon);
     visited.insert(canon);
     Ok(())
 }

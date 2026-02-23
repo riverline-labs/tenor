@@ -34,18 +34,20 @@ pub mod pass3_types;
 pub mod pass4_typecheck;
 pub mod pass5_validate;
 pub mod pass6_serialize;
+pub mod source;
 
-// ── Convenience re-exports: key types ────────────────────────────────
+// -- Convenience re-exports: key types ------------------------------------
 
 pub use ast::{Provenance, RawConstruct, RawExpr, RawLiteral, RawTerm, RawType};
 pub use error::ElabError;
 pub use pass2_index::Index;
 pub use pass3_types::TypeEnv;
 
-// ── Convenience re-exports: pipeline entry points ────────────────────
+// -- Convenience re-exports: pipeline entry points ------------------------
 
-pub use elaborate::elaborate;
+pub use elaborate::{elaborate, elaborate_with_provider};
 pub use pass1_bundle::load_bundle;
 pub use pass2_index::build_index;
 pub use pass3_types::build_type_env;
 pub use pass4_typecheck::resolve_types;
+pub use source::{FileSystemProvider, InMemoryProvider, SourceProvider};

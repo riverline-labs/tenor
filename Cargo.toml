@@ -5,6 +5,7 @@ members = [
     "crates/eval",
     "crates/analyze",
     "crates/codegen",
+    "crates/interchange",
     "crates/lsp",
 ]
 resolver = "2"

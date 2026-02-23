@@ -5,6 +5,22 @@ use crate::ast::*;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
+// Static key constants to avoid repeated heap allocations for the most
+// frequently used JSON keys across construct serialization.
+const K_BASE: &str = "base";
+const K_ID: &str = "id";
+const K_KIND: &str = "kind";
+const K_OP: &str = "op";
+const K_PROVENANCE: &str = "provenance";
+const K_TENOR: &str = "tenor";
+const K_VALUE: &str = "value";
+
+/// Insert a key-value pair into a JSON map, allocating the key from a `&str`.
+#[inline]
+fn ins(m: &mut Map<String, Value>, key: &str, val: Value) {
+    m.insert(key.to_owned(), val);
+}
+
 pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
     let mut fact_types: HashMap<String, RawType> = HashMap::new();
     for c in constructs {
@@ -72,15 +88,17 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
     }
 
     let mut bundle = Map::new();
-    bundle.insert("constructs".to_owned(), Value::Array(result));
-    bundle.insert("id".to_owned(), Value::String(bundle_id.to_owned()));
-    bundle.insert("kind".to_owned(), Value::String("Bundle".to_owned()));
-    bundle.insert(
-        "tenor".to_owned(),
+    ins(&mut bundle, "constructs", Value::Array(result));
+    ins(&mut bundle, K_ID, Value::String(bundle_id.to_owned()));
+    ins(&mut bundle, K_KIND, Value::String("Bundle".to_owned()));
+    ins(
+        &mut bundle,
+        K_TENOR,
         Value::String(crate::TENOR_VERSION.to_owned()),
     );
-    bundle.insert(
-        "tenor_version".to_owned(),
+    ins(
+        &mut bundle,
+        "tenor_version",
         Value::String(crate::TENOR_BUNDLE_VERSION.to_owned()),
     );
     Value::Object(bundle)
@@ -114,22 +132,22 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
                 let default_val = match (type_, d) {
                     (RawType::Decimal { precision, scale }, RawLiteral::Str(s)) => {
                         let mut dm = Map::new();
-                        dm.insert("kind".to_owned(), json!("decimal_value"));
-                        dm.insert("precision".to_owned(), json!(precision));
-                        dm.insert("scale".to_owned(), json!(scale));
-                        dm.insert("value".to_owned(), json!(s));
+                        ins(&mut dm, K_KIND, json!("decimal_value"));
+                        ins(&mut dm, "precision", json!(precision));
+                        ins(&mut dm, "scale", json!(scale));
+                        ins(&mut dm, K_VALUE, json!(s));
                         Value::Object(dm)
                     }
                     _ => serialize_literal(d),
                 };
-                m.insert("default".to_owned(), default_val);
+                ins(&mut m, "default", default_val);
             }
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("Fact"));
-            m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("source".to_owned(), serialize_source(source));
-            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
-            m.insert("type".to_owned(), serialize_type(type_));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("Fact"));
+            ins(&mut m, K_PROVENANCE, serialize_prov(prov));
+            ins(&mut m, "source", serialize_source(source));
+            ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
+            ins(&mut m, "type", serialize_type(type_));
             Value::Object(m)
         }
         RawConstruct::Entity {
@@ -142,25 +160,25 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             ..
         } => {
             let mut m = Map::new();
-            m.insert("id".to_owned(), json!(id));
-            m.insert("initial".to_owned(), json!(initial));
-            m.insert("kind".to_owned(), json!("Entity"));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, "initial", json!(initial));
+            ins(&mut m, K_KIND, json!("Entity"));
             if let Some(p) = parent {
-                m.insert("parent".to_owned(), json!(p));
+                ins(&mut m, "parent", json!(p));
             }
-            m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("states".to_owned(), json!(states));
-            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
+            ins(&mut m, K_PROVENANCE, serialize_prov(prov));
+            ins(&mut m, "states", json!(states));
+            ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
             let t_arr: Vec<Value> = transitions
                 .iter()
                 .map(|(f, to, _)| {
                     let mut tm = Map::new();
-                    tm.insert("from".to_owned(), json!(f));
-                    tm.insert("to".to_owned(), json!(to));
+                    ins(&mut tm, "from", json!(f));
+                    ins(&mut tm, "to", json!(to));
                     Value::Object(tm)
                 })
                 .collect();
-            m.insert("transitions".to_owned(), Value::Array(t_arr));
+            ins(&mut m, "transitions", Value::Array(t_arr));
             Value::Object(m)
         }
         RawConstruct::Rule {
@@ -176,19 +194,20 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             let mut m = Map::new();
             let mut body = Map::new();
             let mut produce = Map::new();
-            produce.insert(
-                "payload".to_owned(),
+            ins(
+                &mut produce,
+                "payload",
                 serialize_payload(payload_type, payload_value, fact_types),
             );
-            produce.insert("verdict_type".to_owned(), json!(verdict_type));
-            body.insert("produce".to_owned(), Value::Object(produce));
-            body.insert("when".to_owned(), serialize_expr(when, fact_types));
-            m.insert("body".to_owned(), Value::Object(body));
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("Rule"));
-            m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("stratum".to_owned(), json!(stratum));
-            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
+            ins(&mut produce, "verdict_type", json!(verdict_type));
+            ins(&mut body, "produce", Value::Object(produce));
+            ins(&mut body, "when", serialize_expr(when, fact_types));
+            ins(&mut m, "body", Value::Object(body));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("Rule"));
+            ins(&mut m, K_PROVENANCE, serialize_prov(prov));
+            ins(&mut m, "stratum", json!(stratum));
+            ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::Operation {
@@ -202,33 +221,34 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             ..
         } => {
             let mut m = Map::new();
-            m.insert("allowed_personas".to_owned(), json!(allowed_personas));
+            ins(&mut m, "allowed_personas", json!(allowed_personas));
             let effects_arr: Vec<Value> = effects
                 .iter()
                 .map(|(eid, f, t, outcome, _)| {
                     let mut em = Map::new();
-                    em.insert("entity_id".to_owned(), json!(eid));
-                    em.insert("from".to_owned(), json!(f));
+                    ins(&mut em, "entity_id", json!(eid));
+                    ins(&mut em, "from", json!(f));
                     if let Some(o) = outcome {
-                        em.insert("outcome".to_owned(), json!(o));
+                        ins(&mut em, "outcome", json!(o));
                     }
-                    em.insert("to".to_owned(), json!(t));
+                    ins(&mut em, "to", json!(t));
                     Value::Object(em)
                 })
                 .collect();
-            m.insert("effects".to_owned(), Value::Array(effects_arr));
-            m.insert("error_contract".to_owned(), json!(error_contract));
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("Operation"));
+            ins(&mut m, "effects", Value::Array(effects_arr));
+            ins(&mut m, "error_contract", json!(error_contract));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("Operation"));
             if !outcomes.is_empty() {
-                m.insert("outcomes".to_owned(), json!(outcomes));
+                ins(&mut m, "outcomes", json!(outcomes));
             }
-            m.insert(
-                "precondition".to_owned(),
+            ins(
+                &mut m,
+                "precondition",
                 serialize_expr(precondition, fact_types),
             );
-            m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
+            ins(&mut m, K_PROVENANCE, serialize_prov(prov));
+            ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::Flow {
@@ -240,24 +260,21 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             ..
         } => {
             let mut m = Map::new();
-            m.insert("entry".to_owned(), json!(entry));
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("Flow"));
-            m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("snapshot".to_owned(), json!(snapshot));
-            m.insert(
-                "steps".to_owned(),
-                serialize_steps(steps, entry, fact_types),
-            );
-            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
+            ins(&mut m, "entry", json!(entry));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("Flow"));
+            ins(&mut m, K_PROVENANCE, serialize_prov(prov));
+            ins(&mut m, "snapshot", json!(snapshot));
+            ins(&mut m, "steps", serialize_steps(steps, entry, fact_types));
+            ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::Persona { id, prov } => {
             let mut m = Map::new();
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("Persona"));
-            m.insert("provenance".to_owned(), serialize_prov(prov));
-            m.insert("tenor".to_owned(), json!(crate::TENOR_VERSION));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("Persona"));
+            ins(&mut m, K_PROVENANCE, serialize_prov(prov));
+            ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
         RawConstruct::System {
@@ -281,8 +298,8 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
 
 fn serialize_prov(prov: &Provenance) -> Value {
     let mut m = Map::new();
-    m.insert("file".to_owned(), json!(prov.file));
-    m.insert("line".to_owned(), json!(prov.line));
+    ins(&mut m, "file", json!(prov.file));
+    ins(&mut m, "line", json!(prov.line));
     Value::Object(m)
 }
 
@@ -291,8 +308,8 @@ fn serialize_source(source: &str) -> Value {
         let system = &source[..dot];
         let field = &source[dot + 1..];
         let mut m = Map::new();
-        m.insert("field".to_owned(), json!(field));
-        m.insert("system".to_owned(), json!(system));
+        ins(&mut m, "field", json!(field));
+        ins(&mut m, "system", json!(system));
         Value::Object(m)
     } else {
         json!(source)
@@ -306,37 +323,37 @@ fn serialize_type(t: &RawType) -> Value {
         RawType::DateTime => json!({"base": "DateTime"}),
         RawType::Int { min, max } => {
             let mut m = Map::new();
-            m.insert("base".to_owned(), json!("Int"));
-            m.insert("max".to_owned(), json!(max));
-            m.insert("min".to_owned(), json!(min));
+            ins(&mut m, K_BASE, json!("Int"));
+            ins(&mut m, "max", json!(max));
+            ins(&mut m, "min", json!(min));
             Value::Object(m)
         }
         RawType::Decimal { precision, scale } => {
             let mut m = Map::new();
-            m.insert("base".to_owned(), json!("Decimal"));
-            m.insert("precision".to_owned(), json!(precision));
-            m.insert("scale".to_owned(), json!(scale));
+            ins(&mut m, K_BASE, json!("Decimal"));
+            ins(&mut m, "precision", json!(precision));
+            ins(&mut m, "scale", json!(scale));
             Value::Object(m)
         }
         RawType::Text { max_length } => {
             let mut m = Map::new();
-            m.insert("base".to_owned(), json!("Text"));
-            m.insert("max_length".to_owned(), json!(max_length));
+            ins(&mut m, K_BASE, json!("Text"));
+            ins(&mut m, "max_length", json!(max_length));
             Value::Object(m)
         }
         RawType::Enum { values } => json!({"base": "Enum", "values": values}),
         RawType::Money { currency } => {
             let mut m = Map::new();
-            m.insert("base".to_owned(), json!("Money"));
-            m.insert("currency".to_owned(), json!(currency));
+            ins(&mut m, K_BASE, json!("Money"));
+            ins(&mut m, "currency", json!(currency));
             Value::Object(m)
         }
         RawType::Duration { unit, min, max } => {
             let mut m = Map::new();
-            m.insert("base".to_owned(), json!("Duration"));
-            m.insert("max".to_owned(), json!(max));
-            m.insert("min".to_owned(), json!(min));
-            m.insert("unit".to_owned(), json!(unit));
+            ins(&mut m, K_BASE, json!("Duration"));
+            ins(&mut m, "max", json!(max));
+            ins(&mut m, "min", json!(min));
+            ins(&mut m, "unit", json!(unit));
             Value::Object(m)
         }
         RawType::Record { fields } => {
@@ -345,15 +362,15 @@ fn serialize_type(t: &RawType) -> Value {
                 fm.insert(k.clone(), serialize_type(v));
             }
             let mut m = Map::new();
-            m.insert("base".to_owned(), json!("Record"));
-            m.insert("fields".to_owned(), Value::Object(fm));
+            ins(&mut m, K_BASE, json!("Record"));
+            ins(&mut m, "fields", Value::Object(fm));
             Value::Object(m)
         }
         RawType::List { element_type, max } => {
             let mut m = Map::new();
-            m.insert("base".to_owned(), json!("List"));
-            m.insert("element_type".to_owned(), serialize_type(element_type));
-            m.insert("max".to_owned(), json!(max));
+            ins(&mut m, K_BASE, json!("List"));
+            ins(&mut m, "element_type", serialize_type(element_type));
+            ins(&mut m, "max", json!(max));
             Value::Object(m)
         }
         RawType::TypeRef(name) => json!({"base": "TypeRef", "id": name}),
@@ -364,37 +381,37 @@ fn serialize_literal(lit: &RawLiteral) -> Value {
     match lit {
         RawLiteral::Bool(b) => {
             let mut m = Map::new();
-            m.insert("kind".to_owned(), json!("bool_literal"));
-            m.insert("value".to_owned(), json!(b));
+            ins(&mut m, K_KIND, json!("bool_literal"));
+            ins(&mut m, K_VALUE, json!(b));
             Value::Object(m)
         }
         RawLiteral::Int(n) => {
             let mut m = Map::new();
-            m.insert("kind".to_owned(), json!("int_literal"));
-            m.insert("value".to_owned(), json!(n));
+            ins(&mut m, K_KIND, json!("int_literal"));
+            ins(&mut m, K_VALUE, json!(n));
             Value::Object(m)
         }
         RawLiteral::Float(f) => {
             let (precision, scale) = decimal_precision_scale(f);
             let mut m = Map::new();
-            m.insert("kind".to_owned(), json!("decimal_value"));
-            m.insert("precision".to_owned(), json!(precision));
-            m.insert("scale".to_owned(), json!(scale));
-            m.insert("value".to_owned(), json!(f));
+            ins(&mut m, K_KIND, json!("decimal_value"));
+            ins(&mut m, "precision", json!(precision));
+            ins(&mut m, "scale", json!(scale));
+            ins(&mut m, K_VALUE, json!(f));
             Value::Object(m)
         }
         RawLiteral::Str(s) => json!(s),
         RawLiteral::Money { amount, currency } => {
             let (precision, scale) = money_decimal_precision_scale(amount);
             let mut amount_m = Map::new();
-            amount_m.insert("kind".to_owned(), json!("decimal_value"));
-            amount_m.insert("precision".to_owned(), json!(precision));
-            amount_m.insert("scale".to_owned(), json!(scale));
-            amount_m.insert("value".to_owned(), json!(amount));
+            ins(&mut amount_m, K_KIND, json!("decimal_value"));
+            ins(&mut amount_m, "precision", json!(precision));
+            ins(&mut amount_m, "scale", json!(scale));
+            ins(&mut amount_m, K_VALUE, json!(amount));
             let mut m = Map::new();
-            m.insert("amount".to_owned(), Value::Object(amount_m));
-            m.insert("currency".to_owned(), json!(currency));
-            m.insert("kind".to_owned(), json!("money_value"));
+            ins(&mut m, "amount", Value::Object(amount_m));
+            ins(&mut m, "currency", json!(currency));
+            ins(&mut m, K_KIND, json!("money_value"));
             Value::Object(m)
         }
     }
@@ -430,28 +447,25 @@ fn serialize_payload(
         },
         _ => type_.clone(),
     };
-    m.insert("type".to_owned(), serialize_type(&effective_type));
+    ins(&mut m, "type", serialize_type(&effective_type));
     match value {
         RawTerm::Literal(RawLiteral::Bool(b)) => {
-            m.insert("value".to_owned(), json!(b));
+            ins(&mut m, K_VALUE, json!(b));
         }
         RawTerm::Literal(RawLiteral::Int(n)) => {
-            m.insert("value".to_owned(), json!(n));
+            ins(&mut m, K_VALUE, json!(n));
         }
         RawTerm::Literal(RawLiteral::Str(s)) => {
-            m.insert("value".to_owned(), json!(s));
+            ins(&mut m, K_VALUE, json!(s));
         }
         RawTerm::Literal(lit) => {
-            m.insert("value".to_owned(), serialize_literal(lit));
+            ins(&mut m, K_VALUE, serialize_literal(lit));
         }
         RawTerm::Mul { left, right } => {
-            m.insert(
-                "value".to_owned(),
-                serialize_mul_term(left, right, fact_types),
-            );
+            ins(&mut m, K_VALUE, serialize_mul_term(left, right, fact_types));
         }
         _ => {
-            m.insert("value".to_owned(), json!(null));
+            ins(&mut m, K_VALUE, json!(null));
         }
     }
     Value::Object(m)
@@ -467,9 +481,9 @@ fn serialize_mul_term(
         (RawTerm::Literal(RawLiteral::Int(n)), RawTerm::FactRef(_)) => (right, *n),
         _ => {
             let mut m = Map::new();
-            m.insert("left".to_owned(), serialize_term(left));
-            m.insert("op".to_owned(), json!("*"));
-            m.insert("right".to_owned(), serialize_term(right));
+            ins(&mut m, "left", serialize_term(left));
+            ins(&mut m, K_OP, json!("*"));
+            ins(&mut m, "right", serialize_term(right));
             return Value::Object(m);
         }
     };
@@ -492,11 +506,11 @@ fn serialize_mul_term(
         None
     };
     let mut m = Map::new();
-    m.insert("left".to_owned(), serialize_term(fact_term));
-    m.insert("literal".to_owned(), json!(lit_n));
-    m.insert("op".to_owned(), json!("*"));
+    ins(&mut m, "left", serialize_term(fact_term));
+    ins(&mut m, "literal", json!(lit_n));
+    ins(&mut m, K_OP, json!("*"));
     if let Some(rt) = result_type {
-        m.insert("result_type".to_owned(), serialize_type(&rt));
+        ins(&mut m, "result_type", serialize_type(&rt));
     }
     Value::Object(m)
 }
@@ -612,17 +626,17 @@ fn serialize_expr(expr: &RawExpr, fact_types: &HashMap<String, RawType>) -> Valu
             };
             let mut m = Map::new();
             if let Some(ct) = comparison_type_for_compare(left, right, fact_types) {
-                m.insert("comparison_type".to_owned(), serialize_type(&ct));
+                ins(&mut m, "comparison_type", serialize_type(&ct));
             }
-            m.insert("left".to_owned(), serialize_term_ctx(left, fact_types));
-            m.insert("op".to_owned(), json!(op));
+            ins(&mut m, "left", serialize_term_ctx(left, fact_types));
+            ins(&mut m, K_OP, json!(op));
             let right_val = match (right, &left_fact_type) {
                 (RawTerm::Literal(RawLiteral::Str(s)), Some(t @ RawType::Enum { .. })) => {
                     json!({"literal": s, "type": serialize_type(t)})
                 }
                 _ => serialize_term_ctx(right, fact_types),
             };
-            m.insert("right".to_owned(), right_val);
+            ins(&mut m, "right", right_val);
             Value::Object(m)
         }
         RawExpr::VerdictPresent { id, .. } => json!({"verdict_present": id}),
@@ -651,12 +665,12 @@ fn serialize_expr(expr: &RawExpr, fact_types: &HashMap<String, RawType>) -> Valu
                 _ => None,
             };
             let mut m = Map::new();
-            m.insert("body".to_owned(), serialize_expr(body, fact_types));
-            m.insert("domain".to_owned(), json!({"fact_ref": domain}));
-            m.insert("quantifier".to_owned(), json!("forall"));
-            m.insert("variable".to_owned(), json!(var));
+            ins(&mut m, "body", serialize_expr(body, fact_types));
+            ins(&mut m, "domain", json!({"fact_ref": domain}));
+            ins(&mut m, "quantifier", json!("forall"));
+            ins(&mut m, "variable", json!(var));
             if let Some(vt) = variable_type {
-                m.insert("variable_type".to_owned(), serialize_type(&vt));
+                ins(&mut m, "variable_type", serialize_type(&vt));
             }
             Value::Object(m)
         }
@@ -668,12 +682,12 @@ fn serialize_expr(expr: &RawExpr, fact_types: &HashMap<String, RawType>) -> Valu
                 _ => None,
             };
             let mut m = Map::new();
-            m.insert("body".to_owned(), serialize_expr(body, fact_types));
-            m.insert("domain".to_owned(), json!({"fact_ref": domain}));
-            m.insert("quantifier".to_owned(), json!("exists"));
-            m.insert("variable".to_owned(), json!(var));
+            ins(&mut m, "body", serialize_expr(body, fact_types));
+            ins(&mut m, "domain", json!({"fact_ref": domain}));
+            ins(&mut m, "quantifier", json!("exists"));
+            ins(&mut m, "variable", json!(var));
             if let Some(vt) = variable_type {
-                m.insert("variable_type".to_owned(), serialize_type(&vt));
+                ins(&mut m, "variable_type", serialize_type(&vt));
             }
             Value::Object(m)
         }
@@ -709,9 +723,9 @@ fn serialize_term(term: &RawTerm) -> Value {
         },
         RawTerm::Mul { left, right } => {
             let mut m = Map::new();
-            m.insert("left".to_owned(), serialize_term(left));
-            m.insert("op".to_owned(), json!("*"));
-            m.insert("right".to_owned(), serialize_term(right));
+            ins(&mut m, "left", serialize_term(left));
+            ins(&mut m, K_OP, json!("*"));
+            ins(&mut m, "right", serialize_term(right));
             Value::Object(m)
         }
     }
@@ -798,18 +812,18 @@ fn serialize_step(id: &str, step: &RawStep, fact_types: &HashMap<String, RawType
             ..
         } => {
             let mut m = Map::new();
-            m.insert("id".to_owned(), json!(id));
-            m.insert("kind".to_owned(), json!("OperationStep"));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("OperationStep"));
             if let Some(h) = on_failure {
-                m.insert("on_failure".to_owned(), serialize_failure_handler(h));
+                ins(&mut m, "on_failure", serialize_failure_handler(h));
             }
-            m.insert("op".to_owned(), json!(op));
+            ins(&mut m, K_OP, json!(op));
             let mut out_m = Map::new();
             for (label, target) in outcomes {
                 out_m.insert(label.clone(), serialize_step_target(target));
             }
-            m.insert("outcomes".to_owned(), Value::Object(out_m));
-            m.insert("persona".to_owned(), json!(persona));
+            ins(&mut m, "outcomes", Value::Object(out_m));
+            ins(&mut m, "persona", json!(persona));
             Value::Object(m)
         }
         RawStep::BranchStep {
