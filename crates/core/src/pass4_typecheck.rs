@@ -173,14 +173,11 @@ fn type_check_produce(
         let right_range = mul_range_from_term(right, fact_types);
         if let (Some((l_min, l_max)), Some((r_min, r_max))) = (left_range, right_range) {
             let products = [l_min * r_min, l_min * r_max, l_max * r_min, l_max * r_max];
-            let prod_min = *products
-                .iter()
-                .min()
-                .expect("products array has exactly 4 elements");
-            let prod_max = *products
-                .iter()
-                .max()
-                .expect("products array has exactly 4 elements");
+            // SAFETY: products is a fixed-size array of exactly 4 elements,
+            // so min()/max() will always return Some. Using unwrap_or as a
+            // defensive fallback that can never actually trigger.
+            let prod_min = *products.iter().min().unwrap_or(&0);
+            let prod_max = *products.iter().max().unwrap_or(&0);
             if let RawType::Int {
                 min: pt_min,
                 max: pt_max,

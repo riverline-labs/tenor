@@ -46,13 +46,39 @@ fn detect_typedecl_cycle(
         let pos = in_stack
             .iter()
             .position(|x| x == name)
-            .expect("name must be in in_stack when contains() returned true");
+            .ok_or_else(|| {
+                ElabError::new(
+                    3,
+                    Some("TypeDecl"),
+                    Some(name),
+                    None,
+                    "",
+                    0,
+                    format!(
+                        "internal error: type '{}' reported in cycle stack by contains() but not found by position()",
+                        name
+                    ),
+                )
+            })?;
         let mut cycle: Vec<String> = in_stack[pos..].to_vec();
         cycle.push(name.to_owned());
         let cycle_str = cycle.join(" \u{2192} ");
         let back_edge_name = in_stack
             .last()
-            .expect("in_stack is non-empty because it contains name");
+            .ok_or_else(|| {
+                ElabError::new(
+                    3,
+                    Some("TypeDecl"),
+                    Some(name),
+                    None,
+                    "",
+                    0,
+                    format!(
+                        "internal error: in_stack is unexpectedly empty while processing type cycle for '{}'",
+                        name
+                    ),
+                )
+            })?;
         let (fields, prov) = decls.get(back_edge_name.as_str()).ok_or_else(|| {
             ElabError::new(
                 3,
@@ -95,7 +121,20 @@ fn detect_typedecl_cycle(
     in_stack.push(name.to_owned());
     let (fields, _) = decls
         .get(name)
-        .expect("name existence in decls verified by contains_key() guard above")
+        .ok_or_else(|| {
+            ElabError::new(
+                3,
+                Some("TypeDecl"),
+                Some(name),
+                None,
+                "",
+                0,
+                format!(
+                    "internal error: type '{}' not found in declarations despite passing contains_key() guard",
+                    name
+                ),
+            )
+        })?
         .clone();
     for t in fields.values() {
         for ref_name in type_refs(t) {

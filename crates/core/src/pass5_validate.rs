@@ -839,7 +839,20 @@ fn dfs_flow_refs<'a>(
                 let cycle_start = path
                     .iter()
                     .position(|&s| s == ref_flow)
-                    .expect("ref_flow must be in path when cycle detected via in_path");
+                    .ok_or_else(|| {
+                        ElabError::new(
+                            5,
+                            Some("Flow"),
+                            Some(flow_id),
+                            Some("steps"),
+                            &prov.file,
+                            prov.line,
+                            format!(
+                                "internal error: flow '{}' detected in cycle path via in_path set but not found in path vector",
+                                ref_flow
+                            ),
+                        )
+                    })?;
                 let mut cycle_nodes: Vec<&str> = path[cycle_start..].to_vec();
                 cycle_nodes.push(ref_flow);
                 let cycle_str = cycle_nodes.join(" \u{2192} ");
@@ -1340,7 +1353,20 @@ fn trigger_dfs<'a>(
                 let cycle_start = path
                     .iter()
                     .position(|&n| n == neighbor)
-                    .expect("neighbor must be in path when back-edge detected via in_path");
+                    .ok_or_else(|| {
+                        ElabError::new(
+                            5,
+                            Some("System"),
+                            Some(system_id),
+                            Some("triggers"),
+                            &prov.file,
+                            prov.line,
+                            format!(
+                                "internal error: trigger node ({}, {}) detected in cycle via in_path set but not found in path vector",
+                                neighbor.0, neighbor.1
+                            ),
+                        )
+                    })?;
                 let mut cycle_nodes: Vec<String> = path[cycle_start..]
                     .iter()
                     .map(|(c, f)| format!("{}.{}", c, f))
