@@ -1,3 +1,4 @@
+use crate::manifest;
 use crate::tap::Tap;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -252,7 +253,7 @@ fn run_manifest_test(tenor_path: &Path, expected_path: &Path, name: &str, tap: &
 
     match elaborate::elaborate(tenor_path) {
         Ok(bundle) => {
-            let manifest = crate::manifest::build_manifest(bundle);
+            let manifest = manifest::build_manifest(bundle);
 
             if json_equal(&manifest, &expected_json) {
                 tap.ok(&test_name);
