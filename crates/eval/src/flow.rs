@@ -98,12 +98,17 @@ fn handle_failure(
     entity_changes_all: &mut Vec<EffectRecord>,
 ) -> Result<Option<FlowResult>, EvalError> {
     match handler {
-        FailureHandler::Terminate { outcome } => Ok(Some(FlowResult {
-            outcome: outcome.clone(),
-            steps_executed: steps_executed.clone(),
-            entity_state_changes: entity_changes_all.clone(),
-            initiating_persona: None, // Caller sets this
-        })),
+        FailureHandler::Terminate { outcome } => {
+            // Use std::mem::take() instead of clone() -- the caller returns
+            // immediately after receiving Some(FlowResult), so the original
+            // vectors are never accessed again.
+            Ok(Some(FlowResult {
+                outcome: outcome.clone(),
+                steps_executed: std::mem::take(steps_executed),
+                entity_state_changes: std::mem::take(entity_changes_all),
+                initiating_persona: None, // Caller sets this
+            }))
+        }
         FailureHandler::Compensate { steps, then } => {
             // Execute compensation steps in order per spec Section 11.3
             for comp_step in steps {
@@ -140,10 +145,11 @@ fn handle_failure(
                         });
                         match &comp_step.on_failure {
                             StepTarget::Terminal { outcome } => {
+                                // take() instead of clone() -- terminal return
                                 return Ok(Some(FlowResult {
                                     outcome: outcome.clone(),
-                                    steps_executed: steps_executed.clone(),
-                                    entity_state_changes: entity_changes_all.clone(),
+                                    steps_executed: std::mem::take(steps_executed),
+                                    entity_state_changes: std::mem::take(entity_changes_all),
                                     initiating_persona: None,
                                 }));
                             }
@@ -166,12 +172,15 @@ fn handle_failure(
             }
             // All compensation succeeded -- route to `then`
             match then {
-                StepTarget::Terminal { outcome } => Ok(Some(FlowResult {
-                    outcome: outcome.clone(),
-                    steps_executed: steps_executed.clone(),
-                    entity_state_changes: entity_changes_all.clone(),
-                    initiating_persona: None,
-                })),
+                StepTarget::Terminal { outcome } => {
+                    // take() instead of clone() -- terminal return
+                    Ok(Some(FlowResult {
+                        outcome: outcome.clone(),
+                        steps_executed: std::mem::take(steps_executed),
+                        entity_state_changes: std::mem::take(entity_changes_all),
+                        initiating_persona: None,
+                    }))
+                }
                 StepTarget::StepRef(_next_id) => {
                     // Caller will set current_step_id
                     Ok(None)

@@ -7,6 +7,8 @@
 //! a stratum does not matter. Higher stratum rules CAN reference verdicts
 //! produced by lower strata.
 
+use std::collections::BTreeMap;
+
 use crate::predicate::{eval_pred, EvalContext};
 use crate::provenance::ProvenanceCollector;
 use crate::types::{
@@ -15,10 +17,9 @@ use crate::types::{
 
 /// Evaluate all rules in stratum order, producing a VerdictSet.
 ///
-/// For each stratum from 0 to max_stratum:
-/// 1. Collect all rules at current stratum
-/// 2. Evaluate each rule's condition against facts + accumulated verdicts
-/// 3. If condition is true, compute payload and add verdict with provenance
+/// Uses a BTreeMap stratum index for O(n) build + O(n) evaluate, replacing
+/// the previous O(k*n) double-scan (find max_stratum, then filter per stratum).
+/// BTreeMap iteration is in key order, ensuring correct stratum sequencing.
 pub fn eval_strata(contract: &Contract, facts: &FactSet) -> Result<VerdictSet, EvalError> {
     let mut verdicts = VerdictSet::new();
 
@@ -26,13 +27,16 @@ pub fn eval_strata(contract: &Contract, facts: &FactSet) -> Result<VerdictSet, E
         return Ok(verdicts);
     }
 
-    let max_stratum = contract.rules.iter().map(|r| r.stratum).max().unwrap_or(0);
+    // Build stratum index once: O(n) where n = number of rules
+    let mut stratum_index: BTreeMap<u32, Vec<&crate::types::Rule>> = BTreeMap::new();
+    for rule in &contract.rules {
+        stratum_index.entry(rule.stratum).or_default().push(rule);
+    }
 
-    for n in 0..=max_stratum {
-        let stratum_rules: Vec<_> = contract.rules.iter().filter(|r| r.stratum == n).collect();
-
-        for rule in stratum_rules {
-            if let Some(verdict) = eval_rule(rule, facts, &verdicts, n)? {
+    // Evaluate in stratum order (BTreeMap iterates in key order): O(n) total
+    for (stratum, rules) in &stratum_index {
+        for rule in rules {
+            if let Some(verdict) = eval_rule(rule, facts, &verdicts, *stratum)? {
                 verdicts.push(verdict);
             }
         }
