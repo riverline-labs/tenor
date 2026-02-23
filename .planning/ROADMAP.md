@@ -23,7 +23,7 @@
 Plans:
 - [ ] 18-01-PLAN.md — Shared interchange deserialization library (HARD-01, HARD-27)
 - [ ] 18-02-PLAN.md — Core error hardening: expect removal, HashSet cycles, string alloc reduction (HARD-03, HARD-22, HARD-23)
-- [ ] 18-03-PLAN.md — Parser error recovery + WASM I/O trait (HARD-04, HARD-05)
+- [x] 18-03-PLAN.md — Parser error recovery + WASM I/O trait (HARD-04, HARD-05)
 - [ ] 18-04-PLAN.md — Eval performance: HashMap indexes, stratum indexing, flow clone elimination (HARD-13, HARD-17, HARD-18)
 - [ ] 18-05-PLAN.md — Cleanup: dead code, duplicates, version constants, configurable limits (HARD-07, HARD-15, HARD-16, HARD-19, HARD-21)
 - [ ] 18-06-PLAN.md — Production HTTP stack with axum + tokio (HARD-06, HARD-08, HARD-09)

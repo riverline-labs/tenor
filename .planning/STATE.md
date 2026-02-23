@@ -3,9 +3,9 @@
 ## Current Position
 
 Phase: 18 (Platform Hardening)
-Plan: 5 of 9
+Plan: 6 of 9
 Status: Executing plans
-Last activity: 2026-02-23 — Completed 18-05 (code hygiene cleanup)
+Last activity: 2026-02-23 — Completed 18-03 (parser error recovery + WASM I/O trait)
 
 ## Project Reference
 
@@ -41,3 +41,6 @@ None.
 - spec_sections field removed from ambiguity module (not wired through)
 - All version strings verified to use TENOR_VERSION/TENOR_BUNDLE_VERSION constants
 - FlowPathConfig provides configurable S6 analysis limits
+- SourceProvider trait abstracts file I/O for WASM-ready elaboration (source.rs)
+- Parser multi-error recovery available via parse_recovering() (opt-in)
+- InMemoryProvider enables filesystem-free elaboration for WASM and testing

@@ -9,8 +9,8 @@
 - [ ] **HARD-01**: Shared interchange deserialization library replaces triplicated parsing in eval, analyze, and codegen
 - [ ] **HARD-02**: explain.rs uses typed interchange structs instead of untyped JSON traversal with silent fallbacks
 - [ ] **HARD-03**: All expect() calls in pass5_validate.rs and pass3_types.rs replaced with proper error propagation
-- [ ] **HARD-04**: Parser recovers from first error and reports multiple diagnostics per parse
-- [ ] **HARD-05**: tenor-core file I/O factored behind a trait so elaborate() works without filesystem (WASM prerequisite)
+- [x] **HARD-04**: Parser recovers from first error and reports multiple diagnostics per parse
+- [x] **HARD-05**: tenor-core file I/O factored behind a trait so elaborate() works without filesystem (WASM prerequisite)
 - [ ] **HARD-06**: libc dependency in serve.rs isolated from tenor-core and tenor-eval crate graph
 - [x] **HARD-07**: spec_sections dead code in ambiguity testing removed or wired through
 - [ ] **HARD-08**: HTTP stack replaced with production-grade framework (axum or actix-web) with TLS and concurrent request handling
