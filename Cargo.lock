@@ -2194,6 +2194,7 @@ dependencies = [
  "tenor-interchange",
  "tenor-lsp",
  "tokio",
+ "tower-http",
  "ureq",
 ]
 
@@ -2244,6 +2245,7 @@ dependencies = [
  "lsp-types",
  "serde",
  "serde_json",
+ "tempfile",
  "tenor-analyze",
  "tenor-core",
 ]

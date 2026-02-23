@@ -3,8 +3,14 @@
 //! Exposes the Rust elaborator and evaluator as an async HTTP service
 //! using `axum` + `tokio`. Supports concurrent request handling.
 //!
+//! Security features:
+//! - Input validation on elaborate endpoint (size, encoding, imports, filename)
+//! - CORS headers on all responses (permissive for local dev)
+//! - Per-IP rate limiting (default: 60 req/min, configurable)
+//! - Optional API key authentication via TENOR_API_KEY env var
+//!
 //! Endpoints:
-//! - GET  /health                      - Server status
+//! - GET  /health                      - Server status (exempt from auth)
 //! - GET  /contracts                   - List loaded contract bundles
 //! - GET  /contracts/{id}/operations   - Operations for a specific contract
 //! - POST /elaborate                   - Elaborate .tenor source text
@@ -14,15 +20,19 @@
 //! All responses use Content-Type: application/json.
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 
-use axum::extract::{DefaultBodyLimit, Path, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, State};
+use axum::http::{Method, Request, StatusCode};
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
+use tower_http::cors::{Any, CorsLayer};
 
 use super::explain;
 
@@ -32,16 +42,149 @@ const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
 /// Maximum source content size for the elaborate endpoint: 1 MB.
 const MAX_SOURCE_SIZE: usize = 1024 * 1024;
 
+/// Default rate limit: 60 requests per minute per IP.
+const DEFAULT_RATE_LIMIT: u64 = 60;
+
+/// Rate limit window duration in seconds (1 minute).
+const RATE_LIMIT_WINDOW_SECS: u64 = 60;
+
+// --- Rate limiter ---
+
+/// Per-IP request tracker: (request count, window start time).
+type IpTracker = HashMap<IpAddr, (u64, Instant)>;
+
+/// In-memory per-IP rate limiter.
+struct RateLimiter {
+    /// Request counts per IP per window.
+    tracker: Mutex<IpTracker>,
+    /// Maximum requests per window.
+    max_requests: u64,
+}
+
+impl RateLimiter {
+    fn new(max_requests: u64) -> Self {
+        Self {
+            tracker: Mutex::new(HashMap::new()),
+            max_requests,
+        }
+    }
+
+    /// Check if a request from the given IP is allowed.
+    /// Returns Ok(()) if allowed, Err(retry_after_secs) if rate limited.
+    async fn check(&self, ip: IpAddr) -> Result<(), u64> {
+        let mut tracker = self.tracker.lock().await;
+        let now = Instant::now();
+
+        let entry = tracker.entry(ip).or_insert((0, now));
+
+        // Reset window if expired
+        let elapsed = now.duration_since(entry.1).as_secs();
+        if elapsed >= RATE_LIMIT_WINDOW_SECS {
+            entry.0 = 0;
+            entry.1 = now;
+        }
+
+        entry.0 += 1;
+        if entry.0 > self.max_requests {
+            let retry_after = RATE_LIMIT_WINDOW_SECS.saturating_sub(elapsed);
+            Err(retry_after)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// Application state shared across request handlers.
 struct AppState {
     /// Loaded contract bundles keyed by bundle ID.
     contracts: RwLock<HashMap<String, serde_json::Value>>,
+    /// Per-IP rate limiter.
+    rate_limiter: RateLimiter,
+    /// Optional API key for authentication. None = no auth required.
+    api_key: Option<String>,
+}
+
+// --- Middleware ---
+
+/// Rate limiting middleware. Checks per-IP request rate before routing.
+async fn rate_limit_middleware(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>,
+    request: Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    let ip = addr.ip();
+    match state.rate_limiter.check(ip).await {
+        Ok(()) => next.run(request).await,
+        Err(retry_after) => {
+            let body = serde_json::json!({
+                "error": "rate limit exceeded",
+                "retry_after": retry_after,
+            });
+            (StatusCode::TOO_MANY_REQUESTS, Json(body)).into_response()
+        }
+    }
+}
+
+/// API key authentication middleware.
+///
+/// If `TENOR_API_KEY` is set, all requests (except /health) must include
+/// either `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+async fn auth_middleware(
+    State(state): State<Arc<AppState>>,
+    request: Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    let expected_key = match &state.api_key {
+        Some(k) => k,
+        None => return next.run(request).await, // No auth configured
+    };
+
+    // /health is exempt from auth (for load balancer health checks)
+    if request.uri().path() == "/health" {
+        return next.run(request).await;
+    }
+
+    // Check Authorization: Bearer <key>
+    let auth_header = request
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok());
+
+    if let Some(auth) = auth_header {
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            if token == expected_key {
+                return next.run(request).await;
+            }
+            return json_error(StatusCode::FORBIDDEN, "invalid API key").into_response();
+        }
+    }
+
+    // Check X-API-Key header
+    let api_key_header = request
+        .headers()
+        .get("x-api-key")
+        .and_then(|v| v.to_str().ok());
+
+    if let Some(key) = api_key_header {
+        if key == expected_key {
+            return next.run(request).await;
+        }
+        return json_error(StatusCode::FORBIDDEN, "invalid API key").into_response();
+    }
+
+    json_error(StatusCode::UNAUTHORIZED, "authentication required").into_response()
 }
 
 /// Start the HTTP server on the given port, optionally pre-loading contracts.
 ///
 /// When TLS cert/key paths are provided, the server listens over HTTPS
 /// using `axum-server` with rustls. Otherwise it uses plain HTTP.
+///
+/// Security:
+/// - CORS: Permissive (`Any` origin) for local dev; tighten for production.
+/// - Rate limit: Per-IP, configurable via `rate_limit` param (default 60 req/min).
+/// - API key: If `TENOR_API_KEY` env var is set, all endpoints except /health require auth.
 pub async fn start_server(
     port: u16,
     contract_paths: Vec<PathBuf>,
@@ -68,9 +211,33 @@ pub async fn start_server(
         }
     }
 
+    // Rate limit: from TENOR_RATE_LIMIT env var, or default
+    let rate_limit = std::env::var("TENOR_RATE_LIMIT")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_RATE_LIMIT);
+
+    // API key: from TENOR_API_KEY env var (None = no auth)
+    let api_key = std::env::var("TENOR_API_KEY")
+        .ok()
+        .filter(|k| !k.is_empty());
+
+    if api_key.is_some() {
+        eprintln!("API key authentication enabled");
+    }
+    eprintln!("Rate limit: {} requests per minute per IP", rate_limit);
+
     let state = Arc::new(AppState {
         contracts: RwLock::new(contracts),
+        rate_limiter: RateLimiter::new(rate_limit),
+        api_key,
     });
+
+    // CORS: permissive for local dev (Phase 22 will tighten for production)
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers(Any);
 
     let app = Router::new()
         .route("/health", get(handle_health))
@@ -80,6 +247,15 @@ pub async fn start_server(
         .route("/evaluate", post(handle_evaluate))
         .route("/explain", post(handle_explain))
         .fallback(handle_not_found)
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit_middleware,
+        ))
+        .layer(cors)
         .layer(DefaultBodyLimit::max(MAX_BODY_SIZE))
         .with_state(state);
 
@@ -93,16 +269,19 @@ pub async fn start_server(
         let socket_addr: std::net::SocketAddr = addr.parse()?;
         eprintln!("Tenor evaluator listening on https://0.0.0.0:{}", port);
         axum_server::bind_rustls(socket_addr, config)
-            .serve(app.into_make_service())
+            .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
             .await?;
         return Ok(());
     }
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     eprintln!("Tenor evaluator listening on http://0.0.0.0:{}", port);
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     eprintln!("\nServer shut down.");
     Ok(())
