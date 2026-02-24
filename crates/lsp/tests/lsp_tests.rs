@@ -24,9 +24,7 @@ fn build_index_from_source(source: &str) -> (tenor_lsp::navigation::ProjectIndex
         let path_str = abs.to_string_lossy().to_string();
         #[cfg(windows)]
         let uri_str = {
-            let p = path_str
-                .strip_prefix(r"\\?\")
-                .unwrap_or(&path_str);
+            let p = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
             format!("file:///{}", p.replace('\\', "/"))
         };
         #[cfg(not(windows))]
