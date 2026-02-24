@@ -4,7 +4,8 @@
 
 Phase: 2 (Execution Kernel)
 Status: Not started
-Last activity: 2026-02-24 — Roadmap restructured, deferred fluff phases, inserted tenor-executor
+Last activity: 2026-02-24 — Two-repo split: tenor (public) + tenor-platform (private)
+Repository: riverline-labs/tenor-platform
 
 ## Project Reference
 
@@ -12,6 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** A contract authored in TenorDSL must be statically verifiable, evaluable against facts, and usable by agents and developers — the full lifecycle from specification to execution with provenance at every step.
 **Current focus:** Platform & Ecosystem — phases 1-4
+**Repo split:** riverline-labs/tenor (public) + riverline-labs/tenor-platform (private)
 
 ## Completed
 
