@@ -2,16 +2,16 @@
 
 ## Current Position
 
-Phase: 2 (AI Authoring Assistant)
+Phase: 2 (Execution Kernel)
 Status: Not started
-Last activity: 2026-02-23 — Completed Phase 1 (Agent Skill Examples)
+Last activity: 2026-02-24 — Roadmap restructured, deferred fluff phases, inserted tenor-executor
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** A contract authored in TenorDSL must be statically verifiable, evaluable against facts, and usable by agents and developers — the full lifecycle from specification to execution with provenance at every step.
-**Current focus:** Platform & Ecosystem — phases 1-7
+**Current focus:** Platform & Ecosystem — phases 1-4
 
 ## Completed
 
