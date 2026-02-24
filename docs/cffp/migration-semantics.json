@@ -1,0 +1,511 @@
+{
+  "protocol": {
+    "name": "Constraint-First Formalization Protocol",
+    "version": "0.2.1",
+    "description": "Invariant-driven semantic design. Candidates survive pressure or die."
+  },
+  "construct": {
+    "name": "Migration Semantics",
+    "description": "Breaking change taxonomy and diff representation for contract version transitions. Classifies every construct-level change as breaking or non-breaking, and determines whether the migration output is expressed as a Tenor contract, JSON interchange diff, or hybrid.",
+    "depends_on": ["Fact", "Entity", "Rule", "Persona", "Operation", "Flow", "TypeDecl"]
+  },
+  "version": "1.0",
+  "phase1": {
+    "invariants": [
+      {
+        "id": "MI1",
+        "description": "Diff completeness: The diff representation must capture every semantic change between two contract versions. No change that affects evaluation outcomes, entity state transitions, verdict resolution, operation preconditions, flow routing, or persona authority may be omitted from the diff. Completeness is verified by showing that for any two interchange bundles B1 and B2 where B1 != B2, if the diff is empty then B1 and B2 are semantically equivalent (produce identical evaluation results for all valid inputs).",
+        "testable": true,
+        "structural": true,
+        "class": "completeness"
+      },
+      {
+        "id": "MI2",
+        "description": "Diff determinism: Given the same two contract versions (represented as interchange bundles), the diff output must be identical regardless of which conforming elaborator produced the bundles. The diff is a function of the interchange JSON content, not of elaborator internals. Two bundles are 'the same' if they are byte-for-byte identical after canonical serialization (sorted keys, Pass 6).",
+        "testable": true,
+        "structural": true,
+        "class": "determinism"
+      },
+      {
+        "id": "MI3",
+        "description": "Classification decidability: For every change captured in the diff, the breaking/non-breaking classification must be decidable at static analysis time without runtime information. The classification function takes a diff entry (construct_kind, field, change_type, before_value, after_value) and returns BREAKING, NON_BREAKING, or REQUIRES_ANALYSIS. The REQUIRES_ANALYSIS classification is permitted only for predicate expression changes where static comparison of predicate strength is undecidable; all other classifications must be definitively BREAKING or NON_BREAKING.",
+        "testable": true,
+        "structural": true,
+        "class": "decidability"
+      },
+      {
+        "id": "MI4",
+        "description": "Taxonomy exhaustiveness: Every (construct_kind, field, change_type) triple that is representable in the interchange schema must have a classification in the taxonomy. There must be no 'unknown' or unclassified entries. The construct kinds are: Fact, Entity, Rule, Persona, Operation, Flow. The change types are: add, remove, change. Every field defined in docs/interchange-schema.json for each construct kind must appear in the taxonomy.",
+        "testable": true,
+        "structural": true,
+        "class": "completeness"
+      },
+      {
+        "id": "MI5",
+        "description": "Policy declaration mandatory: An executor deploying a new contract version that contains any BREAKING changes (as classified by the taxonomy) MUST declare its in-flight flow migration policy before the new version becomes active. The policy is one of: blue_green (new flows on new version, in-flight flows complete on old version), force_migrate (all flows transition to new version), or abort (in-flight flows with breaking changes are terminated). Deployment without a declared policy when breaking changes exist is a conformance violation.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "MI6",
+        "description": "Policy does not affect contract semantics: The migration policy is an executor deployment concern. It does not change the evaluation model (eval_pred, eval_strata), verdict resolution, entity state machine semantics, operation execution semantics, or flow execution semantics. A contract's meaning is identical regardless of which migration policy an executor declares. The policy affects only how the executor manages the transition between contract versions, not what the contracts mean.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "MI7",
+        "description": "Policy completeness: A declared migration policy must address all in-flight flows, not a subset. The policy applies uniformly to every flow instance that was initiated under the previous contract version and has not yet reached a terminal state. Selective application (e.g., force-migrate some flows, abort others) requires the executor to declare per-flow-type policies covering every active flow type, with no flow type left unaddressed.",
+        "testable": true,
+        "structural": true,
+        "class": "completeness"
+      }
+    ]
+  },
+  "phase2": {
+    "candidates": [
+      {
+        "id": "A",
+        "description": "Interchange Diff: Output is structured JSON describing structural changes between two interchange bundles. Each change is a DiffEntry keyed by (construct_kind, construct_id) with field-level before/after values. This is the approach already implemented in diff.rs (MIGR-01). The diff is metadata about contracts, not a contract itself.",
+        "formalism": {
+          "structure": "Diff = [DiffEntry] where DiffEntry = {kind: ConstructKind, id: ConstructId, change_type: 'added' | 'removed' | 'changed', fields: [{field: FieldName, before: Value | null, after: Value | null}]}. The diff is a flat list of entries, one per changed construct. For 'added' constructs, before is null for all fields. For 'removed' constructs, after is null for all fields. For 'changed' constructs, only modified fields appear in the fields list. ConstructKind is one of: Fact, Entity, Rule, Persona, Operation, Flow. The diff is keyed by (kind, id), not by array position — ensuring stability across reorderings.",
+          "evaluation_rule": "The diff is not evaluated by the Tenor evaluator. It is consumed by external tooling (CLI, CI pipelines, migration planners). The breaking change classification is a pure function applied to each DiffEntry: classify(entry) = lookup(entry.kind, entry.field, entry.change_type) in the taxonomy table. The overall diff classification is BREAKING if any entry is BREAKING.",
+          "resolution_rule": "No resolution needed — the diff is a deterministic function of two interchange bundles. Conflicts are impossible because each construct has a unique (kind, id) pair and each field has a single value. The diff is computed by iterating over the union of construct ids in both bundles and comparing field values."
+        },
+        "claims": [
+          {
+            "invariant_id": "MI1",
+            "argument": "The diff iterates over every construct in both bundles, keyed by (kind, id). For each construct present in either bundle, every field is compared. Fields that differ produce a DiffEntry field record. Constructs present in only one bundle produce 'added' or 'removed' entries with all fields listed. Since the diff examines every field of every construct, and the interchange bundle is the complete canonical representation of a contract (by Pass 6 serialization), no semantic change can be omitted. Completeness follows from the exhaustive enumeration of the interchange schema's construct fields."
+          },
+          {
+            "invariant_id": "MI2",
+            "argument": "The diff operates on interchange JSON, which has canonical serialization (sorted keys, deterministic numeric representations). Two conforming elaborators processing the same .tenor source produce byte-for-byte identical interchange (enforced by conformance testing). Therefore the diff input is deterministic, and the diff algorithm (field-by-field comparison, sorted output) is deterministic. The same two bundles always produce the same diff."
+          },
+          {
+            "invariant_id": "MI3",
+            "argument": "The taxonomy is a static lookup table keyed by (construct_kind, field, change_type). Given a DiffEntry, the classification is a table lookup — no runtime information is needed. For predicate expression changes (rule body.when, operation precondition), the classification is REQUIRES_ANALYSIS because static comparison of predicate strength requires theorem proving. For all other fields, the classification is definitively BREAKING or NON_BREAKING based on the field's semantics as defined in the spec."
+          },
+          {
+            "invariant_id": "MI4",
+            "argument": "The taxonomy is constructed by systematic enumeration of docs/interchange-schema.json. Every field in every construct definition ($defs/Fact, $defs/Entity, $defs/Rule, $defs/Persona, $defs/Operation, $defs/Flow) is listed with classifications for add, remove, and change operations. The enumeration is mechanical and verifiable by cross-referencing the taxonomy entries against the JSON Schema field definitions."
+          }
+        ],
+        "complexity": {
+          "time": "O(C * F) where C = number of constructs in the larger bundle, F = maximum field count per construct. Linear in contract size.",
+          "space": "O(D) where D = number of diff entries (changed constructs). Bounded by C.",
+          "static": "O(D) for classification — one taxonomy lookup per diff entry field."
+        },
+        "failure_modes": [
+          {
+            "description": "No composability: two diffs cannot be composed to produce a transitive diff (v1->v2 + v2->v3 != v1->v3). Diff composition requires re-diffing the original bundles.",
+            "trigger": "Any attempt to chain migrations without access to the original interchange bundles",
+            "severity": "degraded"
+          },
+          {
+            "description": "No self-validation: the diff cannot be validated by the Tenor evaluator because it is not a Tenor contract. Correctness of the diff depends entirely on the diff algorithm, not on the evaluation model.",
+            "trigger": "Desire to use Tenor's own validation infrastructure to check migration correctness",
+            "severity": "degraded"
+          },
+          {
+            "description": "No self-reference: the diff format cannot describe changes to itself. If the diff format evolves, there is no way to express that evolution in the diff format.",
+            "trigger": "Future changes to the diff representation",
+            "severity": "ergonomic"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "description": "Migration as Tenor Contract: Output is a .tenor file (or equivalent Tenor contract in interchange JSON) that uses the DSL's own constructs to describe the transformation between two contract versions. Facts represent before/after state, Entities represent construct lifecycle, Rules classify changes, Operations describe migration steps, Flows sequence multi-step migrations. The migration contract is consumable by the evaluator.",
+        "formalism": {
+          "structure": "MigrationContract = TenorContract where: (1) Facts capture diff metadata (e.g., fact construct_kind { type: Enum([Fact, Entity, Rule, Persona, Operation, Flow]) }, fact change_type { type: Enum([added, removed, changed]) }); (2) Entities model construct lifecycle (e.g., entity ConstructLifecycle { states: [stable, added, removed, modified] }); (3) Rules classify changes (e.g., rule classify_state_removal { when: construct_kind = 'Entity' and change_type = 'removed' ... produce: breaking_change(...) }); (4) Operations describe migration actions; (5) Flows sequence multi-step migrations. The migration contract imports or references the contracts it migrates.",
+          "evaluation_rule": "The migration contract is evaluated by the standard Tenor evaluator. Facts are populated with diff data (each changed construct becomes a fact set). Rules fire to produce verdicts classifying each change. Operations execute migration steps. Flows orchestrate multi-step migrations. The evaluator produces verdicts about whether the migration is safe, complete, and valid.",
+          "resolution_rule": "Standard Tenor resolution rules apply. Stratum ordering for classification rules. Exhaustive outcome handling for migration operations. Frozen verdict semantics for migration flows. No new resolution mechanisms required."
+        },
+        "claims": [
+          {
+            "invariant_id": "MI1",
+            "argument": "Diff completeness is achieved by encoding every construct change as a Fact in the migration contract. Since Facts are typed and the type system is closed, every field value can be represented. The migration contract's Rules then process these Facts to produce classification verdicts. Completeness follows from the exhaustive Fact encoding of the diff — if a change is not represented as a Fact, the migration contract cannot classify it, which is detectable by coverage analysis."
+          },
+          {
+            "invariant_id": "MI2",
+            "argument": "The migration contract is generated deterministically from two interchange bundles. The generation algorithm produces the same .tenor source (and thus the same interchange JSON) for the same input bundles. Evaluation of the migration contract is deterministic by the Tenor evaluation model's determinism guarantees. Therefore the classification output is deterministic."
+          },
+          {
+            "invariant_id": "MI3",
+            "argument": "Classification is performed by Rule evaluation, which is decidable (Rules are quantifier-free first-order logic over ground terms, with stratified evaluation). The Rules in the migration contract encode the taxonomy as predicate logic. Static analysis (S1-S7) can verify that the Rules cover all cases and produce correct classifications. The classification is decidable because Rule evaluation is decidable."
+          },
+          {
+            "invariant_id": "MI4",
+            "argument": "Taxonomy exhaustiveness is expressed as a completeness property of the migration contract's Rules: for every (construct_kind, field, change_type) triple, there exists a Rule that produces a classification verdict. This property is statically verifiable by checking that the Rule predicates partition the input space. The Tenor evaluator's stratum mechanism ensures all Rules fire in the correct order."
+          }
+        ],
+        "complexity": {
+          "time": "O(C * F * R) where C = construct count, F = field count, R = rule count in the migration contract. The migration contract's rule count is proportional to the taxonomy size (fixed). Effectively O(C * F) with a larger constant factor than Candidate A.",
+          "space": "O(C * F) for the migration contract's fact set, plus O(R) for the rule set. The migration contract is larger than a simple diff.",
+          "static": "O(R * S) where R = rule count, S = stratum count. Standard Tenor static analysis complexity applies to the migration contract."
+        },
+        "failure_modes": [
+          {
+            "description": "Requires meta-level constructs not in v1.0 spec. Expressing 'Entity state was added' as a Tenor entity requires either: (a) new meta-constructs (MetaEntity, MetaFact) not in the spec, or (b) repurposing existing constructs in conventionalized ways they were not designed for (e.g., using Enum facts to represent construct kinds). Option (a) violates the spec freeze. Option (b) is semantically misleading — a Fact about a construct change is not the same kind of thing as a Fact about a business domain value.",
+            "trigger": "Any attempt to generate a migration contract for a non-trivial diff",
+            "severity": "fatal"
+          },
+          {
+            "description": "Circular dependency risk: the migration contract references the contracts it migrates. If the migration contract imports contract v1 and contract v2, and either contract imports the migration contract (or a previous migration contract), circular imports result. Even without direct circularity, the import semantics are unclear — does the migration contract import the .tenor source or the interchange JSON?",
+            "trigger": "Migration contract generation for contracts with import chains",
+            "severity": "fatal"
+          },
+          {
+            "description": "Evaluator expressiveness gap: the Tenor evaluator evaluates business domain contracts. A migration contract describes meta-level transformations (adding states, removing fields, changing types). The evaluator has no built-in support for type comparison, schema diffing, or structural transformation. Rules can compare equality of simple values but cannot express 'type T2 is wider than type T1' without encoding type comparison logic as predicate expressions, which may exceed the evaluator's expressiveness.",
+            "trigger": "Migration contracts involving type changes (widening, narrowing, base type changes)",
+            "severity": "fatal"
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "description": "Hybrid: Structural diff for raw output (tenor diff), migration contract generation for tenor diff --migration. Both representations serve different use cases. The JSON DiffEntry format (Candidate A's structure) is the primary diff output. The Tenor migration contract (Candidate B's approach) is an optional secondary output generated from the diff. The migration contract uses Tenor constructs in a conventionalized way to express migration semantics, with acknowledged limitations.",
+        "formalism": {
+          "structure": "HybridDiff = {diff: [DiffEntry], migration_contract?: TenorContract}. The diff component follows Candidate A's structure exactly. The migration_contract component, when generated, follows Candidate B's structure but with scope narrowings: (1) the migration contract uses existing v1.0 constructs only — no meta-constructs, (2) construct-level changes are modeled as Enum-typed Facts rather than as Entities with lifecycle states, (3) type comparison is simplified to equality checking rather than widening/narrowing analysis, (4) the migration contract does not import the contracts it migrates — it is self-contained with diff data encoded as Facts.",
+          "evaluation_rule": "Two evaluation modes: (1) tenor diff produces DiffEntry JSON — no evaluation, pure structural comparison. (2) tenor diff --migration generates a Tenor contract from the diff, then optionally evaluates it. The migration contract evaluation follows standard Tenor semantics. The diff JSON is always produced; the migration contract is optional.",
+          "resolution_rule": "Diff resolution follows Candidate A (deterministic structural comparison). Migration contract resolution follows standard Tenor resolution rules. The two representations are independent — the diff JSON is not derived from the migration contract, and the migration contract is derived from the diff JSON (one-way dependency)."
+        },
+        "claims": [
+          {
+            "invariant_id": "MI1",
+            "argument": "Diff completeness is satisfied by the DiffEntry component (same argument as Candidate A). The migration contract component inherits completeness from the diff — it is generated from the complete diff, so it cannot omit changes that the diff captures. Completeness of the overall system reduces to completeness of the DiffEntry diff."
+          },
+          {
+            "invariant_id": "MI2",
+            "argument": "Diff determinism is satisfied by the DiffEntry component (same argument as Candidate A). The migration contract generation is a deterministic transformation of the diff, so the migration contract is also deterministic. Both outputs are deterministic functions of the two interchange bundles."
+          },
+          {
+            "invariant_id": "MI3",
+            "argument": "Classification decidability is satisfied by the taxonomy lookup (same as Candidate A for the diff component). The migration contract's Rules encode the same taxonomy, providing a second decidability path. Either path (direct lookup or Rule evaluation) produces the same classification."
+          },
+          {
+            "invariant_id": "MI4",
+            "argument": "Taxonomy exhaustiveness is satisfied by the DiffEntry taxonomy (same as Candidate A). The migration contract's Rules must also be exhaustive, but this is a derived property — the Rules are generated from the same taxonomy table. Exhaustiveness of the generated Rules is guaranteed by the generation algorithm's completeness."
+          }
+        ],
+        "complexity": {
+          "time": "O(C * F) for diff generation (same as Candidate A). O(C * F + R) for migration contract generation (additional fixed cost for Rule generation). Total: O(C * F) since R is a constant (taxonomy size).",
+          "space": "O(D) for diff output. O(D + R) for migration contract. Two outputs, roughly double the space of Candidate A.",
+          "static": "O(D) for diff classification. O(R * S) for migration contract static analysis (if migration contract is analyzed). The migration contract analysis is optional."
+        },
+        "failure_modes": [
+          {
+            "description": "Dual representation maintenance burden: two output formats must be kept in sync. If the diff format changes, the migration contract generator must be updated. If the taxonomy changes, both the lookup table and the Rule generation must be updated.",
+            "trigger": "Any change to the breaking change taxonomy or diff format",
+            "severity": "degraded"
+          },
+          {
+            "description": "Migration contract inherits Candidate B's expressiveness limitations (conventionalized use of constructs, no type comparison, no meta-level entities) but in an optional, acknowledged-limitation context rather than as the primary output. The migration contract is best-effort, not authoritative.",
+            "trigger": "Migration contracts involving complex type changes or structural transformations",
+            "severity": "ergonomic"
+          },
+          {
+            "description": "User confusion about which output is authoritative. The diff JSON is always correct and complete; the migration contract is a derived, possibly simplified representation. Users must understand that tenor diff output is canonical and tenor diff --migration is supplementary.",
+            "trigger": "Users treating the migration contract as the sole source of truth",
+            "severity": "ergonomic"
+          }
+        ]
+      }
+    ]
+  },
+  "phase3": {
+    "counterexamples": [
+      {
+        "id": "CE1",
+        "target_candidate": "B",
+        "violates": "MI1",
+        "witness": "Contract v1 declares fact amount { type: Int(min: 0, max: 10000) }. Contract v2 changes to fact amount { type: Int(min: 0, max: 1000) } (type narrowing). To express this in a migration contract, we need a Fact like fact_type_change { type: ??? } that captures 'the type was Int(0,10000) and is now Int(0,1000)'. But Tenor Facts have a single type — they cannot hold 'before' and 'after' type descriptors as values because type descriptors are not expressible as Tenor base types. There is no BaseType that can represent 'a description of another type's parameters'. The migration contract cannot express type change details without meta-level types not in the v1.0 spec, violating diff completeness for type changes.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The type change can be partially captured using Enum facts (e.g., fact_before_base { type: Enum([Int, Decimal, Text, ...]) }, fact_before_min { type: Int }, fact_before_max { type: Int }, etc.). Each type parameter becomes a separate Fact. However, this is a lossy encoding — complex types (Record, TaggedUnion, List with nested element_type) cannot be flattened into scalar Facts without arbitrary depth limits. The migration contract can express simple type changes but not arbitrary type changes. This is a scope narrowing: the migration contract covers simple type parameter changes (min/max/precision/scale) but not structural type changes (Record field addition, TaggedUnion variant changes, nested List element type changes).",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contracts cannot express arbitrary type changes involving complex types (Record, TaggedUnion, nested List). Only simple type parameter changes (Int min/max, Decimal precision/scale, Enum value addition/removal) can be faithfully represented as Tenor Facts. Complex type changes are captured in the JSON diff but may be simplified or omitted in the migration contract."
+        }
+      },
+      {
+        "id": "CE2",
+        "target_candidate": "B",
+        "violates": "MI4",
+        "witness": "The taxonomy requires classifying every (construct_kind, field, change_type) triple. For Operation.precondition changes, the classification depends on whether the new precondition is stronger or weaker than the old one. Expressing 'precondition P2 is strictly weaker than P1' in Tenor requires comparing two predicate expressions — but Tenor's Rule predicates operate on ground-term Facts, not on other predicates. There is no Tenor construct that can take two predicate expressions as input and produce a verdict about their relative strength. The migration contract's Rules cannot express the REQUIRES_ANALYSIS classification for precondition changes because they cannot reason about predicate expressions as data.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "This is correct. Tenor's evaluation model operates on ground terms (Fact values), not on predicate expressions as first-class values. A migration contract cannot reason about predicate strength. However, the taxonomy's REQUIRES_ANALYSIS classification for precondition changes is itself an acknowledgment that this analysis is beyond static classification. The migration contract can assign REQUIRES_ANALYSIS to all precondition changes (a conservative correct classification) without performing the actual predicate comparison. The limitation is that the migration contract cannot refine REQUIRES_ANALYSIS into BREAKING or NON_BREAKING for specific precondition changes — that requires external tooling (S3a/S3b analysis in Phase 4).",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contracts cannot perform predicate strength comparison. All precondition and predicate expression changes are conservatively classified as REQUIRES_ANALYSIS. Refinement to BREAKING or NON_BREAKING for specific predicate changes requires S3a/S3b static analysis tooling external to the migration contract."
+        }
+      },
+      {
+        "id": "CE3",
+        "target_candidate": "B",
+        "violates": "MI1",
+        "witness": "Pressure Test Question 4 (CONTEXT.md): Can migration contracts reference the contracts they migrate? Import semantics? A migration contract for v1->v2 needs to know the contents of both v1 and v2. If the migration contract imports v1.tenor and v2.tenor, the import resolution (Pass 1) would merge all three contracts' constructs into a single bundle — creating id collisions (both v1 and v2 declare the same construct ids). If the migration contract does not import them, all diff data must be encoded as migration-contract-internal Facts, losing the structural relationship between the migration contract and the contracts it describes. Neither approach preserves diff completeness without breaking existing import semantics.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The migration contract must be self-contained — it cannot import the contracts it migrates because import resolution merges all constructs into a single namespace, causing id collisions. All diff data is encoded as Facts within the migration contract. This means the migration contract is a standalone description of the diff, not a contract that references other contracts. The structural relationship between the migration contract and the source contracts is maintained by convention (the migration contract's metadata indicates which contract versions it describes), not by the language's import mechanism. This is a scope narrowing: migration contracts do not use Tenor's import system to reference source contracts.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contracts are self-contained and do not import the contracts they migrate. All diff data is encoded as internal Facts. The relationship between a migration contract and its source contracts is maintained by convention (metadata), not by the language's import mechanism. This means migration contracts cannot directly validate against the source contracts' type definitions."
+        }
+      },
+      {
+        "id": "CE4",
+        "target_candidate": "B",
+        "violates": "MI1",
+        "witness": "Pressure Test Question 5 (CONTEXT.md): Does this create circular dependencies? If contract v2 was itself produced by applying migration contract M1 (v1->v2), and now we generate migration contract M2 (v2->v3), M2 describes changes to v2 which was shaped by M1. If a user wants to compose M1 and M2 to get a v1->v3 migration, they need both migration contracts to reference each other's outputs. This is not a direct circular import, but it creates an implicit dependency chain: M2 depends on v2, which was validated against M1's output. The migration contract model cannot express this transitive dependency without new constructs or metadata fields not in v1.0.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "Migration contract composition (chaining M1 + M2 to get M1->M3) is not a requirement of the CFFP run. The invariants MI1-MI7 do not require composition. MI1 requires that a single migration contract captures all changes between two specific versions — it does not require that migration contracts be composable into transitive chains. Composition is a desirable capability (listed as a motivation in CONTEXT.md) but not an invariant. The inability to compose migration contracts is an acknowledged limitation, not an invariant violation. The migration contract for v1->v3 is generated by diffing v1 and v3 directly, not by composing v1->v2 and v2->v3.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contracts are not composable in v1.0. This is a constraint of the classification-only model, not a fundamental design limitation: classification contracts encode what changed but not the resulting state, so they lack the information needed for composition. Once migration contracts gain orchestration capabilities in v2 (Operations executing migration actions, Flows sequencing steps), composition becomes tractable — a completed v1-to-v2 migration produces a known state that can be diffed against v3. The composition model is sequential execution of intermediate migrations, not algebraic contract combination. In v1.0, transitive migration requires directly diffing the endpoint versions' interchange bundles."
+        }
+      },
+      {
+        "id": "CE5",
+        "target_candidate": "B",
+        "violates": "MI3",
+        "witness": "Pressure Test Question 6 (CONTEXT.md): Is the evaluator powerful enough to evaluate migration contracts? The evaluator (tenor-eval) processes Tenor contracts by: (1) assembling Facts from external input, (2) evaluating Rules against Facts to produce Verdicts, (3) executing Operations that transition Entity states, (4) executing Flows that orchestrate Operations. A migration contract would have Facts representing diff entries, Rules classifying them, and potentially Operations representing migration actions. But the evaluator expects Facts to be populated from external systems (source bindings). A migration contract's Facts are populated from the diff algorithm, not from external systems. The evaluator's eval() function takes a Snapshot (facts + verdicts + entity states) — there is no mechanism to populate the Snapshot from a diff. The evaluator would need a new input pathway for migration data, which is not in the v1.0 evaluator spec.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The evaluator takes a Snapshot as input, and the Snapshot is populated by the executor (Section 16, E2). The executor is responsible for gathering Fact values from source systems. For a migration contract, the 'source system' IS the diff algorithm — the executor populates migration Facts from the diff output. This does not require evaluator changes; it requires the executor to know that migration contracts have a different data source. The evaluator does not distinguish between Facts populated from a database and Facts populated from a diff algorithm — it evaluates the Rules against whatever Snapshot it receives. However, the source bindings in migration contract Facts would reference a non-existent system (the diff), which is semantically misleading. This is an ergonomic limitation, not a functional one.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contract Facts use conventionalized source bindings (e.g., system: 'tenor-diff') that do not correspond to real external systems. The executor must understand that migration contracts are populated from diff output, not from external data sources. This is a convention, not a language-level mechanism."
+        }
+      },
+      {
+        "id": "CE6",
+        "target_candidate": "B",
+        "violates": "MI4",
+        "witness": "Pressure Test Question 7 (CONTEXT.md): What does composing two migration contracts look like in the DSL? Given migration contract M1 (v1->v2) and M2 (v2->v3), composing them requires: (1) identifying Facts in M2 whose 'before' values match M1's 'after' values, (2) creating a new contract M3 with M1's 'before' and M2's 'after' values, (3) re-evaluating the classification Rules. Step (1) requires comparing Fact values across contracts — but Tenor has no cross-contract value comparison mechanism. Step (2) requires programmatic contract generation — but Tenor has no code generation constructs. Step (3) requires re-evaluation — which the evaluator can do, but only if the new contract is generated. The composition is not expressible within the DSL; it requires external tooling. This means the taxonomy's composability claims (if any) are not achievable within the migration-as-contract model.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "As established in CE4's rebuttal, migration contract composition is not an invariant requirement. MI4 (taxonomy exhaustiveness) is about classification coverage, not about composability. The counterexample correctly demonstrates that composition is not expressible in the DSL, but this does not violate MI4. The taxonomy is exhaustive regardless of whether migration contracts can be composed. This counterexample is misattributed — it does not violate MI4, it demonstrates a capability limitation. Re-classifying as a scope narrowing on composition.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contract composition is not expressible within the Tenor DSL in v1.0. This is a consequence of the classification-only model: composing two contracts requires knowing the intermediate state, which classification contracts do not capture. Once orchestration is added in v2 (MIGR-ORCH), sequential execution of intermediate migrations provides the composition model. In v1.0, transitive migration requires external tooling to directly diff endpoint versions."
+        }
+      },
+      {
+        "id": "CE7",
+        "target_candidate": "B",
+        "violates": "MI1",
+        "witness": "Pressure Test Question 1 (CONTEXT.md): Can every construct change type be naturally expressed in Tenor's existing constructs? Consider: Entity parent field change (parent: 'order' -> parent: 'account'). The parent field is a string referencing another Entity. In a migration contract, this would be a Fact like fact_parent_before { type: Text, source: { system: 'tenor-diff', field: 'parent_before' } } and fact_parent_after { type: Text, source: { system: 'tenor-diff', field: 'parent_after' } }. The Fact can hold the string values but has no semantic understanding that these strings are Entity references. A Rule classifying this change cannot verify that the new parent Entity exists or that the DAG structure is valid — it can only compare string equality. The diff completeness is maintained at the syntactic level but not at the semantic level.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "MI1 requires that the diff captures every semantic change, not that the migration contract can validate the semantic consequences of each change. The migration contract captures the parent field change (before='order', after='account') as Fact data, and the classification Rule marks parent changes as BREAKING. The validation of whether 'account' is a valid Entity reference is the responsibility of the elaborator when processing contract v2, not the migration contract. The migration contract's job is to detect and classify the change, not to validate the new contract's internal consistency. Diff completeness at the value level is sufficient for MI1.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE8",
+        "target_candidate": "B",
+        "violates": "MI1",
+        "witness": "Pressure Test Question 2 (CONTEXT.md): What new constructs would be needed? Does this violate v1.0 freeze? A migration contract using existing v1.0 constructs must represent: (a) construct metadata as Facts (construct kind, id, change type), (b) field values as Facts (typed before/after values), (c) classification logic as Rules, (d) migration actions as Operations, (e) migration sequencing as Flows. Items (a-c) can use existing constructs with conventionalized naming. Items (d-e) are optional — the minimum viable migration contract needs only Facts and Rules for classification. No new constructs are required for the classification use case. However, the 'migration action' and 'migration sequencing' use cases (d-e) would require meta-level Operations (operations that modify other contracts) which are not in v1.0. The classification-only migration contract is feasible without new constructs; the full migration orchestration contract is not.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The CFFP run's scope is the breaking change taxonomy and diff representation (MIGR-02), not migration orchestration. The classification-only migration contract (Facts + Rules) is sufficient for the taxonomy requirement. Migration orchestration (Operations + Flows for executing migrations) is a separate concern that would require meta-level constructs and is deferred. The scope narrowing is that migration contracts cover classification only, not orchestration.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contracts in v1.0 are limited to classification (Facts encoding diff data + Rules producing classification verdicts). Migration orchestration (Operations that execute migration actions, Flows that sequence multi-step migrations) requires meta-level constructs not in v1.0 and is deferred to v2. The classification-only migration contract is sufficient for MIGR-02."
+        }
+      },
+      {
+        "id": "CE9",
+        "target_candidate": "B",
+        "violates": "MI1",
+        "witness": "Pressure Test Question 3 (CONTEXT.md): Is there a clean mapping from diff-of-contracts to contract-describing-diff? The diff algorithm produces a list of DiffEntry objects. Each DiffEntry has a kind (Fact/Entity/Rule/Persona/Operation/Flow), an id, a change_type, and field-level changes. Mapping to a Tenor contract requires: one Fact per DiffEntry field value (before and after), one Rule per taxonomy classification entry, and metadata Facts for construct kind/id/change_type. For a contract with N constructs and average F fields per construct, the migration contract has approximately 2*N*F Facts and T Rules (where T = taxonomy size). This is a clean mapping but produces large contracts — a modest contract with 50 constructs and 5 fields each produces ~500 Facts. The mapping is mechanical but the output is verbose.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "Verbosity is an ergonomic concern, not an invariant violation. MI1 requires completeness, not conciseness. The mapping is mechanical, deterministic, and complete — every diff entry maps to a set of Facts, and every taxonomy entry maps to a Rule. The resulting migration contract may be large, but it is correct. Tooling (syntax highlighting, collapsing, filtering) can address the verbosity. This is not a counterexample against MI1.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE10",
+        "target_candidate": "A",
+        "violates": "MI1",
+        "witness": "Candidate A's DiffEntry format captures field-level changes but does not capture cross-construct semantic dependencies. Example: removing a Rule that produces verdict V causes all Operations with preconditions referencing verdict_present(V) to become unreachable. The diff shows 'Rule R removed' but does not show 'Operation O precondition now references a non-existent verdict'. The structural diff is complete at the field level but incomplete at the semantic dependency level.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "MI1 requires that the diff captures every semantic change between two contract versions. The removal of Rule R IS captured as a DiffEntry. The consequence (Operation O's precondition referencing a non-existent verdict) is a property of contract v2 that would be detected by the elaborator when processing v2 (Pass 5 would report the unresolved verdict reference). The diff's job is to report what changed, not to compute the transitive consequences of changes. Transitive impact analysis is a Phase 4 concern (S1-S7 static analysis on the diff output). The diff is complete at the change level; impact analysis is a separate layer.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE11",
+        "target_candidate": "A",
+        "violates": "MI3",
+        "witness": "Candidate A classifies changes by taxonomy lookup. But the taxonomy entry for Rule body.when changes is REQUIRES_ANALYSIS (predicate strength comparison is undecidable in general). This means Candidate A cannot fully satisfy MI3 for predicate changes — the classification is not decidable for all cases, only for most cases. The REQUIRES_ANALYSIS classification is a punt, not a decision.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "MI3 explicitly permits REQUIRES_ANALYSIS as a valid classification: 'The REQUIRES_ANALYSIS classification is permitted only for predicate expression changes where static comparison of predicate strength is undecidable.' The invariant is that the classification function always terminates and always produces one of three values (BREAKING, NON_BREAKING, REQUIRES_ANALYSIS). REQUIRES_ANALYSIS is a decidable output — the decision is 'this change requires further analysis.' The undecidability is in the refinement of REQUIRES_ANALYSIS to BREAKING/NON_BREAKING, which is explicitly deferred to S3a/S3b tooling. MI3 is satisfied because the classification function itself is decidable.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE12",
+        "target_candidate": "C",
+        "violates": "MI2",
+        "witness": "Candidate C produces two outputs: the JSON diff (deterministic) and the migration contract (generated from the diff). If the migration contract generator has any non-determinism (e.g., Fact ordering, Rule id generation, variable naming), the migration contract output could differ between runs even for the same input. MI2 requires identical output — if two tools implement the generator differently, they may produce different migration contracts from the same diff.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "MI2 applies to the diff representation, which in Candidate C is the DiffEntry JSON. The DiffEntry JSON is deterministic (same argument as Candidate A). The migration contract is a derived output with a separate determinism guarantee: the generator must be specified precisely enough that any conforming implementation produces the same output. This is achievable by specifying canonical ordering rules for generated Facts, Rules, and construct ids (similar to how Pass 6 specifies canonical JSON serialization). However, the migration contract is a secondary output — MI2 is satisfied by the primary diff output. The migration contract's determinism is an additional quality requirement, not an MI2 obligation.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Migration contract generation must follow canonical ordering rules (alphabetical Fact ids, deterministic Rule ids, canonical construct ordering) to ensure deterministic output. These rules must be specified as part of the migration contract generation algorithm. Without specification, different generators may produce semantically equivalent but textually different migration contracts."
+        }
+      },
+      {
+        "id": "CE13",
+        "target_candidate": "C",
+        "violates": "MI4",
+        "witness": "Candidate C maintains two representations that must both be exhaustive. If the taxonomy is updated to add a new classification entry (e.g., a new field added to an existing construct kind in a future spec revision), both the lookup table (for tenor diff) and the Rule generation (for tenor diff --migration) must be updated in lockstep. If they diverge, one output may classify a change as BREAKING while the other classifies it as NON_BREAKING, violating MI4 for the representation that was not updated.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "MI4 requires that the taxonomy covers every triple, not that two implementations agree. The DiffEntry taxonomy and the migration contract Rules are both derived from the same source-of-truth taxonomy definition. If the source taxonomy is exhaustive, both derived representations are exhaustive. Divergence between them is an implementation bug, not an invariant violation. MI4 is a property of the taxonomy definition, not of its multiple implementations. The risk of implementation divergence is real but is an engineering concern (test coverage, code generation from a single taxonomy source) rather than a formal invariant concern.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      }
+    ],
+    "composition_failures": []
+  },
+  "derived": {
+    "eliminated": [],
+    "survivors": [
+      {
+        "candidate_id": "A",
+        "scope_narrowings": []
+      },
+      {
+        "candidate_id": "B",
+        "scope_narrowings": [
+          "Migration contracts cannot express arbitrary type changes involving complex types (Record, TaggedUnion, nested List). Only simple type parameter changes (Int min/max, Decimal precision/scale, Enum value addition/removal) can be faithfully represented as Tenor Facts. Complex type changes are captured in the JSON diff but may be simplified or omitted in the migration contract.",
+          "Migration contracts cannot perform predicate strength comparison. All precondition and predicate expression changes are conservatively classified as REQUIRES_ANALYSIS. Refinement to BREAKING or NON_BREAKING for specific predicate changes requires S3a/S3b static analysis tooling external to the migration contract.",
+          "Migration contracts are self-contained and do not import the contracts they migrate. All diff data is encoded as internal Facts. The relationship between a migration contract and its source contracts is maintained by convention (metadata), not by the language's import mechanism.",
+          "Migration contracts are not composable in v1.0. This is a v1.0 implementation constraint (classification-only contracts lack state information for composition), not a fundamental design limitation. Once orchestration is added in v2, sequential execution of intermediate migrations provides the composition model. In v1.0, transitive migration requires directly diffing endpoint versions.",
+          "Migration contract Facts use conventionalized source bindings (e.g., system: 'tenor-diff') that do not correspond to real external systems. The executor must understand that migration contracts are populated from diff output, not from external data sources.",
+          "Migration contract composition is not expressible within the Tenor DSL in v1.0. Once orchestration capabilities are added (v2), sequential execution of intermediate migration contracts provides a tractable composition model.",
+          "Migration contracts in v1.0 are limited to classification (Facts encoding diff data + Rules producing classification verdicts). Migration orchestration (Operations that execute migration actions, Flows that sequence multi-step migrations) requires meta-level constructs not in v1.0 and is deferred to v2."
+        ]
+      },
+      {
+        "candidate_id": "C",
+        "scope_narrowings": [
+          "Migration contract generation must follow canonical ordering rules to ensure deterministic output."
+        ]
+      }
+    ]
+  },
+  "phase4": {
+    "attempted": true,
+    "succeeded": true,
+    "merged_candidate": {
+      "id": "C_merged",
+      "description": "Hybrid Migration Semantics (Candidate C subsumes A and B). The primary diff output is structured JSON (DiffEntry format from Candidate A). An optional secondary output (tenor diff --migration) generates a Tenor migration contract (Candidate B's approach) from the diff. The migration contract uses existing v1.0 constructs with conventionalized naming and acknowledged limitations. Candidate C is strictly at least as strong as A (it includes the DiffEntry diff) and at least as strong as B (it includes the migration contract with the same scope narrowings). The merge is natural because C was designed as the union of A and B.",
+      "formalism": {
+        "structure": "HybridMigrationSemantics = {diff: [DiffEntry], taxonomy: BreakingChangeTaxonomy, migration_contract?: TenorContract}. The diff component follows Candidate A's DiffEntry structure. The taxonomy is a static lookup table classifying every (construct_kind, field, change_type) triple. The migration_contract, when generated, is a valid Tenor contract using Facts (diff data) and Rules (classification logic) with conventionalized source bindings. The migration contract is classification-only (no orchestration Operations or Flows in v1.0).",
+        "evaluation_rule": "Two modes: (1) tenor diff produces DiffEntry JSON with breaking change classifications from the taxonomy — no Tenor evaluation involved. (2) tenor diff --migration generates a Tenor contract whose Rules encode the taxonomy; evaluation by the standard Tenor evaluator produces classification verdicts. Both modes produce equivalent classifications; mode 1 is canonical, mode 2 is supplementary.",
+        "resolution_rule": "DiffEntry resolution is deterministic structural comparison (Candidate A). Migration contract resolution follows standard Tenor semantics (stratified Rule evaluation). The DiffEntry output is always authoritative; the migration contract is derived and supplementary."
+      },
+      "claims": [
+        {
+          "invariant_id": "MI1",
+          "argument": "Completeness is guaranteed by the DiffEntry component, which exhaustively compares every field of every construct in both interchange bundles. The migration contract inherits completeness from the diff (it is generated from the complete diff output). Both arms satisfy MI1."
+        },
+        {
+          "invariant_id": "MI2",
+          "argument": "The DiffEntry diff is deterministic (canonical interchange + deterministic comparison algorithm). The migration contract generation follows canonical ordering rules specified in the generation algorithm. Both outputs are deterministic functions of two interchange bundles."
+        },
+        {
+          "invariant_id": "MI3",
+          "argument": "Classification is a static taxonomy lookup for the DiffEntry arm. For the migration contract arm, classification is Rule evaluation which is decidable. Both arms produce decidable classifications, with REQUIRES_ANALYSIS permitted for predicate expression changes."
+        },
+        {
+          "invariant_id": "MI4",
+          "argument": "The taxonomy is constructed by systematic enumeration of the interchange schema. Every (construct_kind, field, change_type) triple has a classification. Both the lookup table and the migration contract Rules are derived from the same source taxonomy, ensuring both representations are exhaustive."
+        }
+      ],
+      "complexity": {
+        "time": "O(C * F) for diff and classification. O(C * F + T) for migration contract generation where T = taxonomy size (fixed constant). Overall O(C * F).",
+        "space": "O(D) for DiffEntry output. O(D + T) for migration contract. Both bounded by contract size.",
+        "static": "O(D) for classification. O(T * S) for migration contract static analysis (optional). S = stratum count in migration contract (typically 1-2)."
+      },
+      "failure_modes": [
+        {
+          "description": "Dual representation maintenance: taxonomy changes must update both the lookup table and the migration contract Rule generation. Mitigated by generating both from a single source-of-truth taxonomy definition.",
+          "trigger": "Taxonomy updates (new construct fields, classification changes)",
+          "severity": "degraded"
+        },
+        {
+          "description": "Migration contract expressiveness limitations inherited from Candidate B: cannot express complex type changes, cannot compare predicate strength, self-contained (no imports), not composable, classification-only (no orchestration). These are acknowledged limitations, not invariant violations.",
+          "trigger": "Migration contracts for diffs involving complex type changes or predicate modifications",
+          "severity": "ergonomic"
+        }
+      ]
+    },
+    "replaces": ["A", "B", "C"]
+  },
+  "phase5": {
+    "obligations": [
+      {
+        "property": "The diff representation preserves all semantic changes detectable by the interchange schema. For any two interchange bundles B1 and B2 where B1 != B2, the diff is non-empty and contains entries for every field that differs between corresponding constructs.",
+        "argument": "The DiffEntry algorithm iterates over the union of construct (kind, id) pairs in both bundles. For each pair, it compares all fields defined in the interchange schema for that construct kind. Fields are compared by value equality on canonical JSON representations. A field that differs produces a DiffEntry field record with before and after values. Constructs present in only one bundle produce 'added' or 'removed' entries. The algorithm's coverage is verified by cross-referencing against the interchange schema's $defs: every field in $defs/Fact, $defs/Entity, $defs/Rule, $defs/Persona, $defs/Operation, $defs/Flow is examined. Since the interchange schema defines the complete structure of a contract, and the diff examines every field in the schema, all semantic changes are captured.",
+        "provable": true
+      },
+      {
+        "property": "The breaking/non-breaking classification is mechanically derivable from the diff output. Given a DiffEntry, the classification function classify(kind, field, change_type) terminates and returns one of {BREAKING, NON_BREAKING, REQUIRES_ANALYSIS} for every valid input.",
+        "argument": "The taxonomy is a finite lookup table keyed by (construct_kind, field, change_type). The key space is finite: 6 construct kinds * max_fields_per_kind * 3 change types. Every valid key maps to exactly one classification value. The lookup function is a table scan that terminates in O(1) expected time (hash map) or O(T) worst case (linear scan) where T = taxonomy size. For inputs not in the table (e.g., fields that do not change), no classification is needed. The function is total over its domain (all valid DiffEntry inputs have a taxonomy entry by MI4).",
+        "provable": true
+      },
+      {
+        "property": "The migration contract (if generated) is a valid Tenor contract that elaborates without error. The generated .tenor source passes all six elaboration passes (lexing, parsing, bundle assembly, indexing, type checking, validation, serialization).",
+        "argument": "The migration contract generator produces Tenor source that: (1) declares typed Facts for each diff entry field (using base types corresponding to the field's interchange schema type), (2) declares Rules at stratum 0 with predicates that match on construct_kind and change_type Facts, producing classification verdicts. The generated source uses only valid v1.0 syntax and constructs. Fact types match declared BaseTypes. Rule predicates use only valid comparison operators on compatible types. No circular dependencies (the migration contract is self-contained). No duplicate ids (each generated construct has a unique id derived from the DiffEntry's (kind, id) pair). The generator's output is constrained to a subset of Tenor that is guaranteed to elaborate correctly — similar to how test fixture .tenor files are constructed to elaborate without error.",
+        "provable": true
+      },
+      {
+        "property": "The taxonomy covers every field in every construct kind defined in docs/interchange-schema.json. No field in any construct definition is unclassified.",
+        "argument": "The taxonomy is constructed by mechanically enumerating the interchange schema. For each construct kind (Fact: 7 fields, Entity: 8 fields, Rule: 5 fields, Persona: 4 fields, Operation: 9 fields, Flow: 6 fields), every field is listed with classifications for each applicable change type (add, remove, change for construct-level; add, remove, change for field-level). The enumeration is verifiable by counting: the taxonomy must have at least as many entries as the total number of fields across all construct kinds. Fields shared across constructs (id, kind, provenance, tenor) are classified consistently. The exhaustiveness is mechanically verifiable by comparing taxonomy entries against the JSON Schema $defs.",
+        "provable": true
+      },
+      {
+        "property": "The in-flight flow migration policy is orthogonal to contract evaluation semantics. Declaring a migration policy does not change the output of eval_pred, eval_strata, execute, or execute_flow for any input.",
+        "argument": "The migration policy is an executor deployment annotation. It is not an input to any evaluation function. The policy is consumed by the executor's deployment infrastructure (Section 16 obligations), not by the evaluation model. The evaluation functions (eval_pred, eval_strata, execute, execute_flow) take a Snapshot (facts, verdicts, entity states) as input — the migration policy is not part of the Snapshot. Therefore the policy cannot affect evaluation output. This separation is structural: the policy type and the Snapshot type share no fields. The policy is processed before evaluation begins (it determines which contract version to evaluate), not during evaluation.",
+        "provable": true
+      }
+    ],
+    "all_provable": true
+  },
+  "phase6": {
+    "canonical": {
+      "construct": "Migration Semantics",
+      "formal_statement": "Migration Semantics defines the breaking change taxonomy and diff representation for Tenor contract version transitions.\n\n1. DIFF REPRESENTATION (Hybrid — Candidate C selected per user directive)\n\nThe primary diff output is structured JSON: Diff = [DiffEntry] where DiffEntry = {kind: ConstructKind, id: ConstructId, change_type: added | removed | changed, fields: [{field: FieldName, before: Value?, after: Value?}]}. This is produced by `tenor diff`.\n\nAn optional secondary output is a Tenor migration contract: a valid .tenor file using Facts (encoding diff data with conventionalized source bindings) and Rules (encoding taxonomy classifications as predicate logic). This is produced by `tenor diff --migration`. The migration contract is classification-only in v1.0 — no orchestration Operations or Flows.\n\n2. BREAKING CHANGE TAXONOMY\n\nThe taxonomy classifies every (construct_kind, field, change_type) triple. Classifications: BREAKING (change invalidates existing executors/flows), NON_BREAKING (change is safe for existing executors/flows), REQUIRES_ANALYSIS (classification depends on value-level analysis, typically predicate strength comparison).\n\nFor each classification, the impact on new flows vs in-flight flows is analyzed separately. Frozen verdict semantics (Section 11.4) provide natural isolation for in-flight flows at the verdict layer, but NOT at the entity state or operation layer.\n\n--- FACT CHANGES ---\n\n| Field | Add Construct | Remove Construct | Change Value |\n|-------|--------------|-----------------|-------------|\n| id | NON_BREAKING: No existing construct references a new Fact | BREAKING: Rules/Operations may reference via fact_ref; in-flight flows with frozen snapshots referencing this fact lose their data source | N/A (id is identity) |\n| type | N/A (part of add) | N/A (part of remove) | Widen (larger range, more enum values): NON_BREAKING — all existing values remain valid. Narrow (smaller range, fewer enum values): BREAKING — existing values may be invalid. Base type change: BREAKING — expression type-checking changes. In-flight: verdict-layer isolated (frozen snapshot), but new flow initiations affected |\n| source | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Source is executor metadata (Section 5.2), not evaluation semantics. Changing source.system or source.field does not affect eval_pred or eval_strata |\n| default | N/A (part of add) | N/A (part of remove) | Add default: NON_BREAKING — provides fallback where none existed. Remove default: BREAKING — facts without values now fail assembly. Change default value: REQUIRES_ANALYSIS — may change evaluation outcomes depending on whether the default is exercised |\n| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Provenance is debugging metadata, not evaluation semantics |\n| kind | N/A | N/A | N/A (discriminator constant, cannot change within same construct type) |\n| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation, not evaluation semantics |\n\n--- ENTITY CHANGES ---\n\n| Field | Add Construct | Remove Construct | Change Value |\n|-------|--------------|-----------------|-------------|\n| id | NON_BREAKING: No existing construct references a new Entity | BREAKING: Operations with effects on this entity are invalid; flows with steps transitioning this entity break; in-flight flows with active entity state lose their target | N/A (id is identity) |\n| states | N/A (part of add) | N/A (part of remove) | Add state: NON_BREAKING — existing transitions unaffected, new paths available. Remove state: BREAKING — entities in removed state are orphaned, operations with transitions from/to removed state are invalid, in-flight flows in removed state cannot continue |\n| initial | N/A (part of add) | N/A (part of remove) | BREAKING: New entity instances start in different state. Existing instances are unaffected, but flow logic expecting a specific initial state may break |\n| transitions | N/A (part of add) | N/A (part of remove) | Add transition: NON_BREAKING — new paths available, existing paths unchanged. Remove transition: BREAKING — operations using this transition are invalid, in-flight flows needing this transition cannot proceed |\n| parent | N/A (part of add) | N/A (part of remove) | Add parent: REQUIRES_ANALYSIS — depends on propagation semantics, may introduce new state dependencies. Remove parent: REQUIRES_ANALYSIS — removes propagation chain, may orphan dependent behavior. Change parent: BREAKING — DAG structure and propagation changes, in-flight entity state hierarchies disrupted |\n| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata |\n| kind | N/A | N/A | N/A (discriminator constant) |\n| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation |\n\n--- RULE CHANGES ---\n\n| Field | Add Construct | Remove Construct | Change Value |\n|-------|--------------|-----------------|-------------|\n| id | REQUIRES_ANALYSIS: Adding a rule at stratum 0 is NON_BREAKING (no cross-stratum impact on new verdicts). Adding at higher strata may shadow or conflict with existing rules' verdict production. In-flight: frozen snapshot means existing verdicts unaffected; new flow initiations may see different verdict sets | BREAKING: Verdicts this rule produced are no longer available. Operations/rules referencing verdict_present() for this rule's verdict types may never fire. Cascading impact on all downstream consumers | N/A (id is identity) |\n| stratum | N/A (part of add) | N/A (part of remove) | BREAKING: Evaluation order changes. Rules at higher strata depend on verdicts from lower strata. Reordering strata can change which verdicts are available when a rule evaluates, producing different verdict sets |\n| body.when | N/A (part of add) | N/A (part of remove) | REQUIRES_ANALYSIS: Predicate change may widen (more verdicts produced — NON_BREAKING for downstream consumers) or narrow (fewer verdicts — BREAKING for downstream consumers expecting them). Static comparison of predicate strength is undecidable in general. Conservative classification |\n| body.produce.verdict_type | N/A (part of add) | N/A (part of remove) | BREAKING: Downstream rules/operations referencing this verdict type via verdict_present() are affected. Changing the verdict type breaks all consumers of the original verdict |\n| body.produce.payload.type | N/A (part of add) | N/A (part of remove) | BREAKING: Consumers of this verdict expect a specific payload type. Changing the type breaks payload extraction |\n| body.produce.payload.value | N/A (part of add) | N/A (part of remove) | BREAKING: Different verdict values may cause different downstream behavior (threshold comparisons, routing decisions) |\n| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata |\n| kind | N/A | N/A | N/A (discriminator constant) |\n| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation |\n\n--- PERSONA CHANGES ---\n\n| Field | Add Construct | Remove Construct | Change Value |\n|-------|--------------|-----------------|-------------|\n| id | NON_BREAKING: No existing construct references a new Persona | BREAKING: Operations/Flows referencing this persona in allowed_personas, step persona fields, handoff from_persona/to_persona are invalid | N/A (id is identity) |\n| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata |\n| kind | N/A | N/A | N/A (discriminator constant) |\n| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation |\n\n--- OPERATION CHANGES ---\n\n| Field | Add Construct | Remove Construct | Change Value |\n|-------|--------------|-----------------|-------------|\n| id | NON_BREAKING: No existing Flow references a new Operation | BREAKING: Flows with OperationSteps referencing this operation are invalid; in-flight flows at steps invoking this operation cannot proceed | N/A (id is identity) |\n| allowed_personas | N/A (part of add) | N/A (part of remove) | Add persona: NON_BREAKING — widens authority, all previously authorized personas remain authorized. Remove persona: BREAKING — narrows authority, existing flows using the removed persona at this operation's steps will fail authorization |\n| precondition | N/A (part of add) | N/A (part of remove) | REQUIRES_ANALYSIS: Weaken (more permissive) is NON_BREAKING — all previously valid invocations still valid. Strengthen (more restrictive) is BREAKING — previously valid invocations may now fail. Static determination of weaken vs strengthen is undecidable for arbitrary predicate expressions |\n| effects | N/A (part of add) | N/A (part of remove) | Add effect (new entity): NON_BREAKING — does not invalidate existing effects. Remove effect: BREAKING — entity state transitions no longer occur, in-flight flows expecting these transitions will have incorrect entity states. Change effect (different from/to): BREAKING — different state transition behavior, in-flight flows at this operation step will transition entities to unexpected states |\n| outcomes | N/A (part of add) | N/A (part of remove) | Add outcome: BREAKING — exhaustive handling in Flows (Section 11.5) means all OperationSteps referencing this operation must handle the new outcome. Existing flows that do not handle the new outcome are invalid. Remove outcome: BREAKING — flows handling this outcome have dead routing paths |\n| error_contract | N/A (part of add) | N/A (part of remove) | Add error type: NON_BREAKING — new failure modes, existing handling unaffected. Remove error type: REQUIRES_ANALYSIS — if failure handlers reference specific errors, removing an error type may leave dead handler code |\n| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata |\n| kind | N/A | N/A | N/A (discriminator constant) |\n| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation |\n\n--- FLOW CHANGES ---\n\n| Field | Add Construct | Remove Construct | Change Value |\n|-------|--------------|-----------------|-------------|\n| id | NON_BREAKING: No existing construct references a new Flow (unless SubFlowStep) | BREAKING: SubFlowSteps referencing this flow are invalid; in-flight instances of this flow are orphaned by contract |\n| entry | N/A (part of add) | N/A (part of remove) | BREAKING: Different execution path for new flow initiations. In-flight flows are unaffected (they already passed entry) |\n| steps | N/A (part of add) | N/A (part of remove) | Add step: REQUIRES_ANALYSIS — depends on whether existing routing paths are modified. If new step is reachable only via new routing, NON_BREAKING. If inserted into existing paths, BREAKING. Remove step: BREAKING — references to removed step from other steps' outcome routing or branch targets are invalid. In-flight flows currently at or routing through the removed step cannot proceed. Change step (routing, persona, operation): BREAKING — different execution paths, authority, or operation invocation for flows reaching this step |\n| snapshot | N/A (part of add) | N/A (part of remove) | BREAKING: Changes when verdicts are frozen. Currently always 'at_initiation' in v1.0, so any change violates the v1.0 spec |\n| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata |\n| kind | N/A | N/A | N/A (discriminator constant) |\n| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation |\n\n3. IN-FLIGHT FLOW MIGRATION POLICY\n\nAn executor deploying a new contract version with any BREAKING changes MUST declare one of three migration policies:\n\n(a) blue_green: New flow initiations use the new contract version. In-flight flows (initiated under the old version) complete execution under the old version. No in-flight flow is affected by the breaking changes. The executor must maintain both contract versions simultaneously until all in-flight flows under the old version reach terminal states.\n\n(b) force_migrate: All in-flight flows transition to the new contract version. The executor must handle the consequences of breaking changes: entities in removed states must be migrated, operations with changed effects must be re-evaluated, flows at removed steps must be routed to valid steps. The executor bears full responsibility for data consistency during the transition.\n\n(c) abort: In-flight flows that traverse any construct affected by a breaking change are terminated with a migration_aborted failure outcome. Flows that do not traverse affected constructs continue under the new version. The executor must identify affected flows and terminate them gracefully.\n\nThe policy is a deployment-time declaration, not a contract-level construct. It does not appear in .tenor source files or interchange JSON. It is an executor obligation (paralleling E1-E9 in Section 16).\n\nThe policy must address all in-flight flows. Per-flow-type policies are permitted (e.g., abort flow type A, blue_green flow type B) but every active flow type must have a declared policy.",
+      "evaluation_def": "Given two interchange bundles B_old and B_new:\n\n1. DIFF COMPUTATION: Iterate over the union of construct (kind, id) pairs in B_old and B_new. For each pair:\n   - Present in B_new only: emit DiffEntry with change_type='added', all fields listed with before=null\n   - Present in B_old only: emit DiffEntry with change_type='removed', all fields listed with after=null\n   - Present in both: compare each field. If any field differs, emit DiffEntry with change_type='changed', only differing fields listed with before and after values\n   Exclude provenance and line fields from comparison (noise fields per diff.rs convention).\n\n2. CLASSIFICATION: For each DiffEntry field record, look up (kind, field_name, change_type) in the taxonomy table. The taxonomy returns BREAKING, NON_BREAKING, or REQUIRES_ANALYSIS. Primitive arrays (states, allowed_personas) are compared as sets (order-insensitive).\n\n3. OVERALL ASSESSMENT: If any field classification is BREAKING, the overall diff is BREAKING and the executor must declare a migration policy (MI5). If all classifications are NON_BREAKING, the diff is NON_BREAKING and no policy is required. If any classification is REQUIRES_ANALYSIS and none are BREAKING, the overall assessment is REQUIRES_ANALYSIS — the executor should perform deeper analysis (S3a/S3b) or conservatively treat as BREAKING.\n\n4. MIGRATION CONTRACT (optional, via tenor diff --migration): Generate a Tenor contract from the diff output. Each DiffEntry becomes a set of typed Facts (construct_kind, construct_id, change_type, field_before_*, field_after_*). Each taxonomy entry becomes a Rule that matches on the appropriate (construct_kind, field, change_type) pattern and produces a classification verdict. The migration contract is evaluated by the standard Tenor evaluator to produce the same classifications as the direct taxonomy lookup.",
+      "satisfies": ["MI1", "MI2", "MI3", "MI4", "MI5", "MI6", "MI7"],
+      "acknowledged_limitations": [
+        "Migration contracts cannot express arbitrary type changes involving complex types (Record, TaggedUnion, nested List). Only simple type parameter changes (Int min/max, Decimal precision/scale, Enum value addition/removal) can be faithfully represented as Tenor Facts.",
+        "Migration contracts cannot perform predicate strength comparison. All precondition and predicate expression changes are conservatively classified as REQUIRES_ANALYSIS.",
+        "Migration contracts are self-contained — they do not import the contracts they migrate. All diff data is encoded as internal Facts with conventionalized source bindings.",
+        "Migration contracts are not composable in v1.0. This is a constraint of the classification-only model, not a fundamental design limitation: classification contracts encode what changed but not the resulting state. Once orchestration is added in v2 (Operations and Flows for migration execution), composition becomes tractable via sequential execution of intermediate migrations. In v1.0, transitive migration requires direct diffing of endpoint versions.",
+        "Migration contracts in v1.0 are classification-only. Migration orchestration (Operations and Flows for executing migration actions) requires meta-level constructs deferred to v2.",
+        "Migration contract generation must follow canonical ordering rules for deterministic output across different generators.",
+        "Migration contract Facts use conventionalized source bindings (system: 'tenor-diff') that do not correspond to real external systems."
+      ]
+    }
+  },
+  "outcome": "collapse",
+  "outcome_notes": "Three candidates survived Phase 3 pressure testing: A (interchange diff), B (migration as Tenor contract), and C (hybrid). Candidate B survived with seven scope narrowings reflecting significant expressiveness limitations when using existing v1.0 constructs for meta-level descriptions. In Phase 4, Candidate C was identified as a natural superset of A and B — it includes A's DiffEntry JSON as the primary output and B's migration contract as an optional secondary output. All three candidates were collapsed into a merged candidate (C_merged) that preserves the DiffEntry diff as the authoritative, always-correct representation and adds the migration contract as a supplementary, best-effort representation with acknowledged limitations. This aligns with the user directive that migration output should be expressed as a Tenor contract: the migration contract IS a Tenor contract, produced by tenor diff --migration, while the standard tenor diff output remains the reliable JSON diff. The breaking change taxonomy in Phase 6 classifies every (construct_kind, field, change_type) triple across all six construct kinds (Fact, Entity, Rule, Persona, Operation, Flow), satisfying MIGR-02. The in-flight flow migration policy requirement (blue_green, force_migrate, or abort) is defined as an executor obligation, satisfying MI5-MI7."
+}

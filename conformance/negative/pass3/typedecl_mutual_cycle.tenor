@@ -1,0 +1,17 @@
+// Negative test — Pass 3 (TypeDecl)
+// Two named types that reference each other, forming a mutual cycle.
+// §12.2 Pass 3: "Detect TypeDecl reference graph cycles via DFS"
+// §4.5: "TypeDecl reference cycles are caught in Pass 3 by DFS."
+//
+// TypeA.ref has type TypeB; TypeB.ref has type TypeA.
+// DFS path: TypeA → TypeB → TypeA (back edge detected at TypeB.ref)
+
+type TypeA {
+  id:  Text(max_length: 32)
+  ref: TypeB
+}
+
+type TypeB {
+  id:  Text(max_length: 32)
+  ref: TypeA
+}

@@ -1,0 +1,204 @@
+{
+  "constructs": [
+    {
+      "id": "amount",
+      "kind": "Fact",
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 9
+      },
+      "source": {
+        "field": "amount",
+        "system": "request"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Money",
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "Request",
+      "initial": "pending",
+      "kind": "Entity",
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 14
+      },
+      "states": [
+        "pending",
+        "reviewed",
+        "approved"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "pending",
+          "to": "reviewed"
+        },
+        {
+          "from": "reviewed",
+          "to": "approved"
+        }
+      ]
+    },
+    {
+      "id": "approver",
+      "kind": "Persona",
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 7
+      },
+      "tenor": "1.0"
+    },
+    {
+      "id": "reviewer",
+      "kind": "Persona",
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 6
+      },
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "approver"
+      ],
+      "effects": [
+        {
+          "entity_id": "Request",
+          "from": "reviewed",
+          "to": "approved"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed"
+      ],
+      "id": "approve_request",
+      "kind": "Operation",
+      "precondition": {
+        "comparison_type": {
+          "base": "Money",
+          "currency": "USD"
+        },
+        "left": {
+          "fact_ref": "amount"
+        },
+        "op": ">",
+        "right": {
+          "literal": {
+            "amount": {
+              "kind": "decimal_value",
+              "precision": 10,
+              "scale": 2,
+              "value": "0.00"
+            },
+            "currency": "USD"
+          },
+          "type": {
+            "base": "Money",
+            "currency": "USD"
+          }
+        }
+      },
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 27
+      },
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "reviewer"
+      ],
+      "effects": [
+        {
+          "entity_id": "Request",
+          "from": "pending",
+          "to": "reviewed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed"
+      ],
+      "id": "review_request",
+      "kind": "Operation",
+      "precondition": {
+        "comparison_type": {
+          "base": "Money",
+          "currency": "USD"
+        },
+        "left": {
+          "fact_ref": "amount"
+        },
+        "op": ">",
+        "right": {
+          "literal": {
+            "amount": {
+              "kind": "decimal_value",
+              "precision": 10,
+              "scale": 2,
+              "value": "0.00"
+            },
+            "currency": "USD"
+          },
+          "type": {
+            "base": "Money",
+            "currency": "USD"
+          }
+        }
+      },
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 20
+      },
+      "tenor": "1.0"
+    },
+    {
+      "entry": "step_review",
+      "id": "approval",
+      "kind": "Flow",
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 34
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_review",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "failure"
+          },
+          "op": "review_request",
+          "outcomes": {
+            "success": "step_approve"
+          },
+          "persona": "reviewer"
+        },
+        {
+          "id": "step_approve",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "failure"
+          },
+          "op": "approve_request",
+          "outcomes": {
+            "success": {
+              "kind": "Terminal",
+              "outcome": "success"
+            }
+          },
+          "persona": "approver"
+        }
+      ],
+      "tenor": "1.0"
+    }
+  ],
+  "id": "persona_multiple",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

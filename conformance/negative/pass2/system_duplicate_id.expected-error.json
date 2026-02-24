@@ -1,0 +1,9 @@
+{
+  "construct_id": "my_system",
+  "construct_kind": "System",
+  "field": "id",
+  "file": "system_duplicate_id.tenor",
+  "line": 13,
+  "message": "duplicate System id 'my_system': first declared at line 4",
+  "pass": 2
+}

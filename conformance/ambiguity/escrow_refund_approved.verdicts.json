@@ -1,0 +1,3 @@
+{
+  "verdicts": ["delivery_failed", "line_items_validated", "refund_approved", "refund_requested", "within_threshold"]
+}

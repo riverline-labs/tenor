@@ -1,0 +1,949 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenor-lang.org/schemas/interchange/v1.0.0",
+  "title": "TenorInterchange v1.0",
+  "description": "JSON Schema for the Tenor interchange format. Defines the canonical structure of TenorInterchange bundles produced by conforming elaborators. Note: JSON Schema cannot enforce lexicographic key ordering within objects; that constraint is specified in the Tenor spec (Section 13.2, Pass 6) and enforced by byte-for-byte conformance testing.",
+  "type": "object",
+  "required": ["constructs", "id", "kind", "tenor", "tenor_version"],
+  "additionalProperties": false,
+  "properties": {
+    "constructs": {
+      "type": "array",
+      "description": "Ordered array of construct documents. Canonical order: Personas (alphabetical), VerdictTypes, Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical).",
+      "items": {
+        "$ref": "#/$defs/Construct"
+      }
+    },
+    "id": {
+      "type": "string",
+      "description": "Bundle identifier. Derived from the entry-point file name."
+    },
+    "kind": {
+      "const": "Bundle",
+      "description": "Always 'Bundle' for the top-level document."
+    },
+    "tenor": {
+      "type": "string",
+      "description": "Short version identifier. '1.0' for v1.0 interchange."
+    },
+    "tenor_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Canonical interchange format version in semver format (e.g., '1.0.0')."
+    }
+  },
+  "$defs": {
+    "Construct": {
+      "description": "A top-level construct document. Discriminated by the 'kind' field. Canonical order: Facts, Entities, Personas, Rules (by stratum), Operations, Flows, Systems.",
+      "oneOf": [
+        { "$ref": "#/$defs/Fact" },
+        { "$ref": "#/$defs/Entity" },
+        { "$ref": "#/$defs/Rule" },
+        { "$ref": "#/$defs/Persona" },
+        { "$ref": "#/$defs/Operation" },
+        { "$ref": "#/$defs/Flow" },
+        { "$ref": "#/$defs/System" }
+      ]
+    },
+
+    "Provenance": {
+      "type": "object",
+      "required": ["file", "line"],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Source file name."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Source line number (1-based)."
+        }
+      }
+    },
+
+    "BaseType": {
+      "description": "Type descriptor for Tenor's type system. Covers all twelve base types plus Duration, List, Record, and TaggedUnion.",
+      "oneOf": [
+        { "$ref": "#/$defs/BoolType" },
+        { "$ref": "#/$defs/IntType" },
+        { "$ref": "#/$defs/DecimalType" },
+        { "$ref": "#/$defs/MoneyType" },
+        { "$ref": "#/$defs/TextType" },
+        { "$ref": "#/$defs/DateType" },
+        { "$ref": "#/$defs/DateTimeType" },
+        { "$ref": "#/$defs/DurationType" },
+        { "$ref": "#/$defs/EnumType" },
+        { "$ref": "#/$defs/ListType" },
+        { "$ref": "#/$defs/RecordType" },
+        { "$ref": "#/$defs/TaggedUnionType" }
+      ]
+    },
+
+    "BoolType": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Bool" }
+      }
+    },
+
+    "IntType": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Int" },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" }
+      }
+    },
+
+    "DecimalType": {
+      "type": "object",
+      "required": ["base", "precision", "scale"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Decimal" },
+        "precision": { "type": "integer", "minimum": 1 },
+        "scale": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "MoneyType": {
+      "type": "object",
+      "required": ["base", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Money" },
+        "currency": { "type": "string", "description": "ISO 4217 currency code." }
+      }
+    },
+
+    "TextType": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Text" },
+        "max_length": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "DateType": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Date" }
+      }
+    },
+
+    "DateTimeType": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "DateTime" }
+      }
+    },
+
+    "DurationType": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Duration" },
+        "unit": { "type": "string", "description": "Duration unit (e.g., 'seconds')." },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" }
+      }
+    },
+
+    "EnumType": {
+      "type": "object",
+      "required": ["base", "values"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Enum" },
+        "values": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Enum variant labels in declaration order."
+        }
+      }
+    },
+
+    "ListType": {
+      "type": "object",
+      "required": ["base", "element_type"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "List" },
+        "element_type": { "$ref": "#/$defs/BaseType" },
+        "max": { "type": "integer", "minimum": 1, "description": "Static upper bound on list length." }
+      }
+    },
+
+    "RecordType": {
+      "type": "object",
+      "required": ["base", "fields"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "Record" },
+        "fields": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/BaseType" },
+          "description": "Field name to BaseType mapping."
+        }
+      }
+    },
+
+    "TaggedUnionType": {
+      "type": "object",
+      "required": ["base", "variants"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "TaggedUnion" },
+        "variants": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/BaseType" },
+          "description": "Variant tag to payload BaseType mapping."
+        }
+      }
+    },
+
+    "DecimalValue": {
+      "type": "object",
+      "required": ["kind", "precision", "scale", "value"],
+      "additionalProperties": false,
+      "description": "Structured decimal value representation. Used for Decimal and Money amount values. No JSON native floats.",
+      "properties": {
+        "kind": { "const": "decimal_value" },
+        "precision": { "type": "integer", "minimum": 1 },
+        "scale": { "type": "integer", "minimum": 0 },
+        "value": { "type": "string", "description": "Decimal value as string to preserve precision." }
+      }
+    },
+
+    "MoneyValue": {
+      "type": "object",
+      "required": ["amount", "currency", "kind"],
+      "additionalProperties": false,
+      "description": "Structured money value representation for Money defaults and literals.",
+      "properties": {
+        "amount": { "$ref": "#/$defs/DecimalValue" },
+        "currency": { "type": "string" },
+        "kind": { "const": "money_value" }
+      }
+    },
+
+    "BoolLiteral": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "description": "Structured boolean literal for default values.",
+      "properties": {
+        "kind": { "const": "bool_literal" },
+        "value": { "type": "boolean" }
+      }
+    },
+
+    "FactDefault": {
+      "description": "Default value for a Fact. Structure depends on the Fact's type.",
+      "oneOf": [
+        { "$ref": "#/$defs/DecimalValue" },
+        { "$ref": "#/$defs/MoneyValue" },
+        { "$ref": "#/$defs/BoolLiteral" },
+        { "type": "boolean" },
+        { "type": "integer" },
+        { "type": "string" }
+      ]
+    },
+
+    "Source": {
+      "type": "object",
+      "required": ["field", "system"],
+      "additionalProperties": false,
+      "description": "External data source binding for a Fact.",
+      "properties": {
+        "field": { "type": "string" },
+        "system": { "type": "string" }
+      }
+    },
+
+    "Fact": {
+      "type": "object",
+      "required": ["id", "kind", "provenance", "source", "tenor", "type"],
+      "additionalProperties": false,
+      "description": "A ground truth assertion sourced from an external system. Section 5 of the Tenor spec.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/FactDefault",
+          "description": "Optional default value used when the source does not provide a value."
+        },
+        "id": { "type": "string" },
+        "kind": { "const": "Fact" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "source": { "$ref": "#/$defs/Source" },
+        "tenor": { "type": "string" },
+        "type": { "$ref": "#/$defs/BaseType" }
+      }
+    },
+
+    "Transition": {
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "description": "A permitted state transition in an Entity state machine.",
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" }
+      }
+    },
+
+    "Entity": {
+      "type": "object",
+      "required": ["id", "initial", "kind", "provenance", "states", "tenor", "transitions"],
+      "additionalProperties": false,
+      "description": "A finite state machine representing a domain entity. Section 6 of the Tenor spec.",
+      "properties": {
+        "id": { "type": "string" },
+        "initial": { "type": "string", "description": "Initial state. Must be a member of the states array." },
+        "kind": { "const": "Entity" },
+        "parent": { "type": "string", "description": "Parent entity id for hierarchical entities." },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Ordered array of state labels."
+        },
+        "tenor": { "type": "string" },
+        "transitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Transition" },
+          "description": "Permitted state transitions."
+        }
+      }
+    },
+
+    "Persona": {
+      "type": "object",
+      "required": ["id", "kind", "provenance", "tenor"],
+      "additionalProperties": false,
+      "description": "A declared identity token representing an actor class. Section 8 of the Tenor spec. Persona is a pure identity token with no metadata.",
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Persona" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "tenor": { "type": "string" }
+      }
+    },
+
+    "PredicateExpression": {
+      "description": "A predicate expression in the Tenor evaluation model. Quantifier-free first-order logic formula over ground terms. Section 10 of the Tenor spec.",
+      "oneOf": [
+        { "$ref": "#/$defs/CompareExpr" },
+        { "$ref": "#/$defs/AndExpr" },
+        { "$ref": "#/$defs/OrExpr" },
+        { "$ref": "#/$defs/NotExpr" },
+        { "$ref": "#/$defs/ForallExpr" },
+        { "$ref": "#/$defs/ExistsExpr" },
+        { "$ref": "#/$defs/VerdictPresentExpr" }
+      ]
+    },
+
+    "ExpressionOperand": {
+      "description": "An operand in a comparison or logical expression.",
+      "oneOf": [
+        { "$ref": "#/$defs/FactRefOperand" },
+        { "$ref": "#/$defs/LiteralOperand" },
+        { "$ref": "#/$defs/FieldRefOperand" },
+        { "$ref": "#/$defs/VerdictPresentExpr" },
+        { "$ref": "#/$defs/MulExpr" },
+        { "$ref": "#/$defs/CompareExpr" },
+        { "$ref": "#/$defs/AndExpr" },
+        { "$ref": "#/$defs/OrExpr" },
+        { "$ref": "#/$defs/NotExpr" },
+        { "$ref": "#/$defs/ForallExpr" },
+        { "$ref": "#/$defs/ExistsExpr" }
+      ]
+    },
+
+    "FactRefOperand": {
+      "type": "object",
+      "required": ["fact_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "fact_ref": { "type": "string", "description": "Reference to a declared Fact id." }
+      }
+    },
+
+    "LiteralOperand": {
+      "type": "object",
+      "required": ["literal", "type"],
+      "additionalProperties": false,
+      "description": "A literal constant value with its type.",
+      "properties": {
+        "literal": {
+          "description": "The literal value. Type depends on the BaseType: boolean for Bool, integer for Int, string for Text/Enum, object for Money/Decimal."
+        },
+        "type": { "$ref": "#/$defs/BaseType" }
+      }
+    },
+
+    "FieldRefOperand": {
+      "type": "object",
+      "required": ["field_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "field_ref": {
+          "type": "object",
+          "required": ["field", "var"],
+          "additionalProperties": false,
+          "properties": {
+            "field": { "type": "string", "description": "Field name within the bound variable's Record type." },
+            "var": { "type": "string", "description": "Bound variable name from an enclosing forall." }
+          }
+        }
+      }
+    },
+
+    "VerdictPresentExpr": {
+      "type": "object",
+      "required": ["verdict_present"],
+      "additionalProperties": false,
+      "description": "Tests whether a verdict has been produced.",
+      "properties": {
+        "verdict_present": { "type": "string", "description": "VerdictTypeId to check." }
+      }
+    },
+
+    "CompareExpr": {
+      "type": "object",
+      "required": ["left", "op", "right"],
+      "additionalProperties": false,
+      "description": "Binary comparison expression.",
+      "properties": {
+        "comparison_type": {
+          "$ref": "#/$defs/BaseType",
+          "description": "Emitted for Money comparisons (always), Int x Decimal cross-type, and Mul x Int comparisons."
+        },
+        "left": { "$ref": "#/$defs/ExpressionOperand" },
+        "op": {
+          "type": "string",
+          "enum": ["=", "!=", "<", "<=", ">", ">="],
+          "description": "Comparison operator."
+        },
+        "right": { "$ref": "#/$defs/ExpressionOperand" }
+      }
+    },
+
+    "AndExpr": {
+      "type": "object",
+      "required": ["left", "op", "right"],
+      "additionalProperties": false,
+      "description": "Logical conjunction.",
+      "properties": {
+        "left": { "$ref": "#/$defs/ExpressionOperand" },
+        "op": { "const": "and" },
+        "right": { "$ref": "#/$defs/ExpressionOperand" }
+      }
+    },
+
+    "OrExpr": {
+      "type": "object",
+      "required": ["left", "op", "right"],
+      "additionalProperties": false,
+      "description": "Logical disjunction.",
+      "properties": {
+        "left": { "$ref": "#/$defs/ExpressionOperand" },
+        "op": { "const": "or" },
+        "right": { "$ref": "#/$defs/ExpressionOperand" }
+      }
+    },
+
+    "NotExpr": {
+      "type": "object",
+      "required": ["op", "operand"],
+      "additionalProperties": false,
+      "description": "Logical negation.",
+      "properties": {
+        "op": { "const": "not" },
+        "operand": { "$ref": "#/$defs/ExpressionOperand" }
+      }
+    },
+
+    "ForallExpr": {
+      "type": "object",
+      "required": ["body", "domain", "quantifier", "variable", "variable_type"],
+      "additionalProperties": false,
+      "description": "Bounded universal quantification over a List-typed domain.",
+      "properties": {
+        "body": { "$ref": "#/$defs/PredicateExpression" },
+        "domain": { "$ref": "#/$defs/FactRefOperand" },
+        "quantifier": { "const": "forall" },
+        "variable": { "type": "string", "description": "Bound variable name." },
+        "variable_type": { "$ref": "#/$defs/BaseType", "description": "Type of the bound variable (element type of the domain List)." }
+      }
+    },
+
+    "ExistsExpr": {
+      "type": "object",
+      "required": ["body", "domain", "quantifier", "variable", "variable_type"],
+      "additionalProperties": false,
+      "description": "Bounded existential quantification over a List-typed domain.",
+      "properties": {
+        "body": { "$ref": "#/$defs/PredicateExpression" },
+        "domain": { "$ref": "#/$defs/FactRefOperand" },
+        "quantifier": { "const": "exists" },
+        "variable": { "type": "string", "description": "Bound variable name." },
+        "variable_type": { "$ref": "#/$defs/BaseType", "description": "Type of the bound variable (element type of the domain List)." }
+      }
+    },
+
+    "MulExpr": {
+      "type": "object",
+      "required": ["left", "literal", "op", "result_type"],
+      "additionalProperties": false,
+      "description": "Multiplication expression: fact_ref * literal (Int only, Rule produce clauses only).",
+      "properties": {
+        "left": { "$ref": "#/$defs/FactRefOperand" },
+        "literal": { "type": "integer", "description": "Integer literal multiplier." },
+        "op": { "const": "*" },
+        "result_type": { "$ref": "#/$defs/BaseType", "description": "Computed result type with derived range." }
+      }
+    },
+
+    "ProduceClause": {
+      "type": "object",
+      "required": ["payload", "verdict_type"],
+      "additionalProperties": false,
+      "description": "A verdict production clause in a Rule body.",
+      "properties": {
+        "payload": {
+          "type": "object",
+          "required": ["type", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "$ref": "#/$defs/BaseType" },
+            "value": {
+              "description": "Payload value. May be a literal (boolean, integer, string) or a MulExpr."
+            }
+          }
+        },
+        "verdict_type": { "type": "string", "description": "VerdictTypeId being produced." }
+      }
+    },
+
+    "RuleBody": {
+      "type": "object",
+      "required": ["produce", "when"],
+      "additionalProperties": false,
+      "description": "The body of a Rule: a when-produce pair.",
+      "properties": {
+        "produce": { "$ref": "#/$defs/ProduceClause" },
+        "when": { "$ref": "#/$defs/PredicateExpression" }
+      }
+    },
+
+    "Rule": {
+      "type": "object",
+      "required": ["body", "id", "kind", "provenance", "stratum", "tenor"],
+      "additionalProperties": false,
+      "description": "A verdict-producing rule. Section 7 of the Tenor spec.",
+      "properties": {
+        "body": { "$ref": "#/$defs/RuleBody" },
+        "id": { "type": "string" },
+        "kind": { "const": "Rule" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "stratum": { "type": "integer", "minimum": 0, "description": "Stratification level." },
+        "tenor": { "type": "string" }
+      }
+    },
+
+    "Effect": {
+      "type": "object",
+      "required": ["entity_id", "from", "to"],
+      "additionalProperties": false,
+      "description": "An entity state transition effect produced by an Operation.",
+      "properties": {
+        "entity_id": { "type": "string", "description": "Target Entity id." },
+        "from": { "type": "string", "description": "Source state." },
+        "outcome": { "type": "string", "description": "Associated outcome label. Required for multi-outcome Operations, optional for single-outcome." },
+        "to": { "type": "string", "description": "Target state." }
+      }
+    },
+
+    "Operation": {
+      "type": "object",
+      "required": ["allowed_personas", "effects", "error_contract", "id", "kind", "precondition", "provenance", "tenor"],
+      "additionalProperties": false,
+      "description": "A persona-gated, precondition-guarded unit of work producing entity state transitions. Section 9 of the Tenor spec.",
+      "properties": {
+        "allowed_personas": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Persona ids authorized to invoke this Operation."
+        },
+        "effects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Effect" },
+          "description": "Entity state transition effects."
+        },
+        "error_contract": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Error labels declared by this Operation."
+        },
+        "id": { "type": "string" },
+        "kind": { "const": "Operation" },
+        "outcomes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Declared outcome labels in declaration order. Required in v1.0 (P7)."
+        },
+        "precondition": { "$ref": "#/$defs/PredicateExpression" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "tenor": { "type": "string" }
+      }
+    },
+
+    "TerminalTarget": {
+      "type": "object",
+      "required": ["kind", "outcome"],
+      "additionalProperties": false,
+      "description": "A terminal step target (end of flow path).",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["Terminal", "Terminate"],
+          "description": "'Terminal' for flow outcomes, 'Terminate' for failure handlers."
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["success", "failure", "escalation"],
+          "description": "Flow outcome."
+        }
+      }
+    },
+
+    "StepTarget": {
+      "description": "A step target: either a step id (string) or a terminal target (object).",
+      "oneOf": [
+        { "type": "string", "description": "StepId reference." },
+        { "$ref": "#/$defs/TerminalTarget" }
+      ]
+    },
+
+    "CompensationStep": {
+      "type": "object",
+      "required": ["on_failure", "op", "persona"],
+      "additionalProperties": false,
+      "description": "A compensation operation executed during failure handling.",
+      "properties": {
+        "on_failure": {
+          "$ref": "#/$defs/TerminalTarget",
+          "description": "Terminal only for compensation steps -- no nested compensation."
+        },
+        "op": { "type": "string", "description": "OperationId to execute." },
+        "persona": { "type": "string", "description": "PersonaId." }
+      }
+    },
+
+    "FailureHandler": {
+      "description": "How to handle step failure.",
+      "oneOf": [
+        { "$ref": "#/$defs/TerminateHandler" },
+        { "$ref": "#/$defs/CompensateHandler" },
+        { "$ref": "#/$defs/EscalateHandler" }
+      ]
+    },
+
+    "TerminateHandler": {
+      "type": "object",
+      "required": ["kind", "outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "Terminate" },
+        "outcome": { "type": "string" }
+      }
+    },
+
+    "CompensateHandler": {
+      "type": "object",
+      "required": ["kind", "steps", "then"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "Compensate" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CompensationStep" },
+          "minItems": 1,
+          "description": "Compensation operations to execute."
+        },
+        "then": {
+          "$ref": "#/$defs/TerminalTarget",
+          "description": "Terminal outcome after compensation."
+        }
+      }
+    },
+
+    "EscalateHandler": {
+      "type": "object",
+      "required": ["kind", "next", "to_persona"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "Escalate" },
+        "next": { "type": "string", "description": "StepId to continue at after escalation." },
+        "to_persona": { "type": "string", "description": "PersonaId to escalate to." }
+      }
+    },
+
+    "OperationStep": {
+      "type": "object",
+      "required": ["id", "kind", "on_failure", "op", "outcomes", "persona"],
+      "additionalProperties": false,
+      "description": "A step that executes an Operation.",
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "OperationStep" },
+        "on_failure": { "$ref": "#/$defs/FailureHandler" },
+        "op": { "type": "string", "description": "OperationId to execute." },
+        "outcomes": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/StepTarget" },
+          "description": "Map from outcome label to next step target. Keys must match the referenced Operation's declared outcomes."
+        },
+        "persona": { "type": "string", "description": "PersonaId executing this step." }
+      }
+    },
+
+    "BranchStep": {
+      "type": "object",
+      "required": ["condition", "id", "if_false", "if_true", "kind", "persona"],
+      "additionalProperties": false,
+      "description": "A conditional branch step.",
+      "properties": {
+        "condition": { "$ref": "#/$defs/PredicateExpression" },
+        "id": { "type": "string" },
+        "if_false": { "$ref": "#/$defs/StepTarget" },
+        "if_true": { "$ref": "#/$defs/StepTarget" },
+        "kind": { "const": "BranchStep" },
+        "persona": { "type": "string", "description": "PersonaId evaluating the condition." }
+      }
+    },
+
+    "HandoffStep": {
+      "type": "object",
+      "required": ["from_persona", "id", "kind", "next", "to_persona"],
+      "additionalProperties": false,
+      "description": "A persona handoff step.",
+      "properties": {
+        "from_persona": { "type": "string" },
+        "id": { "type": "string" },
+        "kind": { "const": "HandoffStep" },
+        "next": { "type": "string", "description": "StepId to continue at." },
+        "to_persona": { "type": "string" }
+      }
+    },
+
+    "SubFlowStep": {
+      "type": "object",
+      "required": ["flow", "id", "kind", "on_failure", "on_success", "persona"],
+      "additionalProperties": false,
+      "description": "A step that invokes a sub-flow.",
+      "properties": {
+        "flow": { "type": "string", "description": "FlowId to invoke." },
+        "id": { "type": "string" },
+        "kind": { "const": "SubFlowStep" },
+        "on_failure": { "$ref": "#/$defs/FailureHandler" },
+        "on_success": { "$ref": "#/$defs/StepTarget" },
+        "persona": { "type": "string" }
+      }
+    },
+
+    "ParallelBranch": {
+      "type": "object",
+      "required": ["entry", "id", "steps"],
+      "additionalProperties": false,
+      "description": "A branch within a ParallelStep.",
+      "properties": {
+        "entry": { "type": "string", "description": "Entry StepId for this branch." },
+        "id": { "type": "string", "description": "BranchId." },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FlowStep" },
+          "description": "Steps within this branch."
+        }
+      }
+    },
+
+    "JoinPolicy": {
+      "type": "object",
+      "required": ["on_all_success", "on_any_failure"],
+      "additionalProperties": false,
+      "description": "Join policy for parallel branches.",
+      "properties": {
+        "on_all_complete": { "$ref": "#/$defs/StepTarget" },
+        "on_all_success": { "$ref": "#/$defs/StepTarget" },
+        "on_any_failure": { "$ref": "#/$defs/FailureHandler" }
+      }
+    },
+
+    "ParallelStep": {
+      "type": "object",
+      "required": ["branches", "id", "join", "kind"],
+      "additionalProperties": false,
+      "description": "A parallel execution step with fork/join semantics.",
+      "properties": {
+        "branches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ParallelBranch" },
+          "minItems": 2,
+          "description": "Parallel branches. All run to completion."
+        },
+        "id": { "type": "string" },
+        "join": { "$ref": "#/$defs/JoinPolicy" },
+        "kind": { "const": "ParallelStep" }
+      }
+    },
+
+    "FlowStep": {
+      "description": "A step within a Flow. Discriminated by the 'kind' field.",
+      "oneOf": [
+        { "$ref": "#/$defs/OperationStep" },
+        { "$ref": "#/$defs/BranchStep" },
+        { "$ref": "#/$defs/HandoffStep" },
+        { "$ref": "#/$defs/SubFlowStep" },
+        { "$ref": "#/$defs/ParallelStep" }
+      ]
+    },
+
+    "Flow": {
+      "type": "object",
+      "required": ["entry", "id", "kind", "provenance", "steps", "tenor"],
+      "additionalProperties": false,
+      "description": "A directed acyclic graph of steps orchestrating Operations. Section 11 of the Tenor spec.",
+      "properties": {
+        "entry": { "type": "string", "description": "Entry StepId." },
+        "id": { "type": "string" },
+        "kind": { "const": "Flow" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "snapshot": {
+          "type": "string",
+          "enum": ["at_initiation"],
+          "description": "Snapshot policy. Always 'at_initiation' in v1."
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FlowStep" },
+          "description": "Steps in topological order. Entry step first."
+        },
+        "tenor": { "type": "string" }
+      }
+    },
+
+    "SystemMember": {
+      "type": "object",
+      "required": ["id", "path"],
+      "additionalProperties": false,
+      "description": "A member contract declaration within a System. Maps a local member id to a contract file path.",
+      "properties": {
+        "id": { "type": "string", "description": "Local member identifier, unique within the System." },
+        "path": { "type": "string", "description": "File path to the member contract (.tenor file), resolved relative to the System file's directory." }
+      }
+    },
+
+    "SharedPersona": {
+      "type": "object",
+      "required": ["contracts", "persona"],
+      "additionalProperties": false,
+      "description": "A shared persona binding declaring identity equivalence of a persona across member contracts.",
+      "properties": {
+        "contracts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "description": "Member ids of contracts sharing this persona. Sorted lexicographically."
+        },
+        "persona": { "type": "string", "description": "PersonaId shared across the listed contracts." }
+      }
+    },
+
+    "SystemTrigger": {
+      "type": "object",
+      "required": ["on", "persona", "source_contract", "source_flow", "target_contract", "target_flow"],
+      "additionalProperties": false,
+      "description": "A cross-contract flow trigger declaration. When the source flow reaches the specified terminal outcome, the target flow is initiated in the target contract.",
+      "properties": {
+        "on": {
+          "type": "string",
+          "enum": ["success", "failure", "escalation"],
+          "description": "Terminal outcome of the source flow that fires this trigger."
+        },
+        "persona": { "type": "string", "description": "PersonaId for the target flow invocation." },
+        "source_contract": { "type": "string", "description": "MemberId of the source contract." },
+        "source_flow": { "type": "string", "description": "FlowId in the source contract." },
+        "target_contract": { "type": "string", "description": "MemberId of the target contract." },
+        "target_flow": { "type": "string", "description": "FlowId in the target contract." }
+      }
+    },
+
+    "SharedEntity": {
+      "type": "object",
+      "required": ["contracts", "entity"],
+      "additionalProperties": false,
+      "description": "A cross-contract entity relationship declaring that an entity is shared across member contracts with identical state sets.",
+      "properties": {
+        "contracts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "description": "Member ids of contracts sharing this entity. Sorted lexicographically."
+        },
+        "entity": { "type": "string", "description": "EntityId shared across the listed contracts." }
+      }
+    },
+
+    "System": {
+      "type": "object",
+      "required": ["id", "kind", "members", "provenance", "shared_entities", "shared_personas", "tenor", "triggers"],
+      "additionalProperties": false,
+      "description": "A multi-contract composition construct. Declares member contracts, shared persona identity, cross-contract flow triggers, and cross-contract entity relationships. Section 12 of the Tenor spec.",
+      "properties": {
+        "id": { "type": "string", "description": "System identifier." },
+        "kind": { "const": "System" },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SystemMember" },
+          "minItems": 1,
+          "description": "Member contract declarations. Sorted by member id."
+        },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "shared_entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedEntity" },
+          "description": "Cross-contract entity relationships. Sorted by entity id."
+        },
+        "shared_personas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedPersona" },
+          "description": "Shared persona bindings. Sorted by persona id."
+        },
+        "tenor": { "type": "string" },
+        "triggers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SystemTrigger" },
+          "description": "Cross-contract flow trigger declarations. Sorted by (source_contract, source_flow, target_contract, target_flow)."
+        }
+      }
+    }
+  }
+}

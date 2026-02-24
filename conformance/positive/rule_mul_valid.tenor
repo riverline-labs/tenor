@@ -1,0 +1,21 @@
+// Positive test — Pass 4
+// Variable × literal multiplication in produce clause where the
+// computed product range is contained within the declared verdict payload type.
+//
+// x: Int(0..10)
+// x * 10 range: Int(0..100)
+// verdict payload type: Int(0..100)
+// 100 ≤ 100 — product range IS contained. Must be accepted.
+
+fact x {
+  type:   Int(min: 0, max: 10)
+  source: "a.x"
+}
+
+rule mul_valid {
+  stratum: 0
+  when:    x > 0
+  produce: verdict scaled_x {
+    payload: Int(min: 0, max: 100) = x * 10
+  }
+}

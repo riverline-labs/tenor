@@ -1,0 +1,20 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "payment_amount",
+          "payment_limit"
+        ],
+        "rule": "within_payment_limit",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "payment_within_limit"
+    }
+  ]
+}

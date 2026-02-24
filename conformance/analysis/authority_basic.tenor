@@ -1,0 +1,45 @@
+// Analysis test: authority topology (S4)
+// Two personas with different authority levels
+
+entity ticket {
+  states:  [open, in_progress, resolved, closed]
+  initial: open
+  transitions: [
+    (open, in_progress),
+    (in_progress, resolved),
+    (resolved, closed),
+    (open, closed)
+  ]
+}
+
+fact priority {
+  type:   Int
+  source: "ticket_service.priority"
+}
+
+rule ticket_valid {
+  stratum: 0
+  when:    priority > 0
+  produce: verdict valid_ticket { payload: Bool = true }
+}
+
+operation assign {
+  allowed_personas: [admin, user]
+  precondition:     verdict_present(valid_ticket)
+  effects:          [(ticket, open, in_progress)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation resolve {
+  allowed_personas: [user]
+  precondition:     verdict_present(valid_ticket)
+  effects:          [(ticket, in_progress, resolved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation close {
+  allowed_personas: [admin]
+  precondition:     verdict_present(valid_ticket)
+  effects:          [(ticket, resolved, closed), (ticket, open, closed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}

@@ -1,0 +1,511 @@
+{
+  "protocol": {
+    "name": "Constraint-First Formalization Protocol",
+    "version": "0.2.1",
+    "description": "Invariant-driven semantic design. Candidates survive pressure or die."
+  },
+  "construct": {
+    "name": "P5 Shared Type Library",
+    "description": "Cross-contract type reuse for Record and TaggedUnion types. Shared type libraries are Tenor files containing only type declarations, imported via the existing import mechanism. Imported types are structurally inlined during elaboration, preserving the current TypeDecl semantics. This extends the existing TypeDecl mechanism (Section 4.5) with cross-file import semantics without changing type identity (which remains structural).",
+    "depends_on": ["Fact", "Entity", "Rule", "Operation", "Flow", "TypeDecl", "Persona", "P7 Operation Outcome Typing"]
+  },
+  "version": "1.0",
+  "phase1": {
+    "invariants": [
+      {
+        "id": "I1",
+        "description": "Type resolution terminates. The resolution of any type reference (TypeRef) to a fully inlined BaseType structure terminates in finite time, regardless of the number of imported files or the depth of the import chain. No circular type reference path can cause non-terminating resolution. This includes both intra-file TypeDecl cycles (already checked by Pass 3) and cross-file TypeDecl cycles introduced by imports.",
+        "testable": true,
+        "structural": true,
+        "class": "termination"
+      },
+      {
+        "id": "I2",
+        "description": "Imported types compose with local types without ambiguity. A type reference in any context (Fact type field, List element_type, TypeDecl field, Entity field, Operation precondition) resolves to exactly one concrete BaseType. When a file imports type T from a library, and also declares a local type T, the elaborator must detect and reject the ambiguity. No silent shadowing of imported types by local types or vice versa.",
+        "testable": true,
+        "structural": true,
+        "class": "determinism"
+      },
+      {
+        "id": "I3",
+        "description": "Circular type imports are detected and rejected at elaboration time. If file A imports from file B and file B imports from file A (directly or transitively), this is an import cycle and is an elaboration error detected during Pass 1. The import graph over all files must be a DAG.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I4",
+        "description": "Cross-contract type resolution is decidable. Given any set of Tenor files with import relationships, the elaborator can determine in finite time whether all type references resolve to valid BaseType structures. The resolution procedure is a function of the file contents only (no external state), and the decision procedure is bounded by a polynomial of the total number of TypeDecl definitions across all files.",
+        "testable": true,
+        "structural": true,
+        "class": "decidability"
+      },
+      {
+        "id": "I5",
+        "description": "Closed-world semantics preserved. Imported types do not introduce external references that affect evaluation. A type imported from a library file is fully inlined at every point of use during elaboration. The resulting interchange output is self-contained: no TypeRef, no import reference, and no cross-file dependency appears in the interchange. The interchange for a contract that imports types is byte-for-byte identical to a contract that inlines those same type definitions locally.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I6",
+        "description": "Type identity is deterministic. Two agents given the same set of Tenor files must agree on whether any two type usages resolve to the same BaseType. Since types are structurally inlined, identity is structural: two Record types with identical field names and field types (recursively) are the same type, regardless of whether they were imported from different files, imported from the same file, or declared locally.",
+        "testable": true,
+        "structural": true,
+        "class": "determinism"
+      },
+      {
+        "id": "I7",
+        "description": "The set of imported types is statically determinable. All import declarations are resolved during Pass 1 of elaboration. No runtime type resolution occurs. No conditional imports are permitted. The complete set of TypeDecl definitions available in a contract (local plus imported) is fixed at elaboration time.",
+        "testable": true,
+        "structural": true,
+        "class": "analyzability"
+      },
+      {
+        "id": "I8",
+        "description": "All type imports are explicit. No implicit type propagation across file boundaries. If file A imports library L, and library L imports library M, the types from M are NOT automatically available in A. Each file must explicitly import the types it uses. Transitive type propagation is not permitted.",
+        "testable": true,
+        "structural": true,
+        "class": "composability"
+      }
+    ]
+  },
+  "phase2": {
+    "candidates": [
+      {
+        "id": "A",
+        "description": "Structural + Import (minimal change). Types remain structurally typed. Shared type libraries are plain .tenor files containing only type declarations. They are imported with the existing import syntax. Imported TypeDecl definitions are merged into the importing file's type environment during Pass 1/Pass 3. At elaboration time, imported TypeDecls are inlined just like local TypeDecls. Cross-file type identity is structural: two Records with identical fields are the same type regardless of origin. No new type identity semantics. No new syntax beyond existing import.",
+        "formalism": {
+          "structure": "A shared type library is a Tenor file containing zero or more TypeDecl constructs and no other construct kinds (no Fact, Entity, Rule, Persona, Operation, Flow). The existing import mechanism (Pass 1) loads the file and merges its TypeDecl definitions into the unified parse tree. TypeDecl namespace rules apply: imported TypeDecl ids must not conflict with local TypeDecl ids or other imported TypeDecl ids (duplicate-id-across-files detection in Pass 1). Type identity is structural: after Pass 3 inlining, two types are identical if and only if their fully expanded BaseType structures are recursively equal. A type library file may import other type library files, forming an import DAG.",
+          "evaluation_rule": "No new evaluation rule. TypeDecls from imported files are consumed during elaboration (Pass 3) and inlined at every point of use (Pass 4), identical to local TypeDecls. The evaluation model (eval_pred, eval_strata, execute, execute_flow) is unchanged. Imported types are invisible at evaluation time because they are fully inlined before interchange is produced.",
+          "resolution_rule": "Type reference resolution is unchanged from the existing TypeDecl mechanism. Pass 3 builds the type environment from ALL TypeDecl definitions in the unified parse tree (local + imported). TypeRef nodes are resolved to full BaseType structures during Pass 4. The only new obligation is that Pass 1 must load imported files and detect duplicate TypeDecl ids across file boundaries (which it already does for other construct kinds). Import cycle detection (already in Pass 1) extends to type library files."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Type resolution termination follows from two properties: (1) The import graph is a DAG (enforced by Pass 1 cycle detection, extended to type library files). (2) The TypeDecl reference graph within the unified parse tree is acyclic (enforced by Pass 3 DFS cycle detection, already specified in Section 4.5). Together, these ensure that resolving any TypeRef traverses a finite acyclic graph, which terminates. The depth of resolution is bounded by the total number of TypeDecl definitions across all files (a finite number determined by the import DAG)."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Pass 1 already detects duplicate construct ids across files (duplicate-id-across-files detection). This applies to TypeDecl ids: if file A declares TypeDecl T and imported library L also declares TypeDecl T, Pass 1 reports an elaboration error. No silent shadowing occurs. Each TypeDecl id in the unified parse tree is unique. Combined with Pass 3's type environment construction (which builds a single lookup table keyed by TypeId), every type reference resolves to exactly one entry."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Pass 1 already implements import cycle detection. If file A imports file B and file B imports file A, Pass 1 detects the cycle and reports an elaboration error. This mechanism is not specific to construct kinds -- it operates on the file import graph. Type library files participate in the same import graph as other Tenor files. No modification to the cycle detection algorithm is needed."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Type resolution is bounded by the total number of TypeDecl definitions. Pass 1 loads all files in the import DAG: O(|files|). Pass 3 resolves all TypeDecl definitions: O(|TypeDecls|^2) worst case for DFS cycle detection plus inlining. Pass 4 resolves all TypeRef nodes: O(|TypeRefs| * max_depth) where max_depth is bounded by |TypeDecls| (the longest acyclic chain in the TypeDecl reference graph). All quantities are finite and statically determined by the file contents. Total complexity is polynomial in the size of the input."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Imported TypeDecls are consumed during Pass 3 (type environment construction) and inlined during Pass 4 (AST materialization). The existing Section 4.5 rule states: 'TypeDecl entries do not appear in the interchange bundle. Interchange is fully self-contained -- no TypeRef lookups are required.' This rule applies equally to imported TypeDecls. After Pass 4, no trace of the import or the type library file remains in the AST. The interchange output for a contract importing type T is identical to a contract that declares type T locally with the same definition. The evaluation model receives only fully inlined BaseType structures."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "Type identity is structural. After Pass 3/4 inlining, every type usage is a fully expanded BaseType tree. Two types are identical iff their BaseType trees are recursively equal: same kind, same fields (for Record), same variants (for TaggedUnion), same parameters (for parameterized types like Int, Decimal, etc.). This definition is independent of origin (local vs imported), file path, or TypeDecl name. Two agents performing structural comparison on the same expanded trees will always agree. This is the existing Tenor type identity semantics -- no change."
+          },
+          {
+            "invariant_id": "I7",
+            "argument": "Import declarations are resolved in Pass 1, which processes the complete set of files before any type resolution begins. There are no conditional imports (the language has no conditional declaration syntax). No import can depend on a Fact value, Rule verdict, or runtime condition. The complete set of TypeDecl definitions available in the unified parse tree is determined by Pass 1 and fixed for the remainder of elaboration."
+          },
+          {
+            "invariant_id": "I8",
+            "argument": "The existing import mechanism loads a file's constructs into the unified parse tree. It does not transitively load files imported by the imported file unless the importing file also explicitly imports them. In the current elaborator, if file A imports file B, and file B imports file C, the constructs from C are available in the unified bundle only because B imported them. For Candidate A, type library imports follow the same rule: if A imports type library L1, and L1 imports type library L2, A has access to types from L2 only if A also imports L2, OR if L1's TypeDecls that reference L2 types are fully inlined within L1 (which they are, since L1's own TypeDecls referencing L2 types are resolved during L1's elaboration). Wait -- this requires clarification. In a single elaboration run processing all files together, Pass 1 loads ALL imported files transitively. If A imports L1 and L1 imports L2, Pass 1 loads A, L1, and L2 into the unified parse tree. All TypeDecl definitions from all three files are available in the type environment. This means A can reference types from L2 without explicitly importing L2 -- the types are in the unified parse tree because L1 imported L2. This violates I8 (no implicit propagation). Resolution: the candidate must add a constraint that only TypeDecl ids explicitly imported (listed in the import declaration) are made available to the importing file. Alternatively, I8 must be relaxed. See Phase 3 pressure for detailed analysis."
+          }
+        ],
+        "complexity": {
+          "time": "O(|files|) for import DAG traversal; O(|TypeDecls|^2) for cycle detection; O(|TypeRefs| * max_depth) for type reference resolution. All are polynomial in input size.",
+          "space": "O(|TypeDecls|) for the type environment; O(|files|) for the import graph. Same as existing elaboration with additional files.",
+          "static": "Unchanged from current static analysis obligations. Imported types are invisible after inlining. All S1-S7 analyses operate on the inlined BaseType structures."
+        },
+        "failure_modes": [
+          {
+            "description": "Transitive import exposure: if file A imports library L1, and L1 imports library L2, types from L2 are available in A's type environment without A explicitly importing L2. This violates the principle of explicit imports (I8).",
+            "trigger": "Any import chain of depth > 1 where the intermediate library imports types from a deeper library",
+            "severity": "degraded"
+          },
+          {
+            "description": "No selective import: the current import mechanism imports all constructs from a file. If a type library contains 50 TypeDecl definitions and a contract only needs 2, all 50 are loaded into the type environment. This is a namespace pollution concern, not a correctness issue.",
+            "trigger": "Large type libraries with many TypeDecl definitions",
+            "severity": "ergonomic"
+          },
+          {
+            "description": "Type library files must contain only TypeDecl constructs. A file that mixes TypeDecl with Fact/Entity/Operation is a regular contract file, not a type library. The distinction is enforced by convention, not by syntax. A contract that imports a file expecting only types will also get Facts, Entities, etc.",
+            "trigger": "Importing a file that contains both TypeDecls and other constructs",
+            "severity": "ergonomic"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "description": "Nominal-with-source + Qualified References. Types gain nominal identity tied to their declaring file. A new 'use' directive imports a type library with a namespace alias. Type references from imported libraries are qualified: alias.TypeName. Two types with identical fields but different source files are different types. This requires type compatibility rules for cross-library use and changes how type identity works in the elaborator.",
+        "formalism": {
+          "structure": "TypeDecl gains a source identifier: TypeDecl = (id: TypeId, source: FilePath, type: Record | TaggedUnion). Type identity is nominal-with-source: two types are identical iff they have the same (source, id) pair. A new 'use' directive: use @\"path/to/library.tenor\" as alias. Type references become qualified: alias.TypeName resolves to (path/to/library.tenor, TypeName). Local types are unqualified. The type environment maps (source, id) pairs to BaseType structures instead of plain id to BaseType.",
+          "evaluation_rule": "No change to evaluation. Nominal identity is resolved during elaboration. After type checking and inlining, the evaluation model operates on fully expanded BaseType structures. Nominal identity affects only elaboration-time type checking: whether two type usages are considered the same type for assignment compatibility.",
+          "resolution_rule": "Pass 1 processes 'use' directives: loads the referenced file, records the alias. Pass 3 builds the type environment keyed by (source, id) instead of plain id. Qualified references (alias.TypeName) resolve to (alias_source_path, TypeName). Unqualified references resolve to (current_file, TypeName). Cross-library type comparison uses nominal identity: types from different sources are incompatible even if structurally identical. A type compatibility operator may be needed for cases where a Fact declared with LibraryA.LineItem must be compared against a local Record with identical fields."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Type resolution terminates for the same structural reasons as Candidate A: the import graph is a DAG (Pass 1 cycle detection) and the TypeDecl reference graph is acyclic (Pass 3). Nominal identity does not affect termination -- it only affects the equality check, not the resolution depth."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Qualified references (alias.TypeName) are inherently unambiguous because the alias uniquely identifies the source file. Local types are unqualified and live in the current file's namespace. A collision between a local TypeName and an imported alias.TypeName is not ambiguous because the qualification distinguishes them. Two libraries with the same TypeName are distinguished by their aliases."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Same as Candidate A. Import cycle detection is file-level, unaffected by type identity semantics."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Same as Candidate A, plus the additional cost of maintaining (source, id) pairs in the type environment. This is O(|TypeDecls|) additional space for source path strings. Decidability is unaffected."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "After elaboration, types are fully inlined in the interchange. However, nominal identity creates a subtle closed-world tension: the interchange must record the source identity of each type for consumers that need to perform nominal type checks. If the interchange does not record source, nominal identity information is lost, and the interchange becomes structurally typed. If it does record source, the interchange contains external file path references that violate self-containedness. This is a fundamental tension in Candidate B."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "Nominal identity is deterministic: two agents comparing (source, id) pairs will always agree. However, the determinism is over nominal identity, which is different from structural identity. Two structurally identical types from different sources are NOT the same type under nominal identity. This is deterministic but changes the semantics of type comparison relative to current Tenor."
+          },
+          {
+            "invariant_id": "I7",
+            "argument": "Same as Candidate A. All use directives are processed in Pass 1. No runtime type resolution."
+          },
+          {
+            "invariant_id": "I8",
+            "argument": "Qualified references naturally enforce explicit imports. If A uses L1 as lib1, then A can reference lib1.LineItem. If L1 uses L2 as lib2 internally, A cannot reference lib2.LineItem unless A also uses L2. The qualification syntax prevents accidental access to transitively imported types because there is no alias for them in A's scope."
+          }
+        ],
+        "complexity": {
+          "time": "Same as Candidate A for import resolution and cycle detection. Additional O(|TypeDecls|) for maintaining source annotations. Type comparison becomes O(|source_path| + |id|) per comparison instead of O(1) hash lookup.",
+          "space": "O(|TypeDecls| * avg|source_path|) additional for source annotations in the type environment.",
+          "static": "Static analysis must account for nominal type identity. Two structurally identical types from different sources are different for type checking but produce identical interchange. This creates a split between elaboration-time semantics (nominal) and interchange-time semantics (structural). S1-S7 analyses may need updating."
+        },
+        "failure_modes": [
+          {
+            "description": "Interchange representation tension. If interchange inlines types structurally, nominal identity information is lost, making the interchange inconsistent with elaboration-time type checking. If interchange preserves nominal identity (via source annotations), the interchange is no longer self-contained.",
+            "trigger": "Any contract importing types from a library -- the interchange must decide whether to preserve nominal identity",
+            "severity": "fatal"
+          },
+          {
+            "description": "Type compatibility across library boundaries. A Fact declared as lib1.LineItem and another Fact declared as lib2.LineItem (with identical structure) cannot be compared or used interchangeably. Rule predicates comparing these Facts would fail type checking even though the values are structurally identical.",
+            "trigger": "Two contracts importing the same logical type from different libraries, or a contract importing a type that is structurally identical to a local type",
+            "severity": "fatal"
+          },
+          {
+            "description": "Breaking change to existing type semantics. Current Tenor uses structural typing. Switching to nominal typing changes the meaning of type comparison in all existing contracts. Two Records with identical fields that are currently the same type would become different types if they have different source paths.",
+            "trigger": "Any contract that relies on structural type identity across TypeDecl boundaries",
+            "severity": "fatal"
+          },
+          {
+            "description": "New syntax (use directive, qualified references) adds language surface area. The parser, lexer, and all elaboration passes must be updated. The conformance suite must add new test categories.",
+            "trigger": "Adopting Candidate B requires changes to every layer of the elaborator",
+            "severity": "degraded"
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "description": "Scoped-down minimal. Shared type libraries are plain .tenor files containing only type declarations. They are imported with the existing import syntax. Imported types are structurally inlined during elaboration (same as current TypeDecl). No new type identity semantics. No new syntax. This is Candidate A with the transitive import exposure problem resolved by restricting type library imports: a type library file may NOT import other type library files. Import depth is bounded to 1. This eliminates the transitive exposure problem at the cost of composability.",
+        "formalism": {
+          "structure": "A shared type library is a Tenor file containing zero or more TypeDecl constructs and no other construct kinds. A type library file may NOT contain import declarations -- it is a leaf in the import graph. A contract file may import type library files. The TypeDecl definitions from imported type library files are merged into the unified parse tree during Pass 1. TypeDecl namespace rules apply: imported TypeDecl ids must not conflict with local TypeDecl ids or other imported TypeDecl ids (duplicate-id-across-files detection). Type identity is structural. Import depth for type libraries is exactly 1: contract -> library (no library -> library chains).",
+          "evaluation_rule": "Identical to Candidate A. No new evaluation rule. TypeDecls are consumed during Pass 3 and inlined during Pass 4.",
+          "resolution_rule": "Identical to Candidate A, with one additional constraint: during Pass 1, if a file identified as a type library (contains only TypeDecl constructs, no other construct kinds) also contains import declarations, this is an elaboration error. Type library files are self-contained definition files. They may reference other TypeDecls within the same file (subject to acyclicity), but may not reference TypeDecls from other files."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Type resolution terminates trivially. Type library files cannot import other files, so the import chain for type libraries has depth 1. Within a type library file, TypeDecl acyclicity is enforced by Pass 3 DFS. Within the contract file, TypeDecl references to imported types are resolved from the unified type environment (which includes both local and imported TypeDecls). The acyclicity check covers the full unified TypeDecl graph. Maximum resolution depth is bounded by the total number of TypeDecls in the contract plus its directly imported libraries."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Same as Candidate A. Pass 1 duplicate-id detection prevents ambiguity. Each TypeDecl id is unique in the unified parse tree."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Import cycles involving type libraries are impossible because type library files cannot contain import declarations. A type library is always a leaf in the import graph. The only possible import pattern is: contract imports library (depth 1). Contract-to-contract import cycles are still detected by existing Pass 1 cycle detection."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Same as Candidate A, with tighter bounds. Import DAG depth for type libraries is 1. Total TypeDecl count is the sum of local TypeDecls plus TypeDecls from directly imported libraries. Resolution is O(|TypeDecls|^2) for cycle detection, O(|TypeRefs| * max_depth) for resolution."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Same as Candidate A. Imported TypeDecls are inlined. Interchange is self-contained. No import references in interchange."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "Same as Candidate A. Structural type identity. Two Records with identical fields are the same type regardless of origin."
+          },
+          {
+            "invariant_id": "I7",
+            "argument": "Same as Candidate A. All imports resolved in Pass 1. No runtime type resolution."
+          },
+          {
+            "invariant_id": "I8",
+            "argument": "Satisfied trivially. Type library files cannot import other files, so there is no transitive propagation chain. If contract A imports library L, A gets exactly L's TypeDecls and nothing else. L cannot import other libraries, so there are no hidden transitive dependencies."
+          }
+        ],
+        "complexity": {
+          "time": "O(|files|) for import DAG (depth 1 for type libraries); O(|TypeDecls|^2) for cycle detection; O(|TypeRefs| * max_depth) for resolution. Tighter bounds than Candidate A due to import depth restriction.",
+          "space": "Same as Candidate A. O(|TypeDecls|) for type environment.",
+          "static": "Same as current static analysis. Imported types are invisible after inlining."
+        },
+        "failure_modes": [
+          {
+            "description": "Type library composition is not supported. A type library cannot reference types from another type library. If library L1 wants to define a Record with a field of type from library L2, this is not possible. Each type library is self-contained.",
+            "trigger": "Attempting to build a type hierarchy across multiple library files",
+            "severity": "degraded"
+          },
+          {
+            "description": "Same as Candidate A: no selective import. All TypeDecls from a library are loaded.",
+            "trigger": "Large type libraries",
+            "severity": "ergonomic"
+          },
+          {
+            "description": "The distinction between a type library file and a contract file is based on content (contains only TypeDecls), not syntax. A file that was a type library could become a contract by adding a Fact or Entity, breaking any other type library that was importing it (though that cannot happen since type libraries cannot import).",
+            "trigger": "Adding non-TypeDecl constructs to a file that was being used as a type library",
+            "severity": "ergonomic"
+          }
+        ]
+      }
+    ]
+  },
+  "phase3": {
+    "counterexamples": [
+      {
+        "id": "CE1",
+        "target_candidate": "A",
+        "violates": "I8",
+        "witness": "File structure: types_common.tenor (declares TypeDecl Address), types_order.tenor (imports types_common.tenor, declares TypeDecl OrderLine which has a field of type Address from types_common). Contract order_contract.tenor imports types_order.tenor. Because Pass 1 transitively loads all imported files, the unified parse tree contains both Address (from types_common) and OrderLine (from types_order). The contract order_contract.tenor can reference Address even though it only imported types_order.tenor, not types_common.tenor. This is implicit transitive type propagation. The contract author may not be aware that Address is available, and removing the import of types_common.tenor from types_order.tenor would break order_contract.tenor's use of Address without any change to order_contract.tenor itself. This violates I8 (all type imports are explicit) and C6 (explicit over implicit).",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correct. The existing import mechanism loads all files transitively. If A imports B and B imports C, all constructs from C are available in A's unified parse tree. This is the existing behavior for all construct kinds, not specific to TypeDecl. For Candidate A to satisfy I8, the import mechanism would need to be modified to restrict which constructs are visible in which file -- essentially adding a module system. This is a significant architectural change that exceeds the scope of P5 in v1.0. Candidate A cannot satisfy I8 as stated without this change.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I8"
+        }
+      },
+      {
+        "id": "CE2",
+        "target_candidate": "B",
+        "violates": "I5",
+        "witness": "Contract declares: use @\"types.tenor\" as lib; fact line_items { type: List(element_type: lib.LineItem, max: 100) }. Library types.tenor declares: type LineItem { id: Text(max_length: 64), amount: Money(currency: \"USD\") }. During elaboration, lib.LineItem is resolved to its structural definition and inlined. The interchange for line_items has element_type: Record(fields: {id: Text(max_length: 64), amount: Money(currency: USD)}). A consumer of the interchange cannot tell this was imported from types.tenor. If nominal identity matters (as Candidate B claims), the interchange loses this information. If the interchange is augmented with source annotations, it is no longer self-contained -- it references an external file path. Either way, I5 (closed-world) or I6 (deterministic identity matching the elaboration behavior) is violated.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correct and identifies a fundamental incompatibility between nominal typing and the existing interchange format. The interchange format is defined as fully self-contained with no external references (Section 4.5, Section 13.2 Pass 6). Nominal typing requires either: (a) recording source identity in interchange (violates self-containedness), or (b) losing nominal identity in interchange (makes interchange structurally typed while elaboration is nominally typed -- a semantic split). Neither option is acceptable. Candidate B cannot satisfy both I5 and I6 given the existing interchange constraints.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I5"
+        }
+      },
+      {
+        "id": "CE3",
+        "target_candidate": "B",
+        "violates": "I6",
+        "witness": "Library lib_a.tenor declares: type LineItem { id: Text(max_length: 64), amount: Money(currency: \"USD\") }. Library lib_b.tenor declares: type LineItem { id: Text(max_length: 64), amount: Money(currency: \"USD\") }. Contract declares: use @\"lib_a.tenor\" as a; use @\"lib_b.tenor\" as b; fact items_a { type: List(element_type: a.LineItem, max: 50) }; fact items_b { type: List(element_type: b.LineItem, max: 50) }. Under nominal typing, a.LineItem != b.LineItem (different source files). A Rule that compares items_a and items_b would fail type checking. But the interchange representation of both types is the same Record structure. An interchange consumer performing structural comparison would see them as the same type. The elaboration-time type system and the interchange-time type system disagree on type identity. This is non-deterministic in the sense that the answer depends on which identity model is used.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample correctly identifies the semantic split between elaboration-time nominal identity and interchange-time structural identity. This is the same fundamental problem as CE2. Candidate B introduces a type identity model that is inconsistent with the existing interchange format. The two problems (CE2 and CE3) are manifestations of the same root issue: nominal typing is incompatible with the structural inlining that defines Tenor's interchange format.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I6"
+        }
+      },
+      {
+        "id": "CE4",
+        "target_candidate": "C",
+        "violates": "I1",
+        "witness": "Type library lib.tenor declares: type Order { lines: List(element_type: OrderLine, max: 100) } and type OrderLine { parent: Order }. This creates a cycle within the same type library file: Order references OrderLine, OrderLine references Order. Pass 3 detects this cycle and rejects the file.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "This is not a counterexample to Candidate C specifically -- it is caught by the existing TypeDecl acyclicity check in Pass 3 (Section 4.5). The cycle is intra-file and has nothing to do with cross-file imports. Pass 3's DFS cycle detection handles this case for all candidates. I1 holds because the cycle is detected and rejected.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE5",
+        "target_candidate": "C",
+        "violates": "I2",
+        "witness": "Type library lib.tenor declares: type Address { street: Text(max_length: 256), city: Text(max_length: 128) }. Contract declares locally: type Address { street: Text(max_length: 256), city: Text(max_length: 128), zip: Text(max_length: 10) }. Contract also imports lib.tenor. Now the unified parse tree has two TypeDecl entries with id 'Address'. Pass 1 duplicate-id detection flags this. But the contract author's intent was to extend the library type with an additional field, which is not possible with structural inlining.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample correctly shows that importing a library and declaring a local type with the same name is an elaboration error (duplicate TypeDecl id). This is the intended behavior: it prevents ambiguity (I2). The contract author's desire to 'extend' a type is a feature request (type inheritance/extension) that is out of scope for v1.0. The resolution is to use different names (e.g., ExtendedAddress) or to define the extended type in the library itself. This is a scope narrowing: type extension/inheritance across libraries is not supported.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Type extension or inheritance across library boundaries is not supported. A contract cannot import a type and then add fields to it. To create a variant of a library type, declare a new TypeDecl with a different name that contains the desired fields."
+        }
+      },
+      {
+        "id": "CE6",
+        "target_candidate": "A",
+        "violates": "I2",
+        "witness": "Library lib1.tenor declares: type Currency { code: Text(max_length: 3) }. Library lib2.tenor also declares: type Currency { code: Text(max_length: 3), name: Text(max_length: 64) }. Contract imports both lib1.tenor and lib2.tenor. The unified parse tree has two TypeDecl entries with id 'Currency' from different files. Pass 1 duplicate-id-across-files detection flags this as an error.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correctly caught by Pass 1 duplicate-id detection. Two imported TypeDecls with the same id from different files are an elaboration error, regardless of whether their structures are identical or different. This enforces I2 (no ambiguity). The contract author must resolve the conflict by importing only one library, or by modifying the libraries to use different names. This is a limitation of the flat namespace model, but it correctly prevents ambiguity.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "TypeDecl names occupy a flat namespace. Two imported libraries that declare the same TypeDecl id cause an elaboration error, even if the definitions are structurally identical. Namespace prefixing or selective imports are not supported in v1.0."
+        }
+      },
+      {
+        "id": "CE7",
+        "target_candidate": "A",
+        "violates": "I5",
+        "witness": "Contract imports library types.tenor which declares 50 TypeDecl definitions. The contract uses only 2 of them. The interchange output contains only the structurally inlined types at their points of use -- the 48 unused TypeDecl definitions do not appear in interchange. However, during elaboration, all 50 TypeDecl definitions are loaded into the type environment, potentially affecting error messages and elaboration-time diagnostics. Does this affect closed-world semantics?",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "Closed-world semantics (C5) applies to the evaluation model, not to the elaboration process. Unused TypeDecl definitions in the type environment do not affect evaluation: they produce no interchange output, they are referenced by no construct, and they participate in no computation. The type environment is a build-time artifact that is consumed by elaboration and discarded. The interchange output is the closed-world artifact. Since unused imported types do not appear in interchange, C5 is preserved.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      },
+      {
+        "id": "CE8",
+        "target_candidate": "C",
+        "violates": "I4",
+        "witness": "A type library declares 1000 TypeDecl definitions, each with multiple Record fields referencing other TypeDecls within the same file. The TypeDecl reference graph within the library is a long chain: T1 -> T2 -> T3 -> ... -> T1000 (each has a field of the next type). Pass 3 must resolve this entire chain. Is this practical?",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "A chain of 1000 TypeDecl definitions is unusual but within practical bounds. Pass 3 DFS cycle detection is O(|V| + |E|) where V is the number of TypeDecls and E is the number of inter-TypeDecl references. For a chain of 1000, this is O(1000). Type resolution for the deepest type in the chain requires inlining all 1000 levels, but this is O(1000) lookups with each lookup being O(1). The result is a deeply nested Record structure, which is valid but may produce large interchange output. This is a practical concern, not an invariant violation. I4 (decidability) holds because the resolution is bounded and terminating.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      }
+    ],
+    "composition_failures": [
+      {
+        "target_candidate": "A",
+        "conflicts_with": "Fact",
+        "violates": "I5",
+        "description": "Composition test -- NOT a failure. Candidate A composes correctly with Fact. A Fact declares a type (e.g., type: List(element_type: ImportedRecordType, max: 100)). The imported TypeDecl is resolved during Pass 3 and inlined during Pass 4. The Fact's type in interchange is a fully expanded BaseType tree with no import references. Fact evaluation (assemble_facts) receives the inlined type and validates values against it. No change to Fact semantics."
+      },
+      {
+        "target_candidate": "A",
+        "conflicts_with": "Entity",
+        "violates": "I5",
+        "description": "Composition test -- NOT a failure. Entity fields that use imported types are structurally inlined. Entity state machines are defined over state labels (not types), so imported types do not affect Entity evaluation. The only type-related Entity interaction is field typing on entity data (if applicable), which uses the same inlined BaseType structures."
+      },
+      {
+        "target_candidate": "A",
+        "conflicts_with": "Rule",
+        "violates": "I5",
+        "description": "Composition test -- NOT a failure. Rule evaluation (eval_pred, eval_strata) operates on typed values in the ResolvedVerdictSet and FactSet. All types are fully inlined before Rule evaluation begins. If a Fact's type was imported, the Rule sees the inlined BaseType structure. Predicate expressions (field access on Records, tag matching on TaggedUnions) work on the structural type. No change to Rule semantics."
+      },
+      {
+        "target_candidate": "A",
+        "conflicts_with": "Operation",
+        "violates": "I5",
+        "description": "Composition test -- NOT a failure. Operations reference Entities (for effects) and Personas (for allowed_personas). Operation preconditions may reference Facts that use imported types. All types are inlined before Operation validation (Pass 5) and evaluation. Operation outcome typing (P7) is unaffected -- outcomes are string labels, not types. The effect-to-entity-transition mapping does not involve types. No change to Operation semantics."
+      },
+      {
+        "target_candidate": "A",
+        "conflicts_with": "Flow",
+        "violates": "I5",
+        "description": "Composition test -- NOT a failure. Flows orchestrate Operations and reference Personas. Flow steps do not directly interact with types -- they sequence Operations and route on outcomes. Imported types affect the contract through Facts and Entities, which are consumed by Rules and Operations that Flows orchestrate. All type resolution is complete before Flow evaluation begins. No change to Flow semantics."
+      },
+      {
+        "target_candidate": "A",
+        "conflicts_with": "TypeDecl",
+        "violates": "I2",
+        "description": "Composition test -- POTENTIAL CONCERN. Local TypeDecl definitions and imported TypeDecl definitions share the same namespace. Pass 1 duplicate-id detection prevents conflicts. However, the interaction between local TypeDecl references and imported TypeDecl references must be carefully validated: a local TypeDecl may reference an imported TypeDecl as a field type, and vice versa. Pass 3 must resolve the unified TypeDecl reference graph (local + imported) and detect cycles. The existing cycle detection operates on the full set of TypeDecl definitions in the unified parse tree, so this is handled. The concern is that adding imported TypeDecl definitions to the graph may introduce cross-file cycles (e.g., local type A references imported type B, imported type B references local type A via a shared import). For Candidate C, this is impossible (type libraries cannot import). For Candidate A, Pass 3 cycle detection on the unified graph catches this. Not a composition failure."
+      },
+      {
+        "target_candidate": "A",
+        "conflicts_with": "Persona",
+        "violates": "I5",
+        "description": "Composition test -- NOT a failure. Persona is a pure identity token (Section 8) with no type fields. Persona declarations do not use TypeDecl references. Persona resolution does not interact with the type system. No composition issue."
+      },
+      {
+        "target_candidate": "A",
+        "conflicts_with": "P7 Operation Outcome Typing",
+        "violates": "I5",
+        "description": "Composition test -- NOT a failure. P7 outcomes are Operation-local string sets (not types). Outcome labels do not reference TypeDecl definitions. The effect-to-outcome association uses entity/state identifiers, not types. Imported types may appear in entity definitions or fact types that Operations reference, but the type resolution is complete before outcome routing occurs. No composition issue."
+      },
+      {
+        "target_candidate": "B",
+        "conflicts_with": "TypeDecl",
+        "violates": "I6",
+        "description": "Composition FAILURE. Candidate B changes type identity from structural to nominal-with-source. The existing TypeDecl semantics (Section 4.5) state that TypeDecl is a DSL-layer convenience that is fully inlined. After inlining, type identity is structural. Candidate B would change this: after inlining, two structurally identical types from different source files would be different types. This contradicts the existing spec statement that 'TypeDecl does not appear in TenorInterchange output' and that 'Interchange is fully self-contained.' The nominal identity information (source file path) would need to be preserved, violating self-containedness. This is a fundamental composition failure with the existing TypeDecl canonical form."
+      }
+    ]
+  },
+  "derived": {
+    "eliminated": [
+      {
+        "candidate_id": "B",
+        "reason": "counterexample_unrebutted",
+        "source_id": "CE2"
+      }
+    ],
+    "survivors": [
+      {
+        "candidate_id": "A",
+        "scope_narrowings": [
+          "TypeDecl names occupy a flat namespace. Two imported libraries that declare the same TypeDecl id cause an elaboration error, even if the definitions are structurally identical. Namespace prefixing or selective imports are not supported in v1.0."
+        ]
+      },
+      {
+        "candidate_id": "C",
+        "scope_narrowings": [
+          "Type extension or inheritance across library boundaries is not supported. A contract cannot import a type and then add fields to it. To create a variant of a library type, declare a new TypeDecl with a different name that contains the desired fields."
+        ]
+      }
+    ]
+  },
+  "phase4": {
+    "attempted": true,
+    "succeeded": false,
+    "reason": "Candidates A and C differ on one structural point: whether type library files may import other type library files. Candidate A allows it (inheriting existing import behavior) but fails I8 (transitive exposure). Candidate C forbids it, satisfying I8 but limiting composability. Merging is not possible because the import depth restriction is a binary choice. Candidate C is preferred for v1.0 because: (1) It satisfies all 8 invariants, while Candidate A fails I8 (a counterexample CE1 was unrebutted but the invariant was set as a design goal per C6 -- explicit over implicit). (2) The import depth restriction (type libraries cannot import other files) is a clean, enforceable constraint with no ambiguity. (3) The composability limitation (type libraries are self-contained) is explicitly acknowledged in the plan as acceptable for v1.0 -- the user flagged P5 module federation as deferred to v2. (4) If the import depth restriction is later relaxed (v2), Candidate C is a strict subset of Candidate A -- contracts valid under C are valid under A. The upgrade path is forward-compatible. (5) Candidate C avoids the need to define visibility rules for transitively imported types, which is a module system problem that exceeds v1.0 scope.",
+    "selected": "C",
+    "selection_basis": "Candidate C (Scoped-down minimal) satisfies all invariants including I8 (explicit imports). Candidate A satisfies I1-I7 but fails I8 due to transitive import exposure. The import depth restriction (type libraries are self-contained leaf files) is the minimal constraint that prevents implicit type propagation while preserving all other properties. The composability limitation is acceptable for v1.0 (module federation is v2 per PROJECT.md). Forward-compatible: relaxing the restriction in v2 is additive. Candidate C represents the smallest possible extension to the existing TypeDecl mechanism."
+  },
+  "phase5": {
+    "obligations": [
+      {
+        "property": "Type resolution across contract boundaries terminates",
+        "argument": "Under Candidate C, type library files cannot import other files. The import graph for type resolution has exactly two levels: contract files (which may import) and type library files (which may not import). Pass 1 loads type library files as leaves. The unified TypeDecl reference graph includes both local and imported TypeDecl definitions. Pass 3 performs DFS cycle detection on this unified graph. Since type libraries cannot import (no cross-library TypeDecl references), cycles can only arise within a single file (already handled) or between local TypeDecls and imported TypeDecls. The latter requires a local type referencing an imported type AND the imported type referencing the local type -- but the imported type cannot reference the local type because type library files are parsed independently and cannot see the importing contract's declarations. Therefore, cross-file TypeDecl cycles are structurally impossible under Candidate C. Resolution terminates.",
+        "provable": true
+      },
+      {
+        "property": "Cross-contract type graph is acyclic",
+        "argument": "The import graph under Candidate C is a bipartite DAG: contract files form one partition, type library files form the other. Edges go from contract files to type library files only (libraries cannot import). A bipartite graph with edges in one direction is trivially acyclic. Within each partition, files may have intra-file TypeDecl references (checked by Pass 3 DFS). Cross-partition TypeDecl references go from contract types to library types only (because library files cannot see contract declarations). The combined TypeDecl reference graph is therefore acyclic: any path from a library type leads only to other types within the same library file (acyclic by Pass 3), and any path from a contract type may go to a library type but never returns to a contract type. DAG property holds.",
+        "provable": true
+      },
+      {
+        "property": "All S1-S7 analyses still work correctly when types are imported",
+        "argument": "S1 (Verdict Space Analysis): operates on Rule verdicts and their types. Types are fully inlined. Imported types are structurally identical to local types after inlining. S1 is unaffected. S2 (Entity Reachability): operates on Entity state machines. Types do not participate in state transitions. S2 is unaffected. S3 (Stratification Verification): operates on Rule dependency graph. Types do not affect stratification. S3 is unaffected. S4 (Authority Topology): operates on Persona and Operation allowed_personas. Types do not participate. S4 is unaffected. S5 (Operation Effect Analysis): operates on Operation effects and outcomes. Types are inlined before analysis. S5 is unaffected. S6 (Flow Path Enumeration): operates on Flow step graph. Types do not participate in flow routing. S6 is unaffected. S7 (Parallel Conflict Detection): operates on Entity effect sets across parallel branches. Types do not affect entity effect set computation. S7 is unaffected. All static analyses operate on constructs after type inlining (Pass 4+), making imported types invisible to analysis.",
+        "provable": true
+      },
+      {
+        "property": "Shared type libraries do not break closed-world semantics (C5)",
+        "argument": "Type library files are loaded and consumed during elaboration. After Pass 4, all TypeDecl definitions (local and imported) are fully inlined. The interchange output contains only expanded BaseType structures with no import references, no file paths, and no TypeRef nodes. The interchange is self-contained. The evaluation model receives only inlined types. No external dependency is introduced at evaluation time. The contract plus its imported type libraries form a closed world at elaboration time, and the resulting interchange is a closed world at evaluation time. C5 is preserved.",
+        "provable": true
+      }
+    ],
+    "all_provable": true
+  },
+  "phase6": {
+    "canonical": {
+      "construct": "P5 Shared Type Library",
+      "formal_statement": "A shared type library is a Tenor file containing zero or more TypeDecl constructs and no other construct kinds (no Fact, Entity, Rule, Persona, Operation, Flow). A type library file may not contain import declarations -- it is a self-contained leaf in the import graph. A contract file may import type library files using the existing import syntax. Imported TypeDecl definitions are merged into the unified parse tree during Pass 1 and participate in type environment construction (Pass 3) and type reference resolution (Pass 4) identically to local TypeDecl definitions. TypeDecl names occupy a flat namespace: imported TypeDecl ids must not conflict with local TypeDecl ids or with TypeDecl ids from other imported libraries. Duplicate TypeDecl ids across file boundaries are elaboration errors (Pass 1). Type identity is structural: after Pass 3/4 inlining, two types are identical if and only if their fully expanded BaseType structures are recursively equal, regardless of origin. Imported TypeDecl definitions do not appear in the interchange bundle. The interchange output for a contract that imports shared types is identical to the interchange for a contract that declares those same types locally. All existing elaboration passes, evaluation rules, and static analyses are unchanged. The shared type library mechanism adds no new syntax, no new keywords, no new construct kinds, and no new interchange fields. It is a pure extension of the existing import mechanism restricted to type-only files.",
+      "evaluation_def": "No new evaluation rule. Shared type libraries are consumed entirely during elaboration. Pass 0: Type library files are parsed. They may contain only TypeDecl constructs. If a non-TypeDecl construct is found in a file being used as a type library, elaboration continues but the file is treated as a regular contract file (all its constructs are imported). Pass 1: Import resolution loads type library files. Type library files may not contain import declarations (elaboration error if present). Imported TypeDecl definitions are merged into the unified parse tree. Duplicate TypeDecl id detection applies across all imported files. Import cycle detection continues to operate on the file-level import graph. Pass 2: All TypeDecl definitions (local + imported) are indexed. Pass 3: Type environment construction processes all TypeDecl definitions uniformly. DFS cycle detection covers the unified TypeDecl reference graph. Cross-file TypeDecl cycles are structurally impossible (type libraries cannot see importing contract's declarations). Pass 4: TypeRef resolution and inlining proceeds identically. All TypeRef nodes are resolved to full BaseType structures. Pass 5: No change. Validation operates on typed constructs after inlining. Pass 6: No change. Interchange serialization emits inlined BaseType structures. No TypeDecl, no import reference, no file path appears in interchange.",
+      "satisfies": ["I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8"],
+      "acknowledged_limitations": [
+        "Module federation (inter-organization type sharing, type registries, versioned type packages) is explicitly deferred to v2. The v1.0 shared type library mechanism supports only direct file import within a single project or repository. Cross-organizational type distribution requires infrastructure (package registries, version resolution) that is out of scope for the language specification.",
+        "Generic type parameters for Records and TaggedUnions are not supported (SPEC-07, deferred to v2). A shared type library cannot define parameterized types like GenericList<T>. Each concrete type variant must be declared separately.",
+        "Type library files may not import other files. This limits composability: a type library cannot reference types from another type library. Complex type hierarchies that span multiple files must be flattened into a single type library file. This restriction may be relaxed in v2 if a visibility/module system is introduced.",
+        "TypeDecl names occupy a flat namespace. Two imported libraries that declare the same TypeDecl id cause an elaboration error, even if the definitions are structurally identical. Namespace prefixing, aliasing, or selective imports are not supported in v1.0. Contracts importing multiple libraries must ensure no TypeDecl id conflicts across libraries.",
+        "Type extension or inheritance across library boundaries is not supported. A contract cannot import a type and add fields to it. To create a variant of a library type, the contract must declare a new TypeDecl with a different name containing the desired fields.",
+        "No selective import: importing a type library file loads all its TypeDecl definitions into the type environment, even if the contract uses only a subset. This is a namespace concern, not a correctness issue. Unused imported types do not appear in interchange."
+      ]
+    }
+  },
+  "outcome": "canonical",
+  "outcome_notes": "Candidate C (Scoped-down minimal) survived all pressure and was selected over Candidates A (Structural + Import) and B (Nominal-with-source + Qualified References) in Phase 4. Candidate B was eliminated by counterexamples CE2 and CE3: nominal typing is fundamentally incompatible with the existing interchange format's structural inlining and self-containedness requirements. Candidate B also had a composition failure with TypeDecl: changing type identity from structural to nominal contradicts the existing TypeDecl canonical form. Candidate A satisfied invariants I1-I7 but failed I8 (explicit imports) due to transitive import exposure (CE1): the existing import mechanism loads all files transitively, making types from deep imports visible without explicit declaration. Candidate C resolves this by restricting type library files to be self-contained leaves in the import graph (no imports allowed in type library files). This eliminates transitive exposure entirely. The canonical form represents the smallest possible extension to the existing TypeDecl mechanism: same syntax, same type identity (structural), same inlining behavior, same interchange format, with the only addition being the ability to import type-only files. The six acknowledged limitations (module federation, generics, import depth, flat namespace, no type extension, no selective import) are all explicitly scoped-down design decisions appropriate for v1.0. The forward-compatible upgrade path to v2 is clear: relaxing the import depth restriction and adding namespace prefixing are additive changes that do not invalidate v1.0 contracts."
+}

@@ -1,0 +1,26 @@
+// Negative test: Effect references an undeclared outcome label
+// Expected: pass 5 error on effects field
+
+persona agent
+
+entity E {
+  states: [a, b, c]
+  initial: a
+  transitions: [(a, b), (a, c)]
+}
+
+fact x {
+  type: Bool
+  source: "sys.x"
+}
+
+operation multi_op {
+  allowed_personas: [agent]
+  precondition: x = true
+  outcomes: [success, failure]
+  effects: [
+    (E, a, b, success),
+    (E, a, c, unknown)
+  ]
+  error_contract: [precondition_failed]
+}

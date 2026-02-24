@@ -1,0 +1,17 @@
+// Evaluator test: money fact with threshold comparison
+
+fact balance {
+  type:   Money(currency: "USD")
+  source: "account.balance"
+}
+
+fact credit_limit {
+  type:   Money(currency: "USD")
+  source: "account.credit_limit"
+}
+
+rule within_limit {
+  stratum: 0
+  when:    balance <= credit_limit
+  produce: verdict within_credit_limit { payload: Bool = true }
+}

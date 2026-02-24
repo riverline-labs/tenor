@@ -1,0 +1,30 @@
+{
+  "constructs": [
+    {
+      "id": "enrollment_system",
+      "kind": "System",
+      "members": [
+        {
+          "id": "contract_a",
+          "path": "system_member_a.tenor"
+        },
+        {
+          "id": "contract_b",
+          "path": "system_member_b.tenor"
+        }
+      ],
+      "provenance": {
+        "file": "system_basic.tenor",
+        "line": 4
+      },
+      "shared_entities": [],
+      "shared_personas": [],
+      "tenor": "1.0",
+      "triggers": []
+    }
+  ],
+  "id": "system_basic",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

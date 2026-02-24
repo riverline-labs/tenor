@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "bad_var_var",
+  "field": "body.when",
+  "file": "var_var_in_predexpr.tenor",
+  "line": 19,
+  "message": "type error: variable × variable multiplication is not permitted in PredicateExpression; only variable × literal_numeric is allowed"
+}

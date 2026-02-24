@@ -1,0 +1,13 @@
+{
+  "inspection_type": "standard",
+  "defect_count": 1,
+  "inspection_items": [
+    {"item_id": "CARGO-001", "description": "Steel beams", "compliant": true, "weight_kg": 5000},
+    {"item_id": "CARGO-002", "description": "Copper wiring", "compliant": true, "weight_kg": 1200},
+    {"item_id": "CARGO-003", "description": "Plastic sheeting", "compliant": true, "weight_kg": 800}
+  ],
+  "defect_threshold": 3,
+  "quality_report": {"inspector_id": "QI-2024-001", "pass": true, "defect_count": 1, "notes": "Minor surface defect on beam lot"},
+  "compliance_report": {"inspector_id": "CO-2024-015", "pass": true, "defect_count": 0, "notes": "All documentation in order"},
+  "cargo_weight_kg": 7000
+}

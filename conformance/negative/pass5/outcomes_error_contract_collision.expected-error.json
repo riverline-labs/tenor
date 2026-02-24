@@ -1,0 +1,9 @@
+{
+  "construct_id": "op",
+  "construct_kind": "Operation",
+  "field": "outcomes",
+  "file": "outcomes_error_contract_collision.tenor",
+  "line": 17,
+  "message": "outcome 'precondition_failed' conflicts with error_contract; outcomes and error_contract must be disjoint",
+  "pass": 5
+}

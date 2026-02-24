@@ -1,0 +1,19 @@
+// Supply Chain Inspection — Shared Types (multi-file import leaf)
+// Declares types shared across the supply chain domain.
+// Imported by: inspection.tenor
+
+// ── Named Types ──────────────────────────────────────────────────────────────
+
+type InspectionReport {
+  inspector_id:   Text(max_length: 64)
+  pass:           Bool
+  defect_count:   Int(min: 0, max: 999)
+  notes:          Text(max_length: 1024)
+}
+
+type InspectionItem {
+  item_id:      Text(max_length: 64)
+  description:  Text(max_length: 256)
+  compliant:    Bool
+  weight_kg:    Int(min: 0, max: 100000)
+}

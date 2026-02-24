@@ -1,0 +1,43 @@
+// Evaluator test: operation with precondition check
+
+entity Task {
+  states:  [open, completed]
+  initial: open
+  transitions: [
+    (open, completed)
+  ]
+}
+
+fact is_valid {
+  type:   Bool
+  source: "system.valid"
+}
+
+rule check_valid {
+  stratum: 0
+  when:    is_valid = true
+  produce: verdict task_valid { payload: Bool = true }
+}
+
+operation complete_task {
+  allowed_personas: [admin]
+  precondition:     verdict_present(task_valid)
+  effects:          [(Task, open, completed)]
+  error_contract:   [precondition_failed]
+}
+
+flow process_flow {
+  snapshot: at_initiation
+  entry:    step_complete
+
+  steps: {
+    step_complete: OperationStep {
+      op:      complete_task
+      persona: admin
+      outcomes: {
+        success: Terminal(task_completed)
+      }
+      on_failure: Terminate(outcome: task_failed)
+    }
+  }
+}

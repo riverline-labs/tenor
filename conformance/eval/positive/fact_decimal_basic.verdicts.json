@@ -1,0 +1,20 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "unit_price",
+          "threshold"
+        ],
+        "rule": "above_threshold",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "price_above_threshold"
+    }
+  ]
+}

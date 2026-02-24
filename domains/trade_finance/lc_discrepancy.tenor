@@ -1,0 +1,284 @@
+// Trade Finance: Letter of Credit Contract
+// Models an international documentary credit lifecycle under UCP 600 rules.
+// Exercises: multi-party personas (5), Money types/comparisons, Date types,
+// document entity state machine, bounded quantification, HandoffStep,
+// BranchStep for compliance routing.
+//
+// Domain: International trade -- issuing bank opens LC for importer (applicant),
+// beneficiary (exporter) presents documents through advising bank, documents
+// are examined for compliance, accepted or rejected, and payment is made.
+
+// ── Named Types ──────────────────────────────────────────────────────────────
+
+type DocumentRequirement {
+  doc_name:  Text(max_length: 64)
+  required:  Bool
+  present:   Bool
+  valid:     Bool
+}
+
+// ── Personas ─────────────────────────────────────────────────────────────────
+// Five distinct parties in a letter of credit transaction:
+
+persona applicant
+persona beneficiary
+persona issuing_bank
+persona advising_bank
+persona confirming_bank
+
+// ── Facts ────────────────────────────────────────────────────────────────────
+
+fact lc_amount {
+  type:   Money(currency: "USD")
+  source: "lc_service.face_value"
+}
+
+fact draft_amount {
+  type:   Money(currency: "USD")
+  source: "presentation_service.draft_amount"
+}
+
+fact expiry_date {
+  type:   Date
+  source: "lc_service.expiry_date"
+}
+
+fact presentation_date {
+  type:   Date
+  source: "presentation_service.presentation_date"
+}
+
+fact required_documents {
+  type:   List(element_type: DocumentRequirement, max: 20)
+  source: "lc_service.required_documents"
+}
+
+fact invoice_submitted {
+  type:    Bool
+  source:  "presentation_service.invoice_submitted"
+  default: false
+}
+
+fact transport_doc_submitted {
+  type:    Bool
+  source:  "presentation_service.transport_doc_submitted"
+  default: false
+}
+
+fact documents_received {
+  type:    Bool
+  source:  "presentation_service.documents_received"
+  default: false
+}
+
+fact discrepancy_type {
+  type:   Enum(values: ["none", "late_presentation", "incorrect_amount", "missing_document", "data_mismatch"])
+  source: "examination_service.discrepancy_type"
+  default: "none"
+}
+
+// ── Entities ─────────────────────────────────────────────────────────────────
+
+entity LetterOfCredit {
+  states:  [issued, amended, presented, examined, discrepant, accepted, paid, expired]
+  initial: issued
+  transitions: [
+    (issued, amended),
+    (issued, presented),
+    (issued, expired),
+    (amended, presented),
+    (amended, expired),
+    (presented, examined),
+    (examined, accepted),
+    (examined, discrepant),
+    (discrepant, examined),
+    (accepted, paid),
+    (accepted, expired)
+  ]
+}
+
+entity Document {
+  states:  [pending, submitted, examined, accepted, rejected]
+  initial: pending
+  transitions: [
+    (pending, submitted),
+    (submitted, examined),
+    (examined, accepted),
+    (examined, rejected),
+    (rejected, submitted)
+  ]
+}
+
+// ── Rules -- Stratum 0 ──────────────────────────────────────────────────────
+// Individual compliance checks on presentation documents.
+
+rule all_documents_present {
+  stratum: 0
+  when:    ∀ doc ∈ required_documents . doc.present = true
+  produce: verdict documents_complete { payload: Bool = true }
+}
+
+rule all_documents_valid {
+  stratum: 0
+  when:    ∀ doc ∈ required_documents . doc.valid = true
+  produce: verdict documents_validated { payload: Bool = true }
+}
+
+rule amount_within_lc {
+  stratum: 0
+  when:    draft_amount <= lc_amount
+  produce: verdict amount_valid { payload: Bool = true }
+}
+
+rule presentation_before_expiry {
+  stratum: 0
+  when:    presentation_date <= expiry_date
+  produce: verdict within_deadline { payload: Bool = true }
+}
+
+rule invoice_present {
+  stratum: 0
+  when:    invoice_submitted = true
+  produce: verdict invoice_verified { payload: Bool = true }
+}
+
+rule transport_document_present {
+  stratum: 0
+  when:    transport_doc_submitted = true
+  produce: verdict transport_doc_verified { payload: Bool = true }
+}
+
+// ── Rules -- Stratum 1 ──────────────────────────────────────────────────────
+// Composite compliance determination using stratum-0 verdicts.
+
+rule documents_fully_compliant {
+  stratum: 1
+  when:    verdict_present(documents_complete)
+         ∧ verdict_present(documents_validated)
+         ∧ verdict_present(amount_valid)
+         ∧ verdict_present(within_deadline)
+         ∧ verdict_present(invoice_verified)
+         ∧ verdict_present(transport_doc_verified)
+  produce: verdict presentation_compliant { payload: Bool = true }
+}
+
+rule discrepancy_detected {
+  stratum: 1
+  when:    ¬verdict_present(documents_complete)
+         ∨ ¬verdict_present(amount_valid)
+         ∨ ¬verdict_present(within_deadline)
+  produce: verdict has_discrepancy { payload: Bool = true }
+}
+
+// ── Operations ───────────────────────────────────────────────────────────────
+
+operation present_documents {
+  allowed_personas: [beneficiary]
+  precondition:     documents_received = true
+  effects:          [(LetterOfCredit, issued, presented), (Document, pending, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation examine_documents {
+  allowed_personas: [advising_bank]
+  precondition:     documents_received = true
+  effects:          [(LetterOfCredit, presented, examined), (Document, submitted, examined)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation accept_presentation {
+  allowed_personas: [issuing_bank]
+  precondition:     verdict_present(presentation_compliant)
+  effects:          [(LetterOfCredit, examined, accepted), (Document, examined, accepted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation pay_beneficiary {
+  allowed_personas: [issuing_bank]
+  precondition:     verdict_present(presentation_compliant)
+  effects:          [(LetterOfCredit, accepted, paid)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation raise_discrepancy {
+  allowed_personas: [advising_bank, issuing_bank]
+  precondition:     verdict_present(has_discrepancy)
+  effects:          [(LetterOfCredit, examined, discrepant), (Document, examined, rejected)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+// ── Flows ────────────────────────────────────────────────────────────────────
+// Main LC presentation and examination workflow.
+// Beneficiary presents documents -> advising bank examines -> if compliant,
+// issuing bank accepts and pays; if discrepant, discrepancy is raised.
+
+flow lc_presentation_flow {
+  snapshot: at_initiation
+  entry:    step_present
+
+  steps: {
+    step_present: OperationStep {
+      op:      present_documents
+      persona: beneficiary
+      outcomes: {
+        success: step_handoff_advising
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_handoff_advising: HandoffStep {
+      from_persona: beneficiary
+      to_persona:   advising_bank
+      next:         step_examine
+    }
+
+    step_examine: OperationStep {
+      op:      examine_documents
+      persona: advising_bank
+      outcomes: {
+        success: step_handoff_issuing
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_handoff_issuing: HandoffStep {
+      from_persona: advising_bank
+      to_persona:   issuing_bank
+      next:         step_check_compliance
+    }
+
+    step_check_compliance: BranchStep {
+      condition: verdict_present(presentation_compliant)
+      persona:   issuing_bank
+      if_true:   step_accept
+      if_false:  step_raise_discrepancy
+    }
+
+    step_accept: OperationStep {
+      op:      accept_presentation
+      persona: issuing_bank
+      outcomes: {
+        success: step_pay
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_pay: OperationStep {
+      op:      pay_beneficiary
+      persona: issuing_bank
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_raise_discrepancy: OperationStep {
+      op:      raise_discrepancy
+      persona: advising_bank
+      outcomes: {
+        success: Terminal(discrepant)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

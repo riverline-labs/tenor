@@ -1,0 +1,57 @@
+{
+  "constructs": [
+    {
+      "id": "is_active",
+      "kind": "Fact",
+      "provenance": {
+        "file": "eval_basic.tenor",
+        "line": 3
+      },
+      "source": {
+        "field": "active",
+        "system": "test"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "active_confirmed"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "is_active"
+          },
+          "op": "=",
+          "right": {
+            "literal": true,
+            "type": {
+              "base": "Bool"
+            }
+          }
+        }
+      },
+      "id": "check_active",
+      "kind": "Rule",
+      "provenance": {
+        "file": "eval_basic.tenor",
+        "line": 8
+      },
+      "stratum": 0,
+      "tenor": "1.0"
+    }
+  ],
+  "id": "eval_basic",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

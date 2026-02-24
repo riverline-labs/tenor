@@ -1,0 +1,34 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_active"
+        ],
+        "rule": "check_active",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "account_active"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "can_process",
+        "stratum": 1,
+        "verdicts_used": [
+          "account_active"
+        ]
+      },
+      "type": "order_processable"
+    }
+  ]
+}

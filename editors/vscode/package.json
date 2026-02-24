@@ -1,0 +1,143 @@
+{
+  "name": "tenor-lang",
+  "displayName": "Tenor",
+  "description": "Syntax highlighting, LSP diagnostics, and agent capabilities preview for Tenor contracts",
+  "publisher": "tenor-lang",
+  "version": "0.1.0",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:tenor"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "tenor",
+        "aliases": [
+          "Tenor",
+          "tenor"
+        ],
+        "extensions": [
+          ".tenor"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tenor",
+        "scopeName": "source.tenor",
+        "path": "./syntaxes/tenor.tmLanguage.json"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "tenor",
+        "scopes": {
+          "keyword": ["keyword.declaration.tenor"],
+          "type": ["support.type.tenor"],
+          "variable": ["variable.other.readwrite.tenor"],
+          "property": ["variable.other.property.tenor"],
+          "enumMember": ["variable.other.enummember.tenor"],
+          "function": ["entity.name.function.tenor"],
+          "class": ["entity.name.type.class.tenor"],
+          "namespace": ["entity.name.type.namespace.tenor"]
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "tenor",
+        "path": "./snippets/tenor.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "tenor.openAgentCapabilities",
+        "title": "Tenor: Open Agent Capabilities Panel",
+        "icon": "$(symbol-event)"
+      },
+      {
+        "command": "tenor.elaborateFile",
+        "title": "Tenor: Elaborate File",
+        "icon": "$(play)"
+      },
+      {
+        "command": "tenor.validateProject",
+        "title": "Tenor: Validate Project"
+      },
+      {
+        "command": "tenor.newTenorFile",
+        "title": "Tenor: New Tenor File (from template)"
+      },
+      {
+        "command": "tenor.showElaborationOutput",
+        "title": "Tenor: Show Elaboration Output (JSON)"
+      },
+      {
+        "command": "tenor.runConformanceTests",
+        "title": "Tenor: Run Conformance Tests"
+      },
+      {
+        "command": "tenor.openDocs",
+        "title": "Tenor: Open Documentation"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "tenor.elaborateFile",
+          "when": "editorLangId == tenor",
+          "group": "navigation"
+        },
+        {
+          "command": "tenor.openAgentCapabilities",
+          "when": "editorLangId == tenor",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "tenor.openAgentCapabilities",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorLangId == tenor"
+      }
+    ],
+    "configuration": {
+      "title": "Tenor",
+      "properties": {
+        "tenor.checkOnType": {
+          "type": "boolean",
+          "default": false,
+          "description": "Check Tenor files on every keystroke (debounced). Default is check on save only."
+        },
+        "tenor.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the tenor binary. Leave empty to use tenor on PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "package": "npx @vscode/vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22",
+    "typescript": "~5.7"
+  }
+}

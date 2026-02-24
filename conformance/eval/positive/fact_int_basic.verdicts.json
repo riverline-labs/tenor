@@ -1,0 +1,19 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "item_count"
+        ],
+        "rule": "has_items",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "has_inventory"
+    }
+  ]
+}

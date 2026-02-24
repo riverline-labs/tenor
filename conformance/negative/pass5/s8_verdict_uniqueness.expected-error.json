@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Rule",
+  "construct_id": "high_amount",
+  "field": "produce",
+  "file": "s8_verdict_uniqueness.tenor",
+  "line": 17,
+  "message": "VerdictType 'threshold_result' is already produced by rule 'low_amount'. Each VerdictType may be produced by at most one rule (S8)."
+}

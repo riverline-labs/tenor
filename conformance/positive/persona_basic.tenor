@@ -1,0 +1,24 @@
+// Positive test: Basic persona declaration
+// Covers: persona construct, allowed_personas referencing declared persona,
+// precondition, effects, error_contract
+// Expected: elaborates without error, produces persona_basic.expected.json
+
+persona admin
+
+fact status {
+  type:   Enum(values: ["active", "inactive"])
+  source: "sys.status"
+}
+
+entity Account {
+  states:  [open, closed]
+  initial: open
+  transitions: [(open, closed)]
+}
+
+operation close_account {
+  allowed_personas: [admin]
+  precondition:     status = "active"
+  effects:          [(Account, open, closed)]
+  error_contract:   [precondition_failed]
+}

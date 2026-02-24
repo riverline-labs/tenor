@@ -1,0 +1,38 @@
+{
+  "constructs": [
+    {
+      "id": "shared_entity_system",
+      "kind": "System",
+      "members": [
+        {
+          "id": "contract_a",
+          "path": "system_member_a.tenor"
+        },
+        {
+          "id": "contract_b",
+          "path": "system_member_b.tenor"
+        }
+      ],
+      "provenance": {
+        "file": "system_shared_entity.tenor",
+        "line": 4
+      },
+      "shared_entities": [
+        {
+          "contracts": [
+            "contract_a",
+            "contract_b"
+          ],
+          "entity": "application"
+        }
+      ],
+      "shared_personas": [],
+      "tenor": "1.0",
+      "triggers": []
+    }
+  ],
+  "id": "system_shared_entity",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

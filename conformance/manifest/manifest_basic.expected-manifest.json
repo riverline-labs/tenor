@@ -1,0 +1,37 @@
+{
+  "bundle": {
+    "constructs": [
+      {
+        "id": "Order",
+        "initial": "draft",
+        "kind": "Entity",
+        "provenance": {
+          "file": "manifest_basic.tenor",
+          "line": 5
+        },
+        "states": [
+          "draft",
+          "submitted",
+          "approved"
+        ],
+        "tenor": "1.0",
+        "transitions": [
+          {
+            "from": "draft",
+            "to": "submitted"
+          },
+          {
+            "from": "submitted",
+            "to": "approved"
+          }
+        ]
+      }
+    ],
+    "id": "manifest_basic",
+    "kind": "Bundle",
+    "tenor": "1.0",
+    "tenor_version": "1.1.0"
+  },
+  "etag": "77de55e299b106ef24b0ec23226602f6a657881194d07464683539dfafb5f305",
+  "tenor": "1.1"
+}

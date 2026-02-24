@@ -1,0 +1,74 @@
+{
+  "constructs": [
+    {
+      "id": "x",
+      "kind": "Fact",
+      "provenance": {
+        "file": "rule_mul_valid.tenor",
+        "line": 10
+      },
+      "source": {
+        "field": "x",
+        "system": "a"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Int",
+        "max": 10,
+        "min": 0
+      }
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Int",
+              "max": 100,
+              "min": 0
+            },
+            "value": {
+              "left": {
+                "fact_ref": "x"
+              },
+              "literal": 10,
+              "op": "*",
+              "result_type": {
+                "base": "Int",
+                "max": 100,
+                "min": 0
+              }
+            }
+          },
+          "verdict_type": "scaled_x"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "x"
+          },
+          "op": ">",
+          "right": {
+            "literal": 0,
+            "type": {
+              "base": "Int",
+              "max": 0,
+              "min": 0
+            }
+          }
+        }
+      },
+      "id": "mul_valid",
+      "kind": "Rule",
+      "provenance": {
+        "file": "rule_mul_valid.tenor",
+        "line": 15
+      },
+      "stratum": 0,
+      "tenor": "1.0"
+    }
+  ],
+  "id": "rule_mul_valid",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

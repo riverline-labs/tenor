@@ -1,0 +1,82 @@
+// Negative test — Pass 5 (Parallel)
+// Two parallel branches both declare effects on the same entity (Order).
+// §12.2 Pass 5 Parallel: "no overlapping entity effect sets across branches"
+// §10.5: "No two parallel branches may declare effects on overlapping entity sets."
+//
+// This is the direct overlap case: each branch directly contains an OperationStep
+// whose effects target the same entity.
+
+entity Order {
+  states:  [draft, submitted, approved, rejected]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (draft, rejected)
+  ]
+}
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+operation submit_order {
+  allowed_personas: [user]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation reject_order {
+  allowed_personas: [user]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, rejected)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow parallel_conflict {
+  snapshot: at_initiation
+  entry:    par_step
+
+  steps: {
+    par_step: ParallelStep {
+      branches: [
+        Branch {
+          id:    branch_submit
+          entry: step_submit
+          steps: {
+            step_submit: OperationStep {
+              op:      submit_order
+              persona: user
+              outcomes: { success: Terminal(success) }
+              on_failure: Terminate(outcome: failure)
+            }
+          }
+        },
+        Branch {
+          id:    branch_reject
+          entry: step_reject
+          steps: {
+            step_reject: OperationStep {
+              op:      reject_order
+              persona: user
+              outcomes: { success: Terminal(success) }
+              on_failure: Terminate(outcome: failure)
+            }
+          }
+        }
+      ]
+      join: JoinPolicy {
+        on_all_success:  Terminal(success)
+        on_any_failure:  Terminate(outcome: failure)
+        on_all_complete: null
+      }
+    }
+  }
+}

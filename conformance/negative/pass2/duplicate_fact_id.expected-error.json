@@ -1,0 +1,9 @@
+{
+  "pass": 2,
+  "construct_kind": "Fact",
+  "construct_id": "foo",
+  "field": "id",
+  "file": "duplicate_fact_id.tenor",
+  "line": 11,
+  "message": "duplicate Fact id 'foo': first declared at line 6"
+}

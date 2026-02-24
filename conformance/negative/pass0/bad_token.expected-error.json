@@ -1,0 +1,9 @@
+{
+  "pass": 0,
+  "construct_kind": null,
+  "construct_id": null,
+  "field": null,
+  "file": "bad_token.tenor",
+  "line": 5,
+  "message": "unexpected character '@'"
+}

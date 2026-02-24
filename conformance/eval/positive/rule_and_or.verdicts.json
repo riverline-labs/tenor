@@ -1,0 +1,21 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_active",
+          "is_verified",
+          "is_blocked"
+        ],
+        "rule": "eligible",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "account_eligible"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+// Numeric precision test — decimal_large_precise
+// A large, precisely-scaled decimal value.
+// Must be represented as an exact string, not a native JSON float.
+// 1234567.89 as a native float loses precision. As decimal_value it is exact.
+
+fact invoice_total {
+  type:    Decimal(precision: 12, scale: 2)
+  source:  "billing.invoice_total"
+  default: "1234567.89"
+}

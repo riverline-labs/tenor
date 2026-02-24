@@ -1,0 +1,39 @@
+{
+  "constructs": [
+    {
+      "id": "trigger_system",
+      "kind": "System",
+      "members": [
+        {
+          "id": "contract_a",
+          "path": "system_member_a.tenor"
+        },
+        {
+          "id": "contract_b",
+          "path": "system_member_b.tenor"
+        }
+      ],
+      "provenance": {
+        "file": "system_flow_trigger.tenor",
+        "line": 4
+      },
+      "shared_entities": [],
+      "shared_personas": [],
+      "tenor": "1.0",
+      "triggers": [
+        {
+          "on": "success",
+          "persona": "applicant",
+          "source_contract": "contract_a",
+          "source_flow": "application_flow",
+          "target_contract": "contract_b",
+          "target_flow": "review_flow"
+        }
+      ]
+    }
+  ],
+  "id": "system_flow_trigger",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

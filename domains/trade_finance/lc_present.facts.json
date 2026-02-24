@@ -1,0 +1,17 @@
+{
+  "lc_amount": {"amount": "250000.00", "currency": "USD"},
+  "draft_amount": {"amount": "245000.00", "currency": "USD"},
+  "expiry_date": "2025-06-30",
+  "presentation_date": "2025-06-15",
+  "required_documents": [
+    {"doc_name": "Bill of Lading", "required": true, "present": true, "valid": true},
+    {"doc_name": "Commercial Invoice", "required": true, "present": true, "valid": true},
+    {"doc_name": "Packing List", "required": true, "present": true, "valid": true},
+    {"doc_name": "Certificate of Origin", "required": true, "present": true, "valid": true},
+    {"doc_name": "Insurance Certificate", "required": true, "present": true, "valid": true}
+  ],
+  "invoice_submitted": true,
+  "transport_doc_submitted": true,
+  "documents_received": true,
+  "discrepancy_type": "none"
+}

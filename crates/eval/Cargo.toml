@@ -1,0 +1,16 @@
+[package]
+name = "tenor-eval"
+version.workspace = true
+edition.workspace = true
+description = "Tenor contract evaluator"
+
+[dependencies]
+tenor-core = { path = "../core" }
+tenor-interchange = { path = "../interchange" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rust_decimal = { workspace = true }
+time = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

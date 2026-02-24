@@ -1,0 +1,20 @@
+// Evaluator test: Int-to-Decimal promotion (spec Section 12.2)
+//
+// Tests that the evaluator correctly promotes an Int value to Decimal
+// before performing a cross-type comparison.
+
+fact quantity {
+  type:   Int(min: 0, max: 1000)
+  source: "order.quantity"
+}
+
+fact threshold {
+  type:   Decimal(precision: 10, scale: 2)
+  source: "order.threshold"
+}
+
+rule above_threshold {
+  stratum: 0
+  when:    quantity > threshold
+  produce: verdict quantity_above_threshold { payload: Bool = true }
+}

@@ -1,0 +1,42 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_urgent"
+        ],
+        "rule": "check_urgent",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "urgent_ticket"
+    }
+  ],
+  "flow_outcome": "resolved_by_supervisor",
+  "steps_executed": [
+    {
+      "step_id": "step_review",
+      "step_type": "operation",
+      "result": "error: entity 'Ticket' in state 'open', expected 'reviewing'"
+    },
+    {
+      "step_id": "step_review",
+      "step_type": "escalation",
+      "result": "escalated to supervisor"
+    },
+    {
+      "step_id": "step_start_review",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_resolve",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_active"
+        ],
+        "rule": "check_active",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "parent_active"
+    }
+  ],
+  "flow_outcome": "parent_success",
+  "steps_executed": [
+    {
+      "step_id": "step_process",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_sub",
+      "step_type": "sub_flow",
+      "result": "sub_success"
+    }
+  ]
+}

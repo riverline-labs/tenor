@@ -1,0 +1,22 @@
+// Type promotion test — int_literal_multiply
+// An Int fact is multiplied by a literal integer.
+// §11.2: "Int(a,b) * literal_n → Int(a*n, b*n) if n≥0 else Int(b*n, a*n)"
+// quantity: Int(0, 100), literal: 3
+// result range: Int(0*3, 100*3) = Int(0, 300)
+// The comparison_type on the multiplication node must be Int(min: 0, max: 300).
+
+fact quantity {
+  type:   Int(min: 0, max: 100)
+  source: "inventory.quantity"
+}
+
+fact max_allowed {
+  type:   Int(min: 0, max: 1000)
+  source: "policy.max_allowed"
+}
+
+rule triple_within_limit {
+  stratum: 0
+  when:    quantity * 3 <= max_allowed
+  produce: verdict triple_ok { payload: Bool = true }
+}

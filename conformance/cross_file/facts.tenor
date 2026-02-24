@@ -1,0 +1,13 @@
+// Cross-file reference test — facts.tenor (leaf file, no imports)
+// Declares Facts that rules.tenor will reference across the file boundary.
+// Root file for elaboration: rules.tenor (the file with the import declaration).
+
+fact is_active {
+  type:   Bool
+  source: "account_service.active"
+}
+
+fact balance {
+  type:   Money(currency: "USD")
+  source: "account_service.balance"
+}

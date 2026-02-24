@@ -1,0 +1,9 @@
+// Negative test — Pass 1
+// Imports a file that does not exist. Must be rejected with an import resolution error.
+
+import "nonexistent_module.tenor"
+
+fact foo {
+  type:   Bool
+  source: "x.y"
+}

@@ -1,0 +1,42 @@
+{
+  "flow_outcome": "approved_by_manager",
+  "steps_executed": [
+    {
+      "result": "error: entity 'Document' in state 'draft', expected 'review'",
+      "step_id": "try_approve",
+      "step_type": "operation"
+    },
+    {
+      "result": "escalated to manager",
+      "step_id": "try_approve",
+      "step_type": "escalation"
+    },
+    {
+      "result": "success",
+      "step_id": "fix_state",
+      "step_type": "operation"
+    },
+    {
+      "result": "success",
+      "step_id": "then_approve",
+      "step_type": "operation"
+    }
+  ],
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "doc_ready"
+        ],
+        "rule": "check_ready",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "ready_for_review"
+    }
+  ]
+}

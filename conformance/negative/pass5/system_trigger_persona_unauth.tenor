@@ -1,0 +1,59 @@
+// Negative test -- Pass 5
+// Trigger persona exists in target contract but is NOT in allowed_personas
+// of the target flow's entry operation. C-SYS-12 extended check.
+
+persona reviewer
+
+persona auditor
+
+fact review_score {
+  type: Int(min: 0, max: 100)
+  source: "review.score"
+}
+
+entity review_item {
+  states: [pending, reviewed]
+  initial: pending
+  transitions: [
+    (pending, reviewed)
+  ]
+}
+
+operation do_review {
+  allowed_personas: [reviewer]
+  precondition: review_score >= 50
+  effects: [(review_item, pending, reviewed)]
+  error_contract: []
+}
+
+flow review_flow {
+  snapshot: at_initiation
+  entry: step_review
+  steps: {
+    step_review: OperationStep {
+      op: do_review
+      persona: reviewer
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}
+
+system audit_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: [
+    {
+      source: contract_a.application_flow,
+      on: success,
+      target: contract_b.review_flow,
+      persona: auditor
+    }
+  ]
+  shared_entities: []
+}

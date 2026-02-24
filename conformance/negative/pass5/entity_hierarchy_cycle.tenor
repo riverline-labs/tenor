@@ -1,0 +1,18 @@
+// Negative test — Pass 5
+// Two entities declare each other as parent, forming a cycle in the entity DAG.
+// §12.2 Pass 5 Entity: "hierarchy acyclic"
+// §6.2: "The transitive closure of the parent relation must be irreflexive."
+
+entity Alpha {
+  parent:  Beta
+  states:  [s1, s2]
+  initial: s1
+  transitions: [(s1, s2)]
+}
+
+entity Beta {
+  parent:  Alpha
+  states:  [s1, s2]
+  initial: s1
+  transitions: [(s1, s2)]
+}

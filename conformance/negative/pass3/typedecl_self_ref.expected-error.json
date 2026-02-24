@@ -1,0 +1,9 @@
+{
+  "pass": 3,
+  "construct_kind": "TypeDecl",
+  "construct_id": "LineItemRecord",
+  "field": "type.fields.parent",
+  "file": "typedecl_self_ref.tenor",
+  "line": 9,
+  "message": "TypeDecl cycle detected: LineItemRecord → LineItemRecord"
+}

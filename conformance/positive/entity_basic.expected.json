@@ -1,0 +1,87 @@
+{
+  "constructs": [
+    {
+      "id": "Order",
+      "initial": "draft",
+      "kind": "Entity",
+      "provenance": {
+        "file": "entity_basic.tenor",
+        "line": 5
+      },
+      "states": [
+        "draft",
+        "submitted",
+        "approved",
+        "rejected",
+        "fulfilled",
+        "cancelled"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "draft",
+          "to": "submitted"
+        },
+        {
+          "from": "draft",
+          "to": "cancelled"
+        },
+        {
+          "from": "submitted",
+          "to": "approved"
+        },
+        {
+          "from": "submitted",
+          "to": "rejected"
+        },
+        {
+          "from": "approved",
+          "to": "fulfilled"
+        },
+        {
+          "from": "approved",
+          "to": "cancelled"
+        }
+      ]
+    },
+    {
+      "id": "OrderLineItem",
+      "initial": "pending",
+      "kind": "Entity",
+      "parent": "Order",
+      "provenance": {
+        "file": "entity_basic.tenor",
+        "line": 18
+      },
+      "states": [
+        "pending",
+        "confirmed",
+        "shipped",
+        "returned"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "pending",
+          "to": "confirmed"
+        },
+        {
+          "from": "pending",
+          "to": "returned"
+        },
+        {
+          "from": "confirmed",
+          "to": "shipped"
+        },
+        {
+          "from": "shipped",
+          "to": "returned"
+        }
+      ]
+    }
+  ],
+  "id": "entity_basic",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

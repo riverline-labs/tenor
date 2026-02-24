@@ -1,0 +1,19 @@
+// Cross-file reference test — rules.tenor (root file, imports facts.tenor)
+// References facts declared in facts.tenor. The elaborator must resolve
+// cross-file fact_refs correctly and produce a single unified interchange bundle.
+// Root file: this file (it contains the import declaration).
+// Expected output: bundle.expected.json
+
+import "facts.tenor"
+
+rule account_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict account_active { payload: Bool = true }
+}
+
+rule has_balance {
+  stratum: 0
+  when:    balance > Money { amount: "0.00", currency: "USD" }
+  produce: verdict has_balance { payload: Bool = true }
+}

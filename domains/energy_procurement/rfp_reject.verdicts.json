@@ -1,0 +1,139 @@
+{
+  "flow_outcome": "escalation_failed",
+  "steps_executed": [
+    {
+      "result": "success",
+      "step_id": "step_publish",
+      "step_type": "operation"
+    },
+    {
+      "result": "success",
+      "step_id": "step_evaluate",
+      "step_type": "operation"
+    },
+    {
+      "result": "success",
+      "step_id": "step_shortlist",
+      "step_type": "operation"
+    },
+    {
+      "result": "false",
+      "step_id": "step_check_tier",
+      "step_type": "branch"
+    },
+    {
+      "result": "false",
+      "step_id": "step_check_high_value",
+      "step_type": "branch"
+    },
+    {
+      "result": "error: precondition failed for operation 'award_rfp': precondition evaluated to false",
+      "step_id": "step_award_category_lead",
+      "step_type": "operation"
+    },
+    {
+      "result": "escalated to vp_supply_chain",
+      "step_id": "step_award_category_lead",
+      "step_type": "escalation"
+    },
+    {
+      "result": "error: precondition failed for operation 'award_rfp': precondition evaluated to false",
+      "step_id": "step_escalate_to_vp",
+      "step_type": "operation"
+    }
+  ],
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "supplier_bids"
+        ],
+        "rule": "all_bids_compliant",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "bids_compliant"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "compliance_checked"
+        ],
+        "rule": "compliance_verified",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "compliance_ok"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "current_date",
+          "rfp_deadline"
+        ],
+        "rule": "deadline_not_passed",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "deadline_ok"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "bid_count"
+        ],
+        "rule": "sufficient_bids",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "enough_bids"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "winning_bid",
+          "minimum_score_threshold"
+        ],
+        "rule": "winning_score_above_threshold",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "score_ok"
+    },
+    {
+      "payload": {
+        "kind": "text_value",
+        "value": "missing budget or compliance"
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "award_blocked",
+        "stratum": 2,
+        "verdicts_used": [
+          "budget_ok"
+        ]
+      },
+      "type": "award_blocked"
+    }
+  ]
+}

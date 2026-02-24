@@ -1,0 +1,29 @@
+// Negative test — Pass 4
+// Variable × variable multiplication in a Rule body produce clause where the
+// computed product range is not contained within the declared verdict payload type.
+//
+// §12.2 Pass 4: "For Rule body variable × variable multiplication: verify Int types,
+// compute product range, verify containment in declared verdict payload type."
+//
+// x: Int(0..100), y: Int(0..100)
+// x * y range: Int(0..10000)
+// verdict payload type: Int(0..100)
+// 10000 > 100 — product range NOT contained in payload type. Must be rejected.
+
+fact x {
+  type:   Int(min: 0, max: 100)
+  source: "a.x"
+}
+
+fact y {
+  type:   Int(min: 0, max: 100)
+  source: "a.y"
+}
+
+rule product_overflow {
+  stratum: 0
+  when:    x > 0
+  produce: verdict product_result {
+    payload: Int(min: 0, max: 100) = x * y
+  }
+}

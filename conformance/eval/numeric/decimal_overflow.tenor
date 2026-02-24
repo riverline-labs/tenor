@@ -1,0 +1,24 @@
+// Evaluator test: Decimal multiplication overflow detection (spec Section 12)
+//
+// This fixture tests that multiplying a Decimal(5,2) value by a large
+// integer literal produces an error when the result cannot fit in the
+// declared precision. The evaluator should detect that the multiplication
+// result exceeds Decimal(5,2) capacity (max integer part: 999).
+//
+// Example: 999.99 * 10000 = 9999900.00 which exceeds Decimal(5,2).
+
+fact price {
+  type:   Decimal(precision: 5, scale: 2)
+  source: "order.price"
+}
+
+fact threshold {
+  type:   Decimal(precision: 5, scale: 2)
+  source: "order.threshold"
+}
+
+rule overflow_check {
+  stratum: 0
+  when:    price * 10000 > threshold
+  produce: verdict overflow_detected { payload: Bool = true }
+}

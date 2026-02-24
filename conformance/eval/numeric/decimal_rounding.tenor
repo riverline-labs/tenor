@@ -1,0 +1,26 @@
+// Evaluator test: Decimal cross-scale comparison and rounding (spec Section 12)
+//
+// Tests that the evaluator correctly compares Decimal values with different
+// declared scales. The Decimal comparison uses rust_decimal which compares
+// by mathematical value regardless of trailing zeros.
+//
+// MidpointNearestEven (banker's rounding) is directly tested by the 61
+// code-based numeric regression tests in numeric_regression.rs. This
+// file-based fixture validates the elaboration-to-evaluation pipeline
+// handles cross-scale Decimal comparison correctly.
+
+fact computed_amount {
+  type:   Decimal(precision: 10, scale: 4)
+  source: "calc.computed_amount"
+}
+
+fact expected_amount {
+  type:   Decimal(precision: 10, scale: 2)
+  source: "calc.expected_amount"
+}
+
+rule amounts_match {
+  stratum: 0
+  when:    computed_amount = expected_amount
+  produce: verdict decimal_amounts_equal { payload: Bool = true }
+}

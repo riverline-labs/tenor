@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Flow",
+  "construct_id": "cyclic_flow",
+  "field": "steps",
+  "file": "flow_step_cycle.tenor",
+  "line": 25,
+  "message": "flow step graph is not acyclic: cycle detected involving steps [step_a, step_b]"
+}

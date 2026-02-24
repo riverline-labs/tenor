@@ -1,0 +1,365 @@
+{
+  "protocol": {
+    "name": "Constraint-First Formalization Protocol",
+    "version": "0.2.1",
+    "description": "Invariant-driven semantic design. Candidates survive pressure or die."
+  },
+  "construct": {
+    "name": "Persona",
+    "description": "Declared identity construct for authority gating in Operations and Flows. A Persona is a named participant identity that must be explicitly declared before it can be referenced in Operation allowed_personas sets, Flow step persona fields, or HandoffStep from_persona/to_persona fields.",
+    "depends_on": ["Fact", "Entity", "Rule", "Operation", "Flow", "TypeDecl"]
+  },
+  "version": "1.0",
+  "phase1": {
+    "invariants": [
+      {
+        "id": "I1",
+        "description": "Every persona reference in an Operation allowed_personas set or Flow step persona field (including OperationStep persona, BranchStep persona, HandoffStep from_persona, HandoffStep to_persona, SubFlowStep persona, CompensationStep persona, Escalate to_persona) must resolve to a declared Persona construct within the same contract.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I2",
+        "description": "Persona ids are unique within a contract. No two Persona declarations may share the same id.",
+        "testable": true,
+        "structural": true,
+        "class": "soundness"
+      },
+      {
+        "id": "I3",
+        "description": "Persona resolution terminates. The resolution of a persona reference to a declared Persona is a single lookup in a finite map. There are no transitive references, no delegation chains, and no recursive structures in the Persona construct that could cause non-termination.",
+        "testable": true,
+        "structural": true,
+        "class": "termination"
+      },
+      {
+        "id": "I4",
+        "description": "The complete set of all declared Persona ids in a contract is statically determinable at elaboration time (Pass 2). No Persona can be dynamically created, conditionally declared, or depend on runtime values.",
+        "testable": true,
+        "structural": true,
+        "class": "analyzability"
+      },
+      {
+        "id": "I5",
+        "description": "Persona does not affect evaluation determinism. A Persona is an input identity, not a computed value. The same persona id provided to the same Operation with the same ResolvedVerdictSet and EntityState always produces the same result. Persona declaration does not introduce any new evaluation steps, derived values, or branching logic into the evaluation model.",
+        "testable": true,
+        "structural": true,
+        "class": "determinism"
+      },
+      {
+        "id": "I6",
+        "description": "Persona composes correctly with S4 authority topology analysis. Given the complete set of declared Personas and the allowed_personas sets of all Operations, S4 can derive for any Persona P and Entity state S the complete set of Operations P can invoke in S. This derivation is decidable and its complexity is bounded by O(|Personas| * |Operations| * |States|).",
+        "testable": true,
+        "structural": true,
+        "class": "composability"
+      }
+    ]
+  },
+  "phase2": {
+    "candidates": [
+      {
+        "id": "A",
+        "description": "Minimal Persona. A Persona is a named identity token with no metadata beyond its id. Persona declarations exist solely to establish the set of valid persona identifiers against which references are validated.",
+        "formalism": {
+          "structure": "Persona = (id: PersonaId) where PersonaId is a non-empty UTF-8 string unique within the contract. The set of all declared Personas forms a finite set P = {p1, p2, ..., pn} where n >= 0. An empty persona set is valid (a contract with no Operations or Flows may have no Personas).",
+          "evaluation_rule": "Persona declarations are not evaluated. They are consumed during elaboration (Pass 2: indexed by (Persona, id); Pass 5: all persona references validated against the index). At runtime, persona identity is an input parameter to Operation execution and Flow initiation -- the executor provides a PersonaId string, and the Operation checks membership in allowed_personas. No new evaluation step is introduced.",
+          "resolution_rule": "Persona reference resolution is a lookup in a finite map: resolve(ref, PersonaIndex) = PersonaIndex[ref] if ref in PersonaIndex, else ElaborationError. Resolution is performed during Pass 5 (construct validation). Unresolved persona references are elaboration errors reported with construct kind, construct id, field name, file, and line."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Pass 5 iterates over all Operation allowed_personas entries and all Flow step persona fields. For each persona reference string, it performs a lookup in the Persona index built during Pass 2. If the lookup fails, an elaboration error is emitted. The Persona index contains exactly the set of declared Persona ids (by I2, unique). Therefore every surviving persona reference resolves to a declared Persona. The enumeration of all persona reference sites is exhaustive because the Step type variants are a closed set (OperationStep, BranchStep, HandoffStep, SubFlowStep, CompensationStep, Escalate)."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Pass 2 builds the construct index keyed by (kind, id). The existing duplicate-id check for same-kind constructs (already implemented for Fact, Entity, Rule, Operation, Flow) is extended to include Persona. Two Persona declarations with the same id produce an elaboration error. This is identical to the existing uniqueness mechanism."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Resolution is a single hash map lookup: O(1) expected time. The Persona construct contains no references to other Personas, no delegation pointers, no transitive fields. There is no structure that could be traversed recursively. Resolution trivially terminates."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Persona declarations are top-level constructs parsed in Pass 0 and indexed in Pass 2. They cannot appear inside conditional blocks (the language has no conditional declaration syntax). They cannot depend on Fact values or Rule verdicts. The set P is fully determined by the parse tree, which is fixed at elaboration time."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Persona adds no new evaluation rules, no new derived values, and no new computation steps. The execute() function's persona check (persona in op.allowed_personas) is already part of the evaluation model (Section 8.2). Persona declaration merely makes the set of valid PersonaId values explicit and statically checkable. The evaluation semantics are unchanged."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "S4 authority topology analysis requires enumerating all (Persona, Operation, EntityState) triples. With declared Personas, the set of all persona identifiers is statically known (by I4). Combined with the statically known Operation set and Entity state sets, S4 can enumerate the authority topology as a finite relation. Complexity: O(|P| * |Ops| * max|S(e)|) where |P| = number of declared Personas, |Ops| = number of Operations, max|S(e)| = maximum state count of any Entity. All three quantities are finite and statically determined."
+          }
+        ],
+        "complexity": {
+          "time": "O(n) for indexing n Persona declarations; O(m) for validating m persona references across all Operations and Flows, where m is the total count of persona reference sites",
+          "space": "O(n) for the Persona index where n is the number of declared Personas",
+          "static": "O(|P| * |Ops| * max|S(e)|) for complete S4 authority topology derivation"
+        },
+        "failure_modes": [
+          {
+            "description": "No metadata means Personas are opaque tokens with no human-readable description in the interchange format",
+            "trigger": "Contract author wants to annotate Personas with display names or descriptions for documentation or UI generation",
+            "severity": "ergonomic"
+          },
+          {
+            "description": "Persona with zero references is not flagged as a warning",
+            "trigger": "Contract declares a Persona that no Operation or Flow references",
+            "severity": "ergonomic"
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "description": "Enriched Persona with optional metadata. A Persona carries an id and an optional description string. The description is preserved in the interchange format for documentation and tooling purposes but has no semantic effect on evaluation.",
+        "formalism": {
+          "structure": "Persona = (id: PersonaId, description?: Text) where PersonaId is a non-empty UTF-8 string unique within the contract, and description is an optional human-readable string (max_length: 256). The set of all declared Personas forms a finite set P = {p1, p2, ..., pn}.",
+          "evaluation_rule": "Identical to Candidate A. Persona declarations are not evaluated. The description field is carried through to interchange but does not participate in any evaluation, resolution, or analysis step. It is pure documentation metadata.",
+          "resolution_rule": "Identical to Candidate A. Resolution is a lookup in the Persona index by id. The description field is not used during resolution."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Identical to Candidate A. The description field does not affect reference resolution. Pass 5 validation is unchanged -- it resolves persona reference strings against PersonaId values in the index."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Identical to Candidate A. Uniqueness is checked on id, not description. Two Personas with different descriptions but the same id are still a duplicate-id error."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Identical to Candidate A. The description field adds no references, no pointers, no traversable structure."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "Identical to Candidate A. The description field is a literal string, not a computed value. It does not affect the determinability of the Persona set."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "The description field has no semantic effect. It is not read by execute(), not used in precondition evaluation, not referenced by any analysis. Evaluation determinism is unaffected."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "Identical to Candidate A. S4 authority topology uses PersonaId values only. The description field is invisible to static analysis."
+          }
+        ],
+        "complexity": {
+          "time": "O(n) for indexing; O(m) for validation. Identical to Candidate A.",
+          "space": "O(n * d) where d is average description length. Marginally more than Candidate A due to stored descriptions.",
+          "static": "Identical to Candidate A for all analyses. Description is not analyzed."
+        },
+        "failure_modes": [
+          {
+            "description": "Description field invites unbounded metadata creep -- once one optional field exists, pressure to add more (display_name, role, department, email) is difficult to resist",
+            "trigger": "Feature requests for additional Persona metadata fields in future spec versions",
+            "severity": "ergonomic"
+          },
+          {
+            "description": "Description has no formal semantics but appears in interchange, potentially misleading tooling into treating it as meaningful",
+            "trigger": "Code generator or analyzer reads description field and attempts to derive behavior from it",
+            "severity": "degraded"
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "description": "Persona with delegation. A Persona carries an id and an optional delegates_to set listing other Persona ids that this Persona can act on behalf of. Delegation enables authority sharing without duplicating Operation allowed_personas entries.",
+        "formalism": {
+          "structure": "Persona = (id: PersonaId, delegates_to?: Set<PersonaId>) where PersonaId is a non-empty UTF-8 string unique within the contract, and delegates_to is an optional set of PersonaId values each of which must also be declared as a Persona. The delegation relation D is a directed graph over the Persona set.",
+          "evaluation_rule": "During Operation execution, the persona check is modified: persona in op.allowed_personas becomes (persona in op.allowed_personas) OR (exists p in op.allowed_personas such that persona delegates_to p, transitively). The transitive closure of the delegation graph is computed at elaboration time (Pass 5) and stored as a lookup table.",
+          "resolution_rule": "Persona reference resolution is unchanged (single lookup by id). Delegation resolution requires computing the transitive closure of the delegation graph. If the delegation graph contains a cycle, this is an elaboration error. Delegation targets that do not resolve to declared Personas are elaboration errors."
+        },
+        "claims": [
+          {
+            "invariant_id": "I1",
+            "argument": "Persona reference resolution is unchanged from Candidate A. The delegation targets are additionally validated: each delegates_to entry must resolve to a declared Persona. This is checked in Pass 5."
+          },
+          {
+            "invariant_id": "I2",
+            "argument": "Identical to Candidate A. Uniqueness is on id."
+          },
+          {
+            "invariant_id": "I3",
+            "argument": "Delegation introduces a graph that requires transitive closure computation. Termination depends on acyclicity of the delegation graph, which must be verified at elaboration time. If acyclic, transitive closure terminates in O(|P|^2) time. However, this is a new termination obligation not present in Candidates A or B."
+          },
+          {
+            "invariant_id": "I4",
+            "argument": "The Persona set is still statically determinable. The delegation relation is also statically determinable since delegates_to values are literal PersonaId strings declared in the contract."
+          },
+          {
+            "invariant_id": "I5",
+            "argument": "Delegation changes the semantics of the persona check in Operation execution. The check is no longer a simple set membership test -- it becomes a transitive reachability query over the delegation graph. However, the transitive closure is precomputed, so the runtime check remains deterministic. The evaluation of execute() is modified but remains deterministic."
+          },
+          {
+            "invariant_id": "I6",
+            "argument": "S4 authority topology must now account for delegation. For any Persona P, the effective authority set is the union of P's direct allowed_personas memberships and the transitive delegation closure. S4 can still derive the complete authority topology, but the derivation is more complex: O(|P|^2 * |Ops| * max|S(e)|)."
+          }
+        ],
+        "complexity": {
+          "time": "O(|P|^2) for delegation transitive closure; O(m) for reference validation; O(m * |P|) for delegation-aware persona checks",
+          "space": "O(|P|^2) for transitive closure table",
+          "static": "O(|P|^2 * |Ops| * max|S(e)|) for S4 authority topology with delegation"
+        },
+        "failure_modes": [
+          {
+            "description": "Delegation introduces implicit authority -- Persona P1 delegates_to P2, so P1 can invoke Operations that only list P2 in allowed_personas. This is implicit authority transfer that violates design constraint C6 (explicit over implicit).",
+            "trigger": "Any use of delegation where allowed_personas does not directly list the acting persona",
+            "severity": "fatal"
+          },
+          {
+            "description": "Delegation cycles create non-termination risk if cycle detection fails or is incomplete",
+            "trigger": "Persona A delegates_to B, Persona B delegates_to A",
+            "severity": "fatal"
+          },
+          {
+            "description": "Delegation changes Operation evaluation semantics, breaking the existing canonical form for Operation (Section 8.2)",
+            "trigger": "Any contract using delegation -- the execute() function's persona check is modified",
+            "severity": "fatal"
+          }
+        ]
+      }
+    ]
+  },
+  "phase3": {
+    "counterexamples": [
+      {
+        "id": "CE1",
+        "target_candidate": "C",
+        "violates": "I5",
+        "witness": "Contract declares persona admin { delegates_to: [manager] } and persona manager {}. Operation approve_order has allowed_personas: [manager]. When admin invokes approve_order, the persona check succeeds via delegation even though admin is not in allowed_personas. A contract reader seeing allowed_personas: [manager] would conclude only manager can invoke the operation. The delegation silently expands the effective authority set. This is implicit authority (C6 violation) and changes the meaning of allowed_personas from 'exactly these personas' to 'these personas plus anyone who transitively delegates to them'. The evaluation result differs from what the contract text declares.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correct. Delegation introduces implicit authority that contradicts the explicit declaration in allowed_personas. This violates C6 (explicit over implicit) which is a non-negotiable design constraint. The candidate cannot claim I5 satisfaction because the persona check semantics are changed -- the same allowed_personas declaration produces different execution outcomes depending on delegation declarations elsewhere in the contract.",
+          "valid": false,
+          "kind": "refutation",
+          "falsified_claim": "I5"
+        }
+      },
+      {
+        "id": "CE2",
+        "target_candidate": "C",
+        "violates": "I3",
+        "witness": "Contract declares persona a { delegates_to: [b] }, persona b { delegates_to: [c] }, persona c { delegates_to: [a] }. The delegation graph has a cycle a -> b -> c -> a. Transitive closure computation does not terminate without explicit cycle detection. While the candidate claims cycle detection at elaboration time, this is an additional termination obligation that Candidates A and B do not require -- the construct itself introduces a structure that can cause non-termination if not explicitly guarded.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The candidate acknowledges this in its formalism: 'If the delegation graph contains a cycle, this is an elaboration error.' Cycle detection via DFS is O(|P|) and is performed before transitive closure. However, this concedes the point: Candidate C requires an additional structural check (delegation acyclicity) that is absent from Candidates A and B. The construct is more complex than necessary.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Delegation requires mandatory acyclicity check on the delegation graph, adding elaboration complexity not present in non-delegation candidates."
+        }
+      },
+      {
+        "id": "CE3",
+        "target_candidate": "B",
+        "violates": "I5",
+        "witness": "Contract declares persona reviewer { description: 'Senior compliance reviewer with override authority' }. A code generator reads the description and generates a UI label or documentation comment. Later, the description is changed to 'Junior compliance reviewer' but the allowed_personas on Operations is unchanged. The generated code now displays incorrect information. The description field has no formal semantics, but its presence in interchange creates an informal semantic channel that tooling may rely on, undermining determinism of tooling behavior.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample targets I5 (determinism) but the issue is tooling misuse, not evaluation non-determinism. The description field does not affect eval_pred, eval_strata, execute, or execute_flow. Tooling that derives behavior from a documentation field is non-conforming. The evaluation model's determinism is preserved. However, the presence of a semantically meaningless field in the interchange format is a design smell that invites misuse.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Optional metadata fields in interchange may be misinterpreted by non-conforming tooling as semantically meaningful. The spec must explicitly state that description has no semantic effect."
+        }
+      },
+      {
+        "id": "CE4",
+        "target_candidate": "A",
+        "violates": "I1",
+        "witness": "Contract declares no Personas. Operation approve_order has allowed_personas: [admin]. Under Candidate A, this fails Pass 5 validation because 'admin' does not resolve to a declared Persona. But under the current v0.3 spec, this contract is valid. Introducing mandatory Persona declarations makes previously valid contracts invalid -- a backward compatibility break.",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "The counterexample is correct that mandatory persona declaration is a breaking change for contracts that currently use bare persona strings without declarations. However, the spec freeze decision states 'no breaking changes to existing construct semantics after Phase 1' -- the breaking change occurs within Phase 1 as part of formalizing the construct. The v0.3 -> v1.0 transition is explicitly a major version bump. All existing contracts must be updated to include persona declarations when migrating to v1.0. This is a scope acknowledgment, not an invariant violation: I1 is stated as a v1.0 invariant, and it holds for all valid v1.0 contracts. The migration requirement is an acknowledged limitation.",
+          "valid": true,
+          "kind": "scope_narrowing",
+          "limitation_description": "Persona declaration is mandatory in v1.0. Contracts written against v0.3 that use bare persona strings in Operations and Flows must add explicit persona declarations when migrating to v1.0. This is a breaking change covered by the major version bump."
+        }
+      },
+      {
+        "id": "CE5",
+        "target_candidate": "A",
+        "violates": "I6",
+        "witness": "Contract declares 100 Personas, 50 Operations each with 10 effects across 5 Entities each with 20 states. S4 authority topology enumeration requires O(100 * 50 * 20) = 100,000 entries. Is this practical?",
+        "minimal": true,
+        "rebuttal": {
+          "argument": "100,000 entries is well within practical bounds for static analysis. The bound O(|P| * |Ops| * max|S(e)|) is polynomial and the constants in realistic contracts are small. For reference, the worked example in Appendix C has 4 Personas, 7 Operations, and at most 4 states per Entity -- yielding 112 entries. Even with 10x scaling, the analysis remains feasible. The invariant claims decidability and bounded complexity, both of which hold.",
+          "valid": true,
+          "kind": "refutation"
+        }
+      }
+    ],
+    "composition_failures": [
+      {
+        "target_candidate": "C",
+        "conflicts_with": "Operation",
+        "violates": "I5",
+        "description": "Operation Section 8.2 defines execute() with a simple persona check: 'if persona not in op.allowed_personas: return Error'. Candidate C modifies this to a transitive delegation check, changing the Operation's canonical evaluation semantics. This is a composition failure: the existing Operation formalism's persona check is part of its canonical form, and Candidate C requires modifying it. The spec freeze means existing construct semantics must be preserved. Delegation would require changing the Operation evaluation rule, which violates the spec freeze constraint."
+      }
+    ]
+  },
+  "derived": {
+    "eliminated": [
+      {
+        "candidate_id": "C",
+        "reason": "counterexample_unrebutted",
+        "source_id": "CE1"
+      }
+    ],
+    "survivors": [
+      {
+        "candidate_id": "A",
+        "scope_narrowings": [
+          "Persona declaration is mandatory in v1.0. Contracts written against v0.3 that use bare persona strings must add explicit persona declarations when migrating to v1.0. This is a breaking change covered by the major version bump."
+        ]
+      },
+      {
+        "candidate_id": "B",
+        "scope_narrowings": [
+          "Optional metadata fields in interchange may be misinterpreted by non-conforming tooling as semantically meaningful. The spec must explicitly state that description has no semantic effect."
+        ]
+      }
+    ]
+  },
+  "phase4": {
+    "attempted": true,
+    "succeeded": false,
+    "reason": "Candidates A and B differ only in the presence of an optional description field. Candidate B's description field has no semantic effect (proven by all six invariant claims being identical or trivially extended). However, Candidate B introduces a failure mode (metadata creep, CE3's scope narrowing) that Candidate A avoids entirely. The description field provides no value to any evaluation, analysis, or generation step defined in the spec. It is pure ergonomic convenience that can be provided by external tooling (comments, external documentation) without adding a field to the construct formalism. Merging would mean accepting the description field, which adds complexity without formal benefit. Selection of A is preferred: it is strictly simpler, satisfies all invariants identically, and avoids the metadata creep failure mode.",
+    "selected": "A",
+    "selection_basis": "Candidate A is strictly simpler than Candidate B. Both satisfy all invariants identically. The description field in B has no semantic effect and introduces a metadata creep risk. Per design constraint C1 (decidability) and the principle of minimal formalism, the simpler candidate that satisfies all invariants is preferred. Documentation metadata for Personas can be provided via DSL comments (already supported by the parser) without adding fields to the construct definition."
+  },
+  "phase5": {
+    "obligations": [
+      {
+        "property": "S4 authority topology can extract all persona references from a contract and build the complete authority graph given declared Personas",
+        "argument": "With declared Personas (I4: statically determinable set), S4 has access to: (1) the complete set P of PersonaIds, (2) for each Operation op, the set op.allowed_personas which is a subset of P (enforced by I1), (3) for each Entity e, the state set S(e) and transition set T(e). The authority topology is the relation: AuthTopology = {(p, op, s) | p in P, op in Ops, s in States(e), p in op.allowed_personas, exists (s, s') in op.effects for entity e}. This relation is finite (bounded by |P| * |Ops| * max|S(e)|), computable (all components are statically known), and complete (I1 ensures no undeclared persona can appear in allowed_personas). S4 can answer: 'Can persona P cause entity E to transition from state S to state S?' by checking if any Operation with P in allowed_personas has effect (E, S, S').",
+        "provable": true
+      },
+      {
+        "property": "Persona declaration does not break closed-world semantics (C5)",
+        "argument": "Persona is a declaration-only construct. It introduces no external references, no runtime dependencies, and no implicit behaviors. The set of Personas is fully determined by the contract text. No Persona value is computed, derived, or fetched from an external source. The contract remains the complete description of the system with respect to persona identity. The executor provides a PersonaId at runtime, but this is already the case in v0.3 -- Persona declaration merely makes the valid set explicit.",
+        "provable": true
+      },
+      {
+        "property": "Persona elaboration integrates into the existing six-pass pipeline without requiring pass reordering",
+        "argument": "Pass 0: Persona declarations are parsed like any other top-level construct. Pass 1: Persona constructs participate in duplicate-id-across-files detection. Pass 2: Persona constructs are indexed by (Persona, id). Pass 3: No type environment changes needed (Persona has no type fields beyond its id). Pass 4: No expression type-checking needed for Persona. Pass 5: Persona reference validation added -- iterate all Operations and Flow steps, check each persona reference against the Persona index. Pass 6: Persona constructs serialized to interchange. No pass reordering required. Persona validation slots naturally into Pass 5 alongside existing Operation and Flow validation.",
+        "provable": true
+      }
+    ],
+    "all_provable": true
+  },
+  "phase6": {
+    "canonical": {
+      "construct": "Persona",
+      "formal_statement": "A Persona is a declared identity construct. Persona = (id: PersonaId) where PersonaId is a non-empty UTF-8 string unique within the contract. The set of all declared Personas P = {p1, ..., pn} is finite, fixed at contract definition time, and statically enumerable. A Persona declaration establishes an identity token that may be referenced in Operation allowed_personas sets, Flow step persona fields (OperationStep.persona, BranchStep.persona, HandoffStep.from_persona, HandoffStep.to_persona, SubFlowStep.persona), CompensationStep.persona, and Escalate.to_persona fields. Every such reference must resolve to a declared Persona (enforced at elaboration time, Pass 5). Persona carries no metadata, no description, no delegation, and no semantic content beyond its identity. It is an opaque token whose sole purpose is to make the authority namespace explicit and statically checkable.",
+      "evaluation_def": "Persona declarations are consumed during elaboration and carried into the interchange format. They have no runtime evaluation rule. The existing Operation evaluation rule (Section 8.2) is unchanged: execute(op, persona, verdict_set, entity_state) checks persona in op.allowed_personas as a simple set membership test. Persona declaration ensures that the strings in allowed_personas sets and step persona fields are drawn from a declared, finite, statically known set. No new evaluation step is introduced. No existing evaluation step is modified.",
+      "satisfies": ["I1", "I2", "I3", "I4", "I5", "I6"],
+      "acknowledged_limitations": [
+        "Persona declaration is mandatory in v1.0. Contracts written against v0.3 that use bare persona strings in Operations and Flows must add explicit persona declarations when migrating to v1.0. This is a breaking change covered by the v0.3 to v1.0 major version bump.",
+        "Persona carries no metadata (description, display name, role). Documentation-level information about personas must be provided via DSL comments or external documentation, not via construct fields. This is a deliberate minimal design -- metadata with no formal semantics does not belong in the construct definition.",
+        "Unreferenced Persona declarations (declared but never used in any Operation or Flow) are not elaboration errors. They are valid but potentially indicate a contract authoring mistake. Static analysis tooling may optionally warn about unreferenced Personas, but this is not an elaboration obligation."
+      ]
+    }
+  },
+  "outcome": "canonical",
+  "outcome_notes": "Candidate A (Minimal Persona) survived all pressure and was selected over Candidate B (Enriched Persona) in Phase 4 on the basis of strict simplicity. Candidate C (Persona with delegation) was eliminated in Phase 3 by counterexample CE1 (delegation introduces implicit authority violating C6) and composition failure with Operation (delegation requires modifying the Operation evaluation rule, breaking the spec freeze). The canonical form establishes Persona as a pure identity token: declared, unique, statically enumerable, with no metadata and no delegation. All six invariants are satisfied. S4 authority topology analysis is fully enabled. The existing Operation and Flow evaluation semantics are preserved without modification."
+}

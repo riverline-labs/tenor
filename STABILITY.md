@@ -1,0 +1,1 @@
+This specification is pre-stable (v0.x). Conformance claims against this version are not recognized. The project maintainers reserve the right to make breaking changes without notice until v1.0 is declared stable.

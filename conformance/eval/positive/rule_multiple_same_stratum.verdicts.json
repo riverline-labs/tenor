@@ -1,0 +1,34 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "a_flag"
+        ],
+        "rule": "check_a",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "verdict_a"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "b_flag"
+        ],
+        "rule": "check_b",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "verdict_b"
+    }
+  ]
+}

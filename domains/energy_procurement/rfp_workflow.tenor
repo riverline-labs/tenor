@@ -1,0 +1,335 @@
+// Energy Procurement RFP Workflow Contract
+// Models a realistic Request for Proposal lifecycle for energy commodity procurement.
+// Covers: RFP issuance, supplier bid evaluation, approval tiers by spend amount,
+// delegation rules, supplier scoring, contract award, and purchase order generation.
+//
+// Key spec features exercised:
+//   - Money types with comparisons (rfp_amount, bid_total, approval thresholds)
+//   - Date types (rfp_deadline)
+//   - Approval tiers via BranchStep (spend-amount routing)
+//   - Escalate handler (escalate to VP for high-value denials)
+//   - Multi-entity effects (RFP + PurchaseOrder on award)
+//   - Bounded universal quantification (forall bid in supplier_bids)
+//   - Multi-file import (types.tenor)
+
+import "types.tenor"
+
+// ── Personas ─────────────────────────────────────────────────────────────────
+
+persona procurement_manager
+persona category_lead
+persona vp_supply_chain
+persona cfo
+persona supplier
+
+// ── Facts ────────────────────────────────────────────────────────────────────
+
+fact rfp_amount {
+  type:   Money(currency: "USD")
+  source: "procurement_service.rfp_total_value"
+}
+
+fact bid_total {
+  type:   Money(currency: "USD")
+  source: "bid_service.winning_bid_amount"
+}
+
+fact rfp_deadline {
+  type:   Date
+  source: "procurement_service.submission_deadline"
+}
+
+fact current_date {
+  type:   Date
+  source: "system.current_date"
+}
+
+fact procurement_stage {
+  type:   Enum(values: ["draft", "published", "evaluation", "awarded", "contracted"])
+  source: "procurement_service.stage"
+}
+
+fact supplier_bids {
+  type:   List(element_type: BidRecord, max: 50)
+  source: "bid_service.all_bids"
+}
+
+fact winning_bid {
+  type:   SupplierScore
+  source: "bid_service.winning_supplier_scores"
+}
+
+fact budget_approved {
+  type:    Bool
+  source:  "finance_service.budget_available"
+  default: false
+}
+
+fact compliance_checked {
+  type:    Bool
+  source:  "compliance_service.regulatory_check_passed"
+  default: false
+}
+
+fact minimum_score_threshold {
+  type:    Int(min: 0, max: 300)
+  source:  "procurement_service.min_score"
+  default: 180
+}
+
+fact bid_count {
+  type:    Int(min: 0, max: 50)
+  source:  "bid_service.total_bids"
+  default: 0
+}
+
+// ── Entities ─────────────────────────────────────────────────────────────────
+
+entity RFP {
+  states:  [draft, published, evaluation, shortlisted, awarded, contracted, cancelled]
+  initial: draft
+  transitions: [
+    (draft, published),
+    (draft, cancelled),
+    (published, evaluation),
+    (published, cancelled),
+    (evaluation, shortlisted),
+    (evaluation, cancelled),
+    (shortlisted, awarded),
+    (shortlisted, cancelled),
+    (awarded, contracted),
+    (awarded, cancelled)
+  ]
+}
+
+entity PurchaseOrder {
+  states:  [pending, approved, issued, fulfilled]
+  initial: pending
+  transitions: [
+    (pending, approved),
+    (approved, issued),
+    (issued, fulfilled)
+  ]
+}
+
+// ── Rules — Stratum 0 (Fact-level checks) ────────────────────────────────────
+
+rule budget_available {
+  stratum: 0
+  when:    budget_approved = true
+  produce: verdict budget_ok { payload: Bool = true }
+}
+
+rule compliance_verified {
+  stratum: 0
+  when:    compliance_checked = true
+  produce: verdict compliance_ok { payload: Bool = true }
+}
+
+rule deadline_not_passed {
+  stratum: 0
+  when:    current_date <= rfp_deadline
+  produce: verdict deadline_ok { payload: Bool = true }
+}
+
+rule all_bids_compliant {
+  stratum: 0
+  when:    ∀ bid ∈ supplier_bids . bid.compliant = true
+  produce: verdict bids_compliant { payload: Bool = true }
+}
+
+rule sufficient_bids {
+  stratum: 0
+  when:    bid_count >= 2
+  produce: verdict enough_bids { payload: Bool = true }
+}
+
+rule winning_score_above_threshold {
+  stratum: 0
+  when:    winning_bid.total_score >= minimum_score_threshold
+  produce: verdict score_ok { payload: Bool = true }
+}
+
+// ── Rules — Stratum 1 (Approval tier determination) ──────────────────────────
+
+rule tier_1_procurement_manager {
+  stratum: 1
+  when:    rfp_amount <= Money { amount: "50000.00", currency: "USD" }
+         ∧ verdict_present(budget_ok)
+  produce: verdict pm_can_approve { payload: Bool = true }
+}
+
+rule tier_2_category_lead {
+  stratum: 1
+  when:    rfp_amount > Money { amount: "50000.00", currency: "USD" }
+         ∧ rfp_amount <= Money { amount: "500000.00", currency: "USD" }
+         ∧ verdict_present(budget_ok)
+  produce: verdict cl_approval_required { payload: Bool = true }
+}
+
+rule tier_3_vp_required {
+  stratum: 1
+  when:    rfp_amount > Money { amount: "500000.00", currency: "USD" }
+         ∧ rfp_amount <= Money { amount: "2000000.00", currency: "USD" }
+         ∧ verdict_present(budget_ok)
+  produce: verdict vp_approval_required { payload: Bool = true }
+}
+
+rule tier_4_cfo_required {
+  stratum: 1
+  when:    rfp_amount > Money { amount: "2000000.00", currency: "USD" }
+         ∧ verdict_present(budget_ok)
+  produce: verdict cfo_approval_required { payload: Bool = true }
+}
+
+// ── Rules — Stratum 2 (Award recommendation) ─────────────────────────────────
+
+rule award_recommended {
+  stratum: 2
+  when:    verdict_present(compliance_ok)
+         ∧ verdict_present(score_ok)
+         ∧ verdict_present(enough_bids)
+         ∧ verdict_present(bids_compliant)
+         ∧ (verdict_present(pm_can_approve) ∨ verdict_present(cl_approval_required)
+            ∨ verdict_present(vp_approval_required) ∨ verdict_present(cfo_approval_required))
+  produce: verdict award_ready { payload: Bool = true }
+}
+
+rule award_blocked {
+  stratum: 2
+  when:    ¬verdict_present(budget_ok)
+         ∨ ¬verdict_present(compliance_ok)
+  produce: verdict award_blocked { payload: Text = "missing budget or compliance" }
+}
+
+// ── Operations ───────────────────────────────────────────────────────────────
+
+operation publish_rfp {
+  allowed_personas: [procurement_manager]
+  precondition:     verdict_present(deadline_ok)
+  effects:          [(RFP, draft, published)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation evaluate_bids {
+  allowed_personas: [procurement_manager, category_lead]
+  precondition:     verdict_present(enough_bids)
+  effects:          [(RFP, published, evaluation)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation shortlist_suppliers {
+  allowed_personas: [procurement_manager, category_lead]
+  precondition:     verdict_present(bids_compliant)
+                  ∧ verdict_present(score_ok)
+  effects:          [(RFP, evaluation, shortlisted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation award_rfp {
+  allowed_personas: [procurement_manager, category_lead, vp_supply_chain, cfo]
+  precondition:     verdict_present(award_ready)
+  effects:          [(RFP, shortlisted, awarded), (PurchaseOrder, pending, approved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation reject_rfp {
+  allowed_personas: [procurement_manager, category_lead, vp_supply_chain]
+  precondition:     verdict_present(award_blocked)
+  effects:          [(RFP, shortlisted, cancelled)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation approve_purchase {
+  allowed_personas: [vp_supply_chain, cfo]
+  precondition:     verdict_present(award_ready)
+  effects:          [(PurchaseOrder, approved, issued)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation cancel_rfp {
+  allowed_personas: [procurement_manager, category_lead, vp_supply_chain]
+  precondition:     verdict_present(budget_ok) ∨ ¬verdict_present(budget_ok)
+  effects:          [(RFP, draft, cancelled)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+// ── Flows ────────────────────────────────────────────────────────────────────
+
+flow rfp_approval_flow {
+  snapshot: at_initiation
+  entry:    step_publish
+
+  steps: {
+    step_publish: OperationStep {
+      op:      publish_rfp
+      persona: procurement_manager
+      outcomes: {
+        success: step_evaluate
+      }
+      on_failure: Terminate(outcome: publish_failed)
+    }
+
+    step_evaluate: OperationStep {
+      op:      evaluate_bids
+      persona: procurement_manager
+      outcomes: {
+        success: step_shortlist
+      }
+      on_failure: Terminate(outcome: evaluation_failed)
+    }
+
+    step_shortlist: OperationStep {
+      op:      shortlist_suppliers
+      persona: procurement_manager
+      outcomes: {
+        success: step_check_tier
+      }
+      on_failure: Terminate(outcome: shortlist_failed)
+    }
+
+    step_check_tier: BranchStep {
+      condition: verdict_present(pm_can_approve)
+      persona:   procurement_manager
+      if_true:   step_award_direct
+      if_false:  step_check_high_value
+    }
+
+    step_award_direct: OperationStep {
+      op:      award_rfp
+      persona: procurement_manager
+      outcomes: {
+        success: Terminal(awarded)
+      }
+      on_failure: Terminate(outcome: award_failed)
+    }
+
+    step_check_high_value: BranchStep {
+      condition: verdict_present(vp_approval_required) ∨ verdict_present(cfo_approval_required)
+      persona:   category_lead
+      if_true:   step_escalate_to_vp
+      if_false:  step_award_category_lead
+    }
+
+    step_award_category_lead: OperationStep {
+      op:      award_rfp
+      persona: category_lead
+      outcomes: {
+        success: Terminal(awarded)
+      }
+      on_failure: Escalate(
+        to:   vp_supply_chain
+        next: step_escalate_to_vp
+      )
+    }
+
+    step_escalate_to_vp: OperationStep {
+      op:      award_rfp
+      persona: vp_supply_chain
+      outcomes: {
+        success: Terminal(awarded)
+      }
+      on_failure: Terminate(outcome: escalation_failed)
+    }
+  }
+}

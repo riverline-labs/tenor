@@ -1,0 +1,32 @@
+{
+  "constructs": [
+    {
+      "id": "Switch",
+      "initial": "off",
+      "kind": "Entity",
+      "provenance": {
+        "file": "arrow_canonical.tenor",
+        "line": 6
+      },
+      "states": [
+        "off",
+        "on"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "off",
+          "to": "on"
+        },
+        {
+          "from": "on",
+          "to": "off"
+        }
+      ]
+    }
+  ],
+  "id": "arrow_canonical",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.1.0"
+}

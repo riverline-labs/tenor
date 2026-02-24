@@ -1,0 +1,7 @@
+// Negative test — Pass 1 (multi-file, secondary file)
+// Part of the dup_across_files test. See dup_across_files_a.tenor.
+
+fact shared_id {
+  type:   Int(min: 0, max: 100)
+  source: "b.shared"
+}

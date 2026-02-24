@@ -1,0 +1,43 @@
+// Evaluator test: operation with entity state transition in a flow
+
+entity Order {
+  states:  [pending, approved]
+  initial: pending
+  transitions: [
+    (pending, approved)
+  ]
+}
+
+fact is_active {
+  type:   Bool
+  source: "account.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict account_active { payload: Bool = true }
+}
+
+operation approve_order {
+  allowed_personas: [admin]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, pending, approved)]
+  error_contract:   [precondition_failed]
+}
+
+flow approval_flow {
+  snapshot: at_initiation
+  entry:    step_approve
+
+  steps: {
+    step_approve: OperationStep {
+      op:      approve_order
+      persona: admin
+      outcomes: {
+        success: Terminal(order_approved)
+      }
+      on_failure: Terminate(outcome: approval_failed)
+    }
+  }
+}

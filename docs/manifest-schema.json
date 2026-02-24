@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenor-lang.org/schemas/manifest/v1.1.0",
+  "title": "TenorManifest v1.1",
+  "description": "JSON Schema for the Tenor contract manifest. The manifest exposes a Tenor interchange bundle at a well-known location (/.well-known/tenor) for agent discovery and cold-start. See TENOR.md §18 for the full specification. Top-level keys are sorted lexicographically: bundle, capabilities (if present), etag, tenor.",
+  "type": "object",
+  "required": ["bundle", "etag", "tenor"],
+  "additionalProperties": false,
+  "properties": {
+    "bundle": {
+      "$ref": "interchange-schema.json",
+      "description": "The full Tenor interchange bundle, inlined. Produced by the elaborator's Pass 6 serialization. No fields added, no fields removed."
+    },
+    "capabilities": {
+      "$ref": "#/$defs/ExecutorCapabilities",
+      "description": "Optional executor capability advertisement. Omitted by static file deployments and pre-v1.1 executors. Excluded from etag computation."
+    },
+    "etag": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex digest of the canonical interchange bundle bytes. Computed as: lowercase_hex(SHA-256(canonical_json_bytes(bundle))). Changes if and only if the bundle changes. The capabilities field is excluded from this computation."
+    },
+    "tenor": {
+      "type": "string",
+      "description": "Manifest schema version identifier. '1.0' = original schema, '1.1' = schema with capabilities field. Independent of interchange format version and Tenor language spec version."
+    }
+  },
+  "$defs": {
+    "ExecutorCapabilities": {
+      "type": "object",
+      "description": "Executor capability advertisement. Dynamic executors (E14) MUST include this. Static deployments MAY omit it.",
+      "required": ["migration_analysis_mode"],
+      "additionalProperties": true,
+      "properties": {
+        "migration_analysis_mode": {
+          "type": "string",
+          "enum": ["conservative", "aggressive"],
+          "description": "Flow migration analysis mode per §17.6.11. 'conservative' = structural compatibility only. 'aggressive' = includes path dominance analysis. Agents MUST assume 'conservative' when capabilities is absent."
+        }
+      }
+    }
+  }
+}

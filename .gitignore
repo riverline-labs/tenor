@@ -1,0 +1,15 @@
+# Rust build artifacts
+target/
+elaborator/target/
+
+# Editor/IDE
+.DS_Store
+*.swp
+*.swo
+
+# Node.js
+node_modules/
+dist/
+
+# Local protocol/process artifacts
+cffp.cue
