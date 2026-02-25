@@ -27,7 +27,15 @@ cargo run -p tenor-cli -- test conformance
 cargo clippy --workspace -- -D warnings
 ```
 
-**Every single check must pass before committing.** No exceptions. No "I'll fix it later." If any check fails, fix it before the commit. You own all test failures, lint failures, and formatting issues. CI runs all five checks and treats clippy warnings as errors (`-D warnings`). This is non-negotiable.
+**If the commit touches `crates/eval/`, `crates/interchange/`, or `crates/tenor-eval-wasm/`**, also run:
+
+```bash
+cd crates/tenor-eval-wasm && wasm-pack build --target nodejs && wasm-pack test --node && cd ../..
+```
+
+The WASM crate is excluded from the workspace — workspace commands do not build or test it. CI runs both.
+
+**Every single check must pass before committing.** No exceptions. No "I'll fix it later." If any check fails, fix it before the commit. You own all test failures, lint failures, and formatting issues. CI runs all checks and treats clippy warnings as errors (`-D warnings`). This is non-negotiable.
 
 ## Build and test
 
