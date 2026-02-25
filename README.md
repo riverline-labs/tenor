@@ -211,6 +211,7 @@ The System scenario composes the supply chain and trade finance contracts via cr
 
 | Document                                      | Audience                |
 | --------------------------------------------- | ----------------------- |
+| [Narrative](docs/guide/narrative.md)           | Everyone                |
 | [Formal specification](docs/TENOR.md)         | Language implementors   |
 | [Author guide](docs/guide/author-guide.md)    | Contract authors        |
 | [What is Tenor?](docs/guide/what-is-tenor.md) | Decision makers         |
