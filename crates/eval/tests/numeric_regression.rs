@@ -43,7 +43,7 @@ fn comparison_bundle(
         "id": "numeric_test",
         "kind": "Bundle",
         "tenor": "1.0",
-        "tenor_version": "1.1.0",
+        "tenor_version": "1.0.0",
         "constructs": [
             {
                 "id": fact_id,
@@ -95,7 +95,7 @@ fn two_fact_comparison_bundle(
         "id": "numeric_test",
         "kind": "Bundle",
         "tenor": "1.0",
-        "tenor_version": "1.1.0",
+        "tenor_version": "1.0.0",
         "constructs": [
             {
                 "id": fact1_id,
@@ -145,7 +145,7 @@ fn mul_payload_bundle(
         "id": "numeric_test",
         "kind": "Bundle",
         "tenor": "1.0",
-        "tenor_version": "1.1.0",
+        "tenor_version": "1.0.0",
         "constructs": [
             {
                 "id": fact_id,
@@ -850,7 +850,7 @@ fn cross_mul_vs_int() {
         "id": "numeric_test",
         "kind": "Bundle",
         "tenor": "1.0",
-        "tenor_version": "1.1.0",
+        "tenor_version": "1.0.0",
         "constructs": [
             {
                 "id": "x",

@@ -139,7 +139,7 @@ mod integration_tests {
             "id": "test_bundle",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.1.0",
+            "tenor_version": "1.0.0",
             "constructs": [
                 {
                     "id": "is_active",
@@ -278,7 +278,7 @@ mod integration_tests {
             "id": "test_defaults",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.1.0",
+            "tenor_version": "1.0.0",
             "constructs": [
                 {
                     "id": "flag",
@@ -326,7 +326,7 @@ mod integration_tests {
             "id": "test_missing",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.1.0",
+            "tenor_version": "1.0.0",
             "constructs": [
                 {
                     "id": "required",
@@ -356,7 +356,7 @@ mod integration_tests {
             "id": "test_empty",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.1.0",
+            "tenor_version": "1.0.0",
             "constructs": [
                 {
                     "id": "x",

@@ -1,8 +1,8 @@
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-/// Manifest envelope version (e.g., "1.1").
-const MANIFEST_TENOR_VERSION: &str = "1.1";
+/// Manifest envelope version (e.g., "1.0").
+const MANIFEST_TENOR_VERSION: &str = "1.0";
 
 /// Compute SHA-256 etag from compact JSON representation.
 pub fn compute_etag(bundle: &Value) -> String {

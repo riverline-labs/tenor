@@ -995,7 +995,7 @@ mod tests {
             "id": "test_bundle",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.1.0"
+            "tenor_version": "1.0.0"
         })
     }
 

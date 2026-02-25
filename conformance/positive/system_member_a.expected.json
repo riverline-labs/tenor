@@ -206,5 +206,5 @@
   "id": "system_member_a",
   "kind": "Bundle",
   "tenor": "1.0",
-  "tenor_version": "1.1.0"
+  "tenor_version": "1.0.0"
 }

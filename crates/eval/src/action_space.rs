@@ -423,7 +423,7 @@ mod tests {
             "id": "action_space_test",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.1.0",
+            "tenor_version": "1.0.0",
             "constructs": [
                 {
                     "id": "is_active",

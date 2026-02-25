@@ -30,8 +30,8 @@
     "id": "manifest_basic",
     "kind": "Bundle",
     "tenor": "1.0",
-    "tenor_version": "1.1.0"
+    "tenor_version": "1.0.0"
   },
-  "etag": "77de55e299b106ef24b0ec23226602f6a657881194d07464683539dfafb5f305",
-  "tenor": "1.1"
+  "etag": "d0e189b7f0e6bb674eca2ff978e8b4382e16c928909e415b6cde5865b55b1a16",
+  "tenor": "1.0"
 }

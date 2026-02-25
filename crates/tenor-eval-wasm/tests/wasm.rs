@@ -73,7 +73,7 @@ const BASIC_BUNDLE: &str = r#"{
   "id": "entity_operation_basic",
   "kind": "Bundle",
   "tenor": "1.0",
-  "tenor_version": "1.1.0"
+  "tenor_version": "1.0.0"
 }"#;
 
 #[wasm_bindgen_test(unsupported = test)]

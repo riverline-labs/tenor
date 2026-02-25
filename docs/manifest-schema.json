@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tenor-lang.org/schemas/manifest/v1.1.0",
-  "title": "TenorManifest v1.1",
+  "$id": "https://tenor-lang.org/schemas/manifest/v1.0.0",
+  "title": "TenorManifest v1.0",
   "description": "JSON Schema for the Tenor contract manifest. The manifest exposes a Tenor interchange bundle at a well-known location (/.well-known/tenor) for agent discovery and cold-start. See TENOR.md §18 for the full specification. Top-level keys are sorted lexicographically: bundle, capabilities (if present), etag, tenor.",
   "type": "object",
   "required": ["bundle", "etag", "tenor"],
@@ -22,7 +22,7 @@
     },
     "tenor": {
       "type": "string",
-      "description": "Manifest schema version identifier. '1.0' = original schema, '1.1' = schema with capabilities field. Independent of interchange format version and Tenor language spec version."
+      "description": "Manifest schema version identifier. Independent of interchange format version and Tenor language spec version."
     }
   },
   "$defs": {

@@ -471,7 +471,7 @@ mod tests {
             "id": "test-bundle",
             "kind": "Bundle",
             "tenor": "1.0",
-            "tenor_version": "1.1.0",
+            "tenor_version": "1.0.0",
             "constructs": constructs
         })
     }
@@ -482,7 +482,7 @@ mod tests {
         let result = from_interchange(&bundle).unwrap();
         assert_eq!(result.id, "test-bundle");
         assert_eq!(result.tenor, "1.0");
-        assert_eq!(result.tenor_version, "1.1.0");
+        assert_eq!(result.tenor_version, "1.0.0");
         assert!(result.constructs.is_empty());
     }
 

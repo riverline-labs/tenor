@@ -852,9 +852,9 @@ fn e10_manifest_valid_schema() {
         etag
     );
 
-    // tenor version is "1.1"
+    // tenor version is "1.0"
     let tenor_version = manifest["tenor"].as_str().expect("tenor is not a string");
-    assert_eq!(tenor_version, "1.1", "manifest tenor version should be 1.1");
+    assert_eq!(tenor_version, "1.0", "manifest tenor version should be 1.0");
 
     // bundle has kind: "Bundle"
     let bundle_kind = manifest["bundle"]["kind"]
