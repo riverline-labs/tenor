@@ -13,9 +13,13 @@
 //! - GET  /health                      - Server status (exempt from auth)
 //! - GET  /contracts                   - List loaded contract bundles
 //! - GET  /contracts/{id}/operations   - Operations for a specific contract
+//! - GET  /.well-known/tenor           - Contract manifest with ETag (spec §19)
+//! - GET  /inspect                     - Structured contract summary
 //! - POST /elaborate                   - Elaborate .tenor source text
 //! - POST /evaluate                    - Evaluate a contract against facts
 //! - POST /explain                     - Explain a contract bundle
+//! - POST /flows/{flow_id}/simulate    - Stateless flow simulation
+//! - POST /actions                     - Action space for a persona
 //!
 //! All responses use Content-Type: application/json.
 
@@ -26,7 +30,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, State};
-use axum::http::{Method, Request, StatusCode};
+use axum::http::{header, HeaderMap, Method, Request, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -35,6 +39,7 @@ use tokio::sync::{Mutex, RwLock};
 use tower_http::cors::{Any, CorsLayer};
 
 use super::explain;
+use super::manifest;
 
 /// Maximum request body size: 10 MB.
 const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
@@ -243,9 +248,13 @@ pub async fn start_server(
         .route("/health", get(handle_health))
         .route("/contracts", get(handle_list_contracts))
         .route("/contracts/{id}/operations", get(handle_get_operations))
+        .route("/.well-known/tenor", get(handle_well_known_tenor))
+        .route("/inspect", get(handle_inspect))
         .route("/elaborate", post(handle_elaborate))
         .route("/evaluate", post(handle_evaluate))
         .route("/explain", post(handle_explain))
+        .route("/flows/{flow_id}/simulate", post(handle_simulate_flow))
+        .route("/actions", post(handle_actions))
         .fallback(handle_not_found)
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -714,4 +723,511 @@ async fn handle_explain(
         )
         .into_response(),
     }
+}
+
+// --- Phase 4 endpoints ---
+
+/// GET /.well-known/tenor
+///
+/// Contract manifest endpoint per spec §19. Returns the TenorManifest JSON
+/// with the full interchange bundle inlined. Sets ETag response header and
+/// supports If-None-Match for conditional requests (304 Not Modified).
+/// Satisfies executor obligations E10, E11, E12.
+async fn handle_well_known_tenor(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    let contracts = state.contracts.read().await;
+
+    let bundle = match contracts.values().next() {
+        Some(b) => b.clone(),
+        None => return json_error(StatusCode::NOT_FOUND, "no contracts loaded").into_response(),
+    };
+    drop(contracts);
+
+    let manifest_value = manifest::build_manifest(bundle);
+    let etag = manifest_value
+        .get("etag")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let etag_quoted = format!("\"{}\"", etag);
+
+    // Check If-None-Match
+    if let Some(inm) = headers.get(header::IF_NONE_MATCH) {
+        if let Ok(inm_str) = inm.to_str() {
+            if inm_str == etag_quoted || inm_str == etag {
+                return StatusCode::NOT_MODIFIED.into_response();
+            }
+        }
+    }
+
+    let mut response = Json(manifest_value).into_response();
+    if let Ok(val) = etag_quoted.parse() {
+        response.headers_mut().insert(header::ETAG, val);
+    }
+    response
+}
+
+/// Internal error type for simulate_flow to distinguish persona errors from eval errors.
+enum SimulateError {
+    PersonaNotFound(String),
+    Eval(tenor_eval::EvalError),
+}
+
+/// Core simulation logic, runs synchronously in a blocking task.
+fn simulate_flow_inner(
+    bundle: &serde_json::Value,
+    facts: &serde_json::Value,
+    flow_id: &str,
+    persona_id: &str,
+    entity_states_input: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, SimulateError> {
+    let contract = tenor_eval::Contract::from_interchange(bundle).map_err(SimulateError::Eval)?;
+
+    // Check persona exists in contract
+    if !contract.personas.contains(&persona_id.to_string()) {
+        return Err(SimulateError::PersonaNotFound(persona_id.to_string()));
+    }
+
+    // Assemble facts
+    let fact_set =
+        tenor_eval::assemble::assemble_facts(&contract, facts).map_err(SimulateError::Eval)?;
+
+    // Evaluate rules to produce verdicts
+    let verdict_set =
+        tenor_eval::rules::eval_strata(&contract, &fact_set).map_err(SimulateError::Eval)?;
+
+    // Create frozen snapshot
+    let snapshot = tenor_eval::Snapshot {
+        facts: fact_set,
+        verdicts: verdict_set.clone(),
+    };
+
+    // Build entity states: start from contract defaults, override with request
+    let mut entity_states = tenor_eval::operation::init_entity_states(&contract);
+    if let Some(es_input) = entity_states_input {
+        if let Some(obj) = es_input.as_object() {
+            for (entity_id, state_info) in obj {
+                if let Some(state) = state_info.get("state").and_then(|v| v.as_str()) {
+                    entity_states.insert(entity_id.clone(), state.to_string());
+                }
+            }
+        }
+    }
+
+    // Find the flow
+    let target_flow = contract.get_flow(flow_id).ok_or_else(|| {
+        SimulateError::Eval(tenor_eval::EvalError::DeserializeError {
+            message: format!("flow '{}' not found in contract", flow_id),
+        })
+    })?;
+
+    // Build step index for enriching the response path with operation/persona info
+    let step_info: HashMap<String, (String, String)> = target_flow
+        .steps
+        .iter()
+        .filter_map(|s| match s {
+            tenor_eval::types::FlowStep::OperationStep {
+                id, op, persona, ..
+            } => Some((id.clone(), (op.clone(), persona.clone()))),
+            _ => None,
+        })
+        .collect();
+
+    // Execute the flow
+    let flow_result =
+        tenor_eval::flow::execute_flow(target_flow, &contract, &snapshot, &mut entity_states, None)
+            .map_err(SimulateError::Eval)?;
+
+    // Build path
+    let path: Vec<serde_json::Value> = flow_result
+        .steps_executed
+        .iter()
+        .map(|step| {
+            let mut step_json = serde_json::json!({
+                "step": step.step_id,
+                "type": step.step_type,
+                "outcome": step.result,
+            });
+            if let Some((op_name, step_persona)) = step_info.get(&step.step_id) {
+                step_json["operation"] = serde_json::json!(op_name);
+                step_json["persona"] = serde_json::json!(step_persona);
+            }
+            step_json
+        })
+        .collect();
+
+    // Build would_transition
+    let would_transition: Vec<serde_json::Value> = flow_result
+        .entity_state_changes
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "entity_id": e.entity_id,
+                "from": e.from_state,
+                "to": e.to_state,
+            })
+        })
+        .collect();
+
+    // Build verdicts
+    let verdicts: Vec<serde_json::Value> = verdict_set
+        .0
+        .iter()
+        .map(|v| {
+            serde_json::json!({
+                "type": v.verdict_type,
+                "payload": tenor_eval::types::value_to_json(&v.payload),
+            })
+        })
+        .collect();
+
+    Ok(serde_json::json!({
+        "simulation": true,
+        "flow_id": flow_id,
+        "outcome": flow_result.outcome,
+        "path": path,
+        "would_transition": would_transition,
+        "verdicts": verdicts,
+    }))
+}
+
+/// POST /flows/{flow_id}/simulate
+///
+/// Dedicated flow simulation endpoint. Stateless — entity states come from
+/// the request body, nothing is persisted. Returns simulation: true always.
+async fn handle_simulate_flow(
+    State(state): State<Arc<AppState>>,
+    Path(flow_id): Path<String>,
+    Json(parsed): Json<serde_json::Value>,
+) -> Response {
+    let persona_id = match parsed.get("persona_id").and_then(|v| v.as_str()) {
+        Some(p) => p.to_string(),
+        None => {
+            return json_error(StatusCode::BAD_REQUEST, "missing 'persona_id' field")
+                .into_response()
+        }
+    };
+
+    let facts = parsed
+        .get("facts")
+        .cloned()
+        .unwrap_or(serde_json::json!({}));
+    let entity_states_input = parsed.get("entity_states").cloned();
+
+    // Find the contract containing this flow
+    let contracts = state.contracts.read().await;
+    let mut found_bundle: Option<serde_json::Value> = None;
+
+    for bundle in contracts.values() {
+        if let Some(constructs) = bundle.get("constructs").and_then(|c| c.as_array()) {
+            let has_flow = constructs.iter().any(|c| {
+                c.get("kind").and_then(|k| k.as_str()) == Some("Flow")
+                    && c.get("id").and_then(|i| i.as_str()) == Some(&flow_id)
+            });
+            if has_flow {
+                found_bundle = Some(bundle.clone());
+                break;
+            }
+        }
+    }
+    drop(contracts);
+
+    let bundle = match found_bundle {
+        Some(b) => b,
+        None => {
+            return json_error(
+                StatusCode::NOT_FOUND,
+                &format!("flow '{}' not found", flow_id),
+            )
+            .into_response()
+        }
+    };
+
+    let fid = flow_id.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        simulate_flow_inner(
+            &bundle,
+            &facts,
+            &fid,
+            &persona_id,
+            entity_states_input.as_ref(),
+        )
+    })
+    .await;
+
+    match result {
+        Ok(Ok(response_json)) => (StatusCode::OK, Json(response_json)).into_response(),
+        Ok(Err(SimulateError::PersonaNotFound(p))) => json_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &format!("persona '{}' not found in contract", p),
+        )
+        .into_response(),
+        Ok(Err(SimulateError::Eval(e))) => {
+            json_error(StatusCode::UNPROCESSABLE_ENTITY, &format!("{}", e)).into_response()
+        }
+        Err(e) => json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("task join error: {}", e),
+        )
+        .into_response(),
+    }
+}
+
+/// POST /actions
+///
+/// Compute the action space for a persona. Stateless — facts and entity
+/// states come from the request body, nothing is persisted. Returns all
+/// available and blocked actions with reasons.
+///
+/// Input: { "persona_id": "...", "facts": {...}, "entity_states": {...} }
+/// Output: ActionSpace JSON
+async fn handle_actions(
+    State(state): State<Arc<AppState>>,
+    Json(parsed): Json<serde_json::Value>,
+) -> Response {
+    let persona_id = match parsed.get("persona_id").and_then(|v| v.as_str()) {
+        Some(p) => p.to_string(),
+        None => {
+            return json_error(StatusCode::BAD_REQUEST, "missing 'persona_id' field")
+                .into_response()
+        }
+    };
+
+    let facts = parsed
+        .get("facts")
+        .cloned()
+        .unwrap_or(serde_json::json!({}));
+    let entity_states_input: std::collections::BTreeMap<String, String> =
+        match parsed.get("entity_states") {
+            Some(v) => match serde_json::from_value(v.clone()) {
+                Ok(m) => m,
+                Err(e) => {
+                    return json_error(
+                        StatusCode::BAD_REQUEST,
+                        &format!("invalid entity_states: {}", e),
+                    )
+                    .into_response()
+                }
+            },
+            None => std::collections::BTreeMap::new(),
+        };
+
+    // Find first loaded contract (same pattern as /evaluate)
+    let contracts = state.contracts.read().await;
+    let bundle = match contracts.values().next() {
+        Some(b) => b.clone(),
+        None => return json_error(StatusCode::NOT_FOUND, "no contracts loaded").into_response(),
+    };
+    drop(contracts);
+
+    let result = tokio::task::spawn_blocking(move || {
+        let contract = match tenor_eval::Contract::from_interchange(&bundle) {
+            Ok(c) => c,
+            Err(e) => return Err(format!("invalid contract: {}", e)),
+        };
+
+        tenor_eval::action_space::compute_action_space(
+            &contract,
+            &facts,
+            &entity_states_input,
+            &persona_id,
+        )
+        .map_err(|e| format!("{}", e))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(action_space)) => match serde_json::to_value(&action_space) {
+            Ok(json) => (StatusCode::OK, Json(json)).into_response(),
+            Err(e) => json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("serialization error: {}", e),
+            )
+            .into_response(),
+        },
+        Ok(Err(e)) => json_error(StatusCode::UNPROCESSABLE_ENTITY, &e).into_response(),
+        Err(e) => json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("task join error: {}", e),
+        )
+        .into_response(),
+    }
+}
+
+/// GET /inspect
+///
+/// Structured summary of the loaded contract. Returns all declared constructs
+/// with their key properties — enough for an agent to cold-start or a UI to
+/// render a contract explorer.
+async fn handle_inspect(State(state): State<Arc<AppState>>) -> Response {
+    let contracts = state.contracts.read().await;
+
+    let mut all_facts = Vec::new();
+    let mut all_entities = Vec::new();
+    let mut all_rules = Vec::new();
+    let mut all_personas = Vec::new();
+    let mut all_operations = Vec::new();
+    let mut all_flows = Vec::new();
+    let mut etag_bundle = None;
+
+    for bundle in contracts.values() {
+        if etag_bundle.is_none() {
+            etag_bundle = Some(bundle.clone());
+        }
+
+        let parsed = match tenor_interchange::from_interchange(bundle) {
+            Ok(p) => p,
+            Err(e) => {
+                return json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("failed to parse bundle: {}", e),
+                )
+                .into_response()
+            }
+        };
+
+        for construct in &parsed.constructs {
+            match construct {
+                tenor_interchange::InterchangeConstruct::Fact(f) => {
+                    let base = f
+                        .fact_type
+                        .get("base")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    let mut fact_json = serde_json::json!({
+                        "id": f.id,
+                        "type": base,
+                    });
+                    if let Some(ref src) = f.source {
+                        fact_json["source"] = src.clone();
+                    }
+                    if f.default.is_some() {
+                        fact_json["has_default"] = serde_json::json!(true);
+                    }
+                    // Include full type spec for richer inspection
+                    fact_json["type_spec"] = f.fact_type.clone();
+                    all_facts.push(fact_json);
+                }
+                tenor_interchange::InterchangeConstruct::Entity(e) => {
+                    let transitions: Vec<serde_json::Value> = e
+                        .transitions
+                        .iter()
+                        .map(|t| {
+                            serde_json::json!({
+                                "from": t.from,
+                                "to": t.to,
+                            })
+                        })
+                        .collect();
+                    all_entities.push(serde_json::json!({
+                        "id": e.id,
+                        "states": e.states,
+                        "initial": e.initial,
+                        "transitions": transitions,
+                    }));
+                }
+                tenor_interchange::InterchangeConstruct::Rule(r) => {
+                    let condition_summary = r.when().map(summarize_condition).unwrap_or_default();
+                    let verdict_type = r
+                        .produce()
+                        .and_then(|p| p.get("verdict_type"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    all_rules.push(serde_json::json!({
+                        "id": r.id,
+                        "stratum": r.stratum,
+                        "produces": verdict_type,
+                        "condition_summary": condition_summary,
+                    }));
+                }
+                tenor_interchange::InterchangeConstruct::Persona(p) => {
+                    all_personas.push(serde_json::json!({ "id": p.id }));
+                }
+                tenor_interchange::InterchangeConstruct::Operation(op) => {
+                    let effects: Vec<serde_json::Value> = op
+                        .effects
+                        .iter()
+                        .map(|e| {
+                            serde_json::json!({
+                                "entity_id": e.entity_id,
+                                "from": e.from,
+                                "to": e.to,
+                            })
+                        })
+                        .collect();
+                    let precondition_summary = op
+                        .precondition
+                        .as_ref()
+                        .map(summarize_condition)
+                        .unwrap_or_else(|| "none".to_string());
+                    all_operations.push(serde_json::json!({
+                        "id": op.id,
+                        "allowed_personas": op.allowed_personas,
+                        "effects": effects,
+                        "precondition_summary": precondition_summary,
+                        "outcomes": op.outcomes,
+                    }));
+                }
+                tenor_interchange::InterchangeConstruct::Flow(f) => {
+                    let step_ids: Vec<&str> = f
+                        .steps
+                        .iter()
+                        .filter_map(|s| s.get("id").and_then(|v| v.as_str()))
+                        .collect();
+                    all_flows.push(serde_json::json!({
+                        "id": f.id,
+                        "entry": f.entry,
+                        "steps": step_ids,
+                    }));
+                }
+                tenor_interchange::InterchangeConstruct::System(_)
+                | tenor_interchange::InterchangeConstruct::TypeDecl(_) => {}
+            }
+        }
+    }
+    drop(contracts);
+
+    let etag = etag_bundle
+        .map(|b| manifest::compute_etag(&b))
+        .unwrap_or_default();
+
+    let response = serde_json::json!({
+        "facts": all_facts,
+        "entities": all_entities,
+        "rules": all_rules,
+        "personas": all_personas,
+        "operations": all_operations,
+        "flows": all_flows,
+        "etag": etag,
+    });
+
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+/// Produce a human-readable summary of a condition expression for inspect output.
+fn summarize_condition(cond: &serde_json::Value) -> String {
+    if cond.is_null() {
+        return "always".to_string();
+    }
+    if let Some(vp) = cond.get("verdict_present").and_then(|v| v.as_str()) {
+        return format!("verdict '{}' present", vp);
+    }
+    if let Some(op) = cond.get("op").and_then(|v| v.as_str()) {
+        let left = cond
+            .get("left")
+            .and_then(|l| l.get("fact_ref").and_then(|v| v.as_str()))
+            .unwrap_or("...");
+        let right = cond
+            .get("right")
+            .and_then(|r| {
+                r.get("literal")
+                    .map(|l| format!("{}", l))
+                    .or_else(|| r.get("fact_ref").and_then(|v| v.as_str()).map(String::from))
+            })
+            .unwrap_or_else(|| "...".to_string());
+        return format!("{} {} {}", left, op, right);
+    }
+    "complex".to_string()
 }

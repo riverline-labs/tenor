@@ -9,6 +9,9 @@ members = [
     "crates/lsp",
     "crates/storage",
 ]
+exclude = [
+    "crates/tenor-eval-wasm",
+]
 resolver = "2"
 
 [workspace.package]
@@ -16,6 +19,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+async-trait = "0.1"
 axum = "0.8"
 axum-server = { version = "0.8", features = ["tls-rustls"] }
 clap = { version = "4.5", features = ["derive"] }
@@ -30,3 +34,4 @@ tower-http = { version = "0.6", features = ["cors"] }
 ureq = { version = "3", features = ["json"] }
 lsp-server = "0.7"
 lsp-types = "0.97"
+rand = "0.8"

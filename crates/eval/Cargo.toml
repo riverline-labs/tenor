@@ -5,8 +5,10 @@ edition.workspace = true
 description = "Tenor contract evaluator"
 
 [dependencies]
+async-trait = { workspace = true }
 tenor-core = { path = "../core" }
 tenor-interchange = { path = "../interchange" }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rust_decimal = { workspace = true }
@@ -14,3 +16,4 @@ time = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+tokio = { workspace = true }

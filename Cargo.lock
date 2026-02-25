@@ -2232,12 +2232,15 @@ dependencies = [
 name = "tenor-eval"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "rand",
  "rust_decimal",
  "serde",
  "serde_json",
  "tenor-core",
  "tenor-interchange",
  "time",
+ "tokio",
 ]
 
 [[package]]

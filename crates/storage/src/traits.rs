@@ -55,7 +55,10 @@ pub trait TenorStorage: Send + Sync + 'static {
 
     // ── Entity operations (within snapshot) ──────────────────────────────────
 
-    /// Initialize a new entity instance at state `"initial"` with version 0.
+    /// Initialize a new entity instance at the given `initial_state` with version 0.
+    ///
+    /// The caller passes the entity's declared initial state from the contract
+    /// definition — different entities may have different initial state names.
     ///
     /// Returns `Err(StorageError::AlreadyInitialized)` if the entity already exists.
     async fn initialize_entity(
@@ -63,6 +66,7 @@ pub trait TenorStorage: Send + Sync + 'static {
         snapshot: &mut Self::Snapshot,
         entity_id: &str,
         instance_id: &str,
+        initial_state: &str,
     ) -> Result<(), StorageError>;
 
     /// Read an entity's current state, locking the row for update.
@@ -162,6 +166,14 @@ pub trait TenorStorage: Send + Sync + 'static {
         &self,
         execution_id: &str,
     ) -> Result<FlowExecutionRecord, StorageError>;
+
+    /// Retrieve provenance records for a specific operation execution.
+    ///
+    /// Returns an empty `Vec` if no provenance records exist for the given ID.
+    async fn get_provenance(
+        &self,
+        operation_execution_id: &str,
+    ) -> Result<Vec<ProvenanceRecord>, StorageError>;
 
     /// List flow executions with optional filters.
     ///

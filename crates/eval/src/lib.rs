@@ -7,19 +7,26 @@
 //!
 //! Implementation: Phase 3.
 
+pub mod action_space;
 pub mod assemble;
 pub mod flow;
 pub mod numeric;
 pub mod operation;
+pub mod policy;
 pub mod predicate;
 pub mod provenance;
 pub mod rules;
 pub mod types;
 
+pub use action_space::{
+    compute_action_space, Action, ActionSpace, BlockedAction, BlockedReason, EntitySummary,
+    VerdictSummary,
+};
 pub use flow::{FlowEvalResult, FlowResult, Snapshot, StepRecord};
 pub use operation::{
     EffectRecord, EntityStateMap, OperationError, OperationProvenance, OperationResult,
 };
+pub use policy::{AgentPolicy, AgentSnapshot, FirstAvailablePolicy, PriorityPolicy, RandomPolicy};
 pub use types::{Contract, EvalError, FactSet, Value, VerdictInstance, VerdictSet};
 
 /// Result of evaluating a contract against facts (rules only).
