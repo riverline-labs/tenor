@@ -28,6 +28,7 @@
 //! ```
 
 mod commit;
+mod concurrent;
 mod error;
 mod init;
 mod provenance;
@@ -131,6 +132,7 @@ where
     results.extend(commit::run_commit_tests(&factory).await);
     results.extend(version::run_version_tests(&factory).await);
     results.extend(provenance::run_provenance_tests(&factory).await);
+    results.extend(concurrent::run_concurrent_tests(&factory).await);
 
     let passed = results.iter().filter(|r| r.passed).count();
     let total = results.len();
