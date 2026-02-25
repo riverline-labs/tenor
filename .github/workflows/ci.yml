@@ -30,3 +30,14 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --workspace -- -D warnings
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: WASM build
+        run: wasm-pack build --target nodejs
+        working-directory: crates/tenor-eval-wasm
+
+      - name: WASM tests
+        run: wasm-pack test --node
+        working-directory: crates/tenor-eval-wasm

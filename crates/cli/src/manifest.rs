@@ -13,6 +13,11 @@ pub fn compute_etag(bundle: &Value) -> String {
 }
 
 /// Wrap an interchange bundle in a TenorManifest envelope.
+///
+/// Keys are lexicographically sorted for spec compliance (§19).
+/// `serde_json::Map` is backed by `BTreeMap` (the default when the
+/// `preserve_order` feature is not enabled), so insertion order does
+/// not matter — the map itself guarantees sorted output.
 pub fn build_manifest(bundle: Value) -> Value {
     let etag = compute_etag(&bundle);
     let mut map = Map::new();
