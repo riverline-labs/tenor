@@ -1407,6 +1407,235 @@ mod tests {
     // Configurable max_steps parameter test
     // ──────────────────────────────────────
 
+    // ──────────────────────────────────────────────────────────
+    // BEHAVIORAL CHARACTERIZATION: Parallel branch entity state conflict
+    //
+    // This test documents the ACTUAL behavior when two parallel branches
+    // modify the same entity to different states. The spec (Section 10.5,
+    // Section 12.2 Pass 5) requires non-overlapping entity effect sets
+    // across parallel branches, and the elaborator enforces this at
+    // compile time (Pass 5). However, the evaluator does NOT enforce
+    // this constraint at runtime — it trusts the elaborator.
+    //
+    // This test constructs a scenario that would be rejected by the
+    // elaborator but is valid interchange JSON, to characterize the
+    // evaluator's merge semantics when two branches write conflicting
+    // entity states.
+    //
+    // Observed behavior: LAST-WRITER-WINS (silent).
+    // - Both branches execute independently from cloned entity state.
+    // - Both succeed (each sees the entity in "initial" state).
+    // - During merge, branch outcomes are processed in declaration order.
+    // - The last branch's entity_states.insert() overwrites the first's.
+    // - entity_changes_all contains BOTH effect records (no dedup).
+    // - No error is raised. No warning is emitted.
+    //
+    // This is a characterization test, not a prescriptive test. If the
+    // evaluator is changed to detect conflicts, this test should be
+    // updated to reflect the new behavior.
+    // ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn parallel_branch_entity_conflict_last_writer_wins() {
+        // Entity: Order with states [initial, state_a, state_b]
+        let entity = Entity {
+            id: "Order".to_string(),
+            states: vec![
+                "initial".to_string(),
+                "state_a".to_string(),
+                "state_b".to_string(),
+            ],
+            initial: "initial".to_string(),
+            transitions: vec![],
+        };
+
+        // op_to_a: transitions Order from initial -> state_a
+        let op_a = Operation {
+            id: "op_to_a".to_string(),
+            allowed_personas: vec!["system".to_string()],
+            precondition: Predicate::Literal {
+                value: Value::Bool(true),
+                type_spec: bool_type(),
+            },
+            effects: vec![Effect {
+                entity_id: "Order".to_string(),
+                from: "initial".to_string(),
+                to: "state_a".to_string(),
+                outcome: None,
+            }],
+            error_contract: vec![],
+            outcomes: vec!["success".to_string()],
+        };
+
+        // op_to_b: transitions Order from initial -> state_b
+        let op_b = Operation {
+            id: "op_to_b".to_string(),
+            allowed_personas: vec!["system".to_string()],
+            precondition: Predicate::Literal {
+                value: Value::Bool(true),
+                type_spec: bool_type(),
+            },
+            effects: vec![Effect {
+                entity_id: "Order".to_string(),
+                from: "initial".to_string(),
+                to: "state_b".to_string(),
+                outcome: None,
+            }],
+            error_contract: vec![],
+            outcomes: vec!["success".to_string()],
+        };
+
+        // Flow with a parallel step: branch_a runs op_to_a, branch_b runs op_to_b
+        let flow = Flow {
+            id: "conflict_flow".to_string(),
+            snapshot: "at_initiation".to_string(),
+            entry: "par_step".to_string(),
+            steps: vec![FlowStep::ParallelStep {
+                id: "par_step".to_string(),
+                branches: vec![
+                    ParallelBranch {
+                        id: "branch_a".to_string(),
+                        entry: "step_a".to_string(),
+                        steps: vec![FlowStep::OperationStep {
+                            id: "step_a".to_string(),
+                            op: "op_to_a".to_string(),
+                            persona: "system".to_string(),
+                            outcomes: {
+                                let mut m = BTreeMap::new();
+                                m.insert(
+                                    "success".to_string(),
+                                    StepTarget::Terminal {
+                                        outcome: "branch_a_done".to_string(),
+                                    },
+                                );
+                                m
+                            },
+                            on_failure: FailureHandler::Terminate {
+                                outcome: "branch_a_failed".to_string(),
+                            },
+                        }],
+                    },
+                    ParallelBranch {
+                        id: "branch_b".to_string(),
+                        entry: "step_b".to_string(),
+                        steps: vec![FlowStep::OperationStep {
+                            id: "step_b".to_string(),
+                            op: "op_to_b".to_string(),
+                            persona: "system".to_string(),
+                            outcomes: {
+                                let mut m = BTreeMap::new();
+                                m.insert(
+                                    "success".to_string(),
+                                    StepTarget::Terminal {
+                                        outcome: "branch_b_done".to_string(),
+                                    },
+                                );
+                                m
+                            },
+                            on_failure: FailureHandler::Terminate {
+                                outcome: "branch_b_failed".to_string(),
+                            },
+                        }],
+                    },
+                ],
+                join: JoinPolicy {
+                    on_all_success: Some(StepTarget::Terminal {
+                        outcome: "all_done".to_string(),
+                    }),
+                    on_any_failure: Some(FailureHandler::Terminate {
+                        outcome: "some_failed".to_string(),
+                    }),
+                    on_all_complete: None,
+                },
+            }],
+        };
+
+        let contract = make_contract_with(vec![entity], vec![op_a, op_b], vec![flow.clone()]);
+
+        let snapshot = Snapshot {
+            facts: FactSet::new(),
+            verdicts: VerdictSet::new(),
+        };
+
+        let mut entity_states = EntityStateMap::new();
+        entity_states.insert("Order".to_string(), "initial".to_string());
+
+        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None);
+
+        // ── Characterize actual behavior ──
+
+        // The flow should succeed (no conflict detection at the evaluator level).
+        assert!(
+            result.is_ok(),
+            "Expected flow to succeed (no runtime conflict detection), but got error: {:?}",
+            result.err()
+        );
+
+        let flow_result = result.unwrap();
+
+        // Both branches succeed, so on_all_success fires -> outcome "all_done"
+        assert_eq!(
+            flow_result.outcome, "all_done",
+            "Expected on_all_success outcome since both branches succeed independently"
+        );
+
+        // CRITICAL OBSERVATION: The final entity state is determined by
+        // branch processing order. Since branches are iterated in declaration
+        // order and the merge loop does entity_states.insert() for each,
+        // the LAST branch's state wins.
+        //
+        // branch_a sets Order -> state_a
+        // branch_b sets Order -> state_b (overwrites state_a)
+        let final_state = entity_states.get("Order").unwrap();
+        assert_eq!(
+            final_state, "state_b",
+            "Last-writer-wins: branch_b (declared second) overwrites branch_a's state. \
+             Final entity state is '{}', expected 'state_b'.",
+            final_state
+        );
+
+        // Both effect records are collected (extend, not replace).
+        // This means entity_changes_all contains contradictory records:
+        // [Order: initial->state_a, Order: initial->state_b]
+        assert_eq!(
+            flow_result.entity_state_changes.len(),
+            2,
+            "Both branches' effect records are collected (no dedup). Got: {:?}",
+            flow_result.entity_state_changes
+        );
+
+        // Verify the individual effect records
+        let change_a = &flow_result.entity_state_changes[0];
+        assert_eq!(change_a.entity_id, "Order");
+        assert_eq!(change_a.from_state, "initial");
+        assert_eq!(change_a.to_state, "state_a");
+
+        let change_b = &flow_result.entity_state_changes[1];
+        assert_eq!(change_b.entity_id, "Order");
+        assert_eq!(change_b.from_state, "initial");
+        assert_eq!(change_b.to_state, "state_b");
+
+        // Verify steps executed: parallel step + 2 branch operation steps
+        assert_eq!(flow_result.steps_executed.len(), 3);
+        assert_eq!(flow_result.steps_executed[0].step_type, "parallel");
+        assert_eq!(flow_result.steps_executed[1].step_type, "operation");
+        assert_eq!(flow_result.steps_executed[2].step_type, "operation");
+
+        // The parallel step's result shows both branches succeeded
+        assert!(
+            flow_result.steps_executed[0]
+                .result
+                .contains("branch_a:branch_a_done"),
+            "branch_a should report success"
+        );
+        assert!(
+            flow_result.steps_executed[0]
+                .result
+                .contains("branch_b:branch_b_done"),
+            "branch_b should report success"
+        );
+    }
+
     #[test]
     fn configurable_max_steps_triggers_at_custom_limit() {
         // A circular flow: step_a -> step_b -> step_a
