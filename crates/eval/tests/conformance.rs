@@ -108,7 +108,7 @@ fn run_domain_flow_fixture(
         .unwrap_or_else(|e| panic!("Invalid facts JSON for {}: {}", name, e));
 
     // Step 3: Evaluate flow
-    let result = tenor_eval::evaluate_flow(&bundle, &facts, flow_id, persona)
+    let result = tenor_eval::evaluate_flow(&bundle, &facts, flow_id, persona, None)
         .unwrap_or_else(|e| panic!("Flow evaluation failed for {}: {:?}", name, e));
 
     // Step 4: Compare verdicts (flow result also includes verdicts from rule eval)

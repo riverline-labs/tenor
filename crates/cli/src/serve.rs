@@ -612,7 +612,7 @@ async fn handle_evaluate(
         let fid_for_response = fid.clone();
 
         let result = tokio::task::spawn_blocking(move || {
-            tenor_eval::evaluate_flow(&bundle, &facts, &fid, &p)
+            tenor_eval::evaluate_flow(&bundle, &facts, &fid, &p, None)
         })
         .await;
 

@@ -64,7 +64,7 @@ pub fn evaluate(
 /// 2. Assemble facts
 /// 3. Evaluate rules (stratified) to produce verdicts
 /// 4. Create Snapshot from current FactSet + VerdictSet
-/// 5. Initialize entity states from contract
+/// 5. Initialize entity states (from override or contract defaults)
 /// 6. Execute the named flow against the snapshot
 ///
 /// # Arguments
@@ -73,6 +73,9 @@ pub fn evaluate(
 /// * `flow_id` - ID of the flow to execute
 /// * `persona` - Persona executing the flow (recorded for provenance; per spec Section 11.4,
 ///   flow-level persona authorization is delegated to step-level Operation persona checks)
+/// * `override_entity_states` - If provided, used instead of contract initial states.
+///   This allows callers (e.g. the executor) to pass DB-observed entity states so that
+///   multi-flow progressions work correctly.
 ///
 /// # Returns
 /// * `FlowEvalResult` containing verdicts and flow execution result
@@ -81,6 +84,7 @@ pub fn evaluate_flow(
     facts: &serde_json::Value,
     flow_id: &str,
     persona: &str,
+    override_entity_states: Option<&EntityStateMap>,
 ) -> Result<FlowEvalResult, EvalError> {
     let contract = Contract::from_interchange(bundle)?;
     let fact_set = assemble::assemble_facts(&contract, facts)?;
@@ -92,8 +96,11 @@ pub fn evaluate_flow(
         verdicts: verdict_set.clone(),
     };
 
-    // Initialize entity states
-    let mut entity_states = operation::init_entity_states(&contract);
+    // Use provided entity states or initialize from contract defaults
+    let mut entity_states = match override_entity_states {
+        Some(provided) => provided.clone(),
+        None => operation::init_entity_states(&contract),
+    };
 
     // Find the flow (O(1) via HashMap index)
     let target_flow = contract

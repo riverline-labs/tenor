@@ -479,7 +479,7 @@ fn cmd_eval(
             }
         };
 
-        match tenor_eval::evaluate_flow(&bundle, &facts, fid, p) {
+        match tenor_eval::evaluate_flow(&bundle, &facts, fid, p, None) {
             Ok(result) => {
                 if !quiet {
                     match output {
