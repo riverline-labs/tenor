@@ -102,14 +102,15 @@ fn extract_workspace_root(params: &lsp_types::InitializeParams) -> Option<PathBu
 /// Convert a URI string to a file system path.
 fn uri_to_path_from_str(uri_str: &str) -> PathBuf {
     if let Some(path) = uri_str.strip_prefix("file://") {
+        let decoded = percent_decode(path);
         #[cfg(windows)]
         {
-            let path = path.strip_prefix('/').unwrap_or(path);
-            PathBuf::from(path)
+            let decoded = decoded.strip_prefix('/').unwrap_or(&decoded);
+            PathBuf::from(decoded)
         }
         #[cfg(not(windows))]
         {
-            PathBuf::from(path)
+            PathBuf::from(decoded)
         }
     } else {
         PathBuf::from(uri_str)
@@ -396,22 +397,58 @@ fn infer_workspace_root(file_path: &Path) -> Option<PathBuf> {
 
 /// Convert an LSP URI to a file system path.
 ///
-/// Handles `file:///path/to/file` URIs by stripping the scheme and authority.
+/// Handles `file:///path/to/file` URIs by stripping the scheme and authority
+/// and percent-decoding (e.g. `%3A` → `:`).
 fn uri_to_path(uri: &Uri) -> PathBuf {
     let s = uri.as_str();
     if let Some(path) = s.strip_prefix("file://") {
+        let decoded = percent_decode(path);
         // On Unix: file:///foo/bar -> /foo/bar
         // On Windows: file:///C:/foo -> C:/foo (strip leading /)
         #[cfg(windows)]
         {
-            let path = path.strip_prefix('/').unwrap_or(path);
-            PathBuf::from(path)
+            let decoded = decoded.strip_prefix('/').unwrap_or(&decoded);
+            PathBuf::from(decoded)
         }
         #[cfg(not(windows))]
         {
-            PathBuf::from(path)
+            PathBuf::from(decoded)
         }
     } else {
         PathBuf::from(s)
+    }
+}
+
+/// Decode percent-encoded characters in a URI path (e.g. `%3A` → `:`).
+fn percent_decode(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.bytes();
+    while let Some(b) = chars.next() {
+        if b == b'%' {
+            let hi = chars.next();
+            let lo = chars.next();
+            if let (Some(hi), Some(lo)) = (hi, lo) {
+                if let (Some(h), Some(l)) = (hex_val(hi), hex_val(lo)) {
+                    result.push((h << 4 | l) as char);
+                    continue;
+                }
+                // Malformed percent encoding -- pass through
+                result.push('%');
+                result.push(hi as char);
+                result.push(lo as char);
+            }
+        } else {
+            result.push(b as char);
+        }
+    }
+    result
+}
+
+fn hex_val(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
     }
 }

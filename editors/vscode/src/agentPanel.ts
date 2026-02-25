@@ -47,6 +47,7 @@ export class AgentCapabilitiesPanel {
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
+        retainContextWhenHidden: true,
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
       }
     );

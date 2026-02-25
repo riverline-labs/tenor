@@ -172,12 +172,25 @@ fn find_tenor_files(root: &Path) -> Vec<PathBuf> {
 /// Convert a file path to a `file://` URI.
 fn path_to_uri(path: &Path) -> Uri {
     let abs = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let s = format!("file://{}", abs.display());
-    s.parse().unwrap_or_else(|_| {
-        // Fallback
-        format!("file://{}", path.display())
-            .parse()
-            .expect("fallback URI must parse")
+    let path_str = abs.to_string_lossy().to_string();
+    // On Windows: strip UNC prefix (\\?\), use forward slashes, and prepend /
+    #[cfg(windows)]
+    let uri_path = {
+        let p = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
+        format!("file:///{}", p.replace('\\', "/"))
+    };
+    #[cfg(not(windows))]
+    let uri_path = format!("file://{}", path_str);
+    uri_path.parse().unwrap_or_else(|e| {
+        // Last resort: use the original path as-is
+        let fallback = format!("file:///{}", path.display().to_string().replace('\\', "/"));
+        fallback.parse().unwrap_or_else(|_| {
+            panic!(
+                "cannot convert path to URI: {} (error: {:?})",
+                path.display(),
+                e
+            )
+        })
     })
 }
 
