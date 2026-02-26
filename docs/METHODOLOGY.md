@@ -1,6 +1,6 @@
 # Design Methodology
 
-When Tenor confronts a major linguistic decision where multiple candidate formalisms could work and the winner is not obvious, we use protocols from the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) (IAP) suite.
+When Tenor confronts a major linguistic decision where multiple candidate formalisms could work and the winner is not obvious, we use protocols from the [Dialectics](https://github.com/riverline-labs/dialectics) suite.
 
 ## CFFP — Constraint-First Formalization Protocol
 

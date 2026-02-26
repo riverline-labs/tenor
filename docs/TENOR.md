@@ -3655,7 +3655,6 @@ This executes the release flow for escrow transaction esc-001 with delivery reco
 | **PredicateExpression** | A quantifier-free first-order logic formula over ground terms. The expression language for preconditions, rule conditions, and branch conditions (§10). |
 | **ProtocolTag** | A core protocol identifier (`http`, `database`, `graphql`, `grpc`, `static`, `manual`) or a namespaced extension identifier (`x_*`) declared on a Source construct (§5A.2, §5A.3). |
 | **Provenance** | The complete derivation chain for a verdict or operation result. Every verdict records which Facts and Rules produced it. Provenance is part of the evaluation relation, not a runtime feature (§15). |
-| **RCP** | [Reconciliation Protocol](https://github.com/riverline-labs/iap). Verifies consistency across multiple protocol run outputs. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap)  suite. |
 | **ResolvedVerdictSet** | The set of all verdicts produced by evaluating all Rules against the current FactSet. Each verdict carries its payload and provenance. |
 | **Rule** | A verdict-producing declaration with a `when` predicate and a `produce` clause. Rules are stratified — higher strata can reference verdicts from lower strata but not the same or higher (§7). |
 | **Snapshot** | The frozen state captured at Flow initiation: the FactSet and ResolvedVerdictSet at that point in time. Immutable for the duration of the Flow (§11). |
