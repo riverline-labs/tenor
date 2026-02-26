@@ -9,9 +9,17 @@ pub mod diff;
 pub mod error;
 pub mod plan;
 
+pub use analysis::{
+    analyze_migration, BreakingChange, EntityAction, EntityMigrationAction, MigrationAnalysis,
+    MigrationSeverity,
+};
 pub use classify::{
     classify_diff, ChangeClassification, ChangeSeverity, ClassificationSummary, ClassifiedChange,
     ClassifiedConstruct, ClassifiedDiff, ClassifiedFieldDiff,
 };
 pub use diff::{diff_bundles, BundleDiff, ConstructChange, ConstructSummary, DiffError, FieldDiff};
 pub use error::MigrationError;
+pub use plan::{
+    build_migration_plan, EntityStateMapping, FlowCompatibilityResult, IncompatibilityReason,
+    LayerResults, MigrationPlan, MigrationPolicy,
+};
