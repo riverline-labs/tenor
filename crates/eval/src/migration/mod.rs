@@ -8,6 +8,7 @@ pub mod classify;
 pub mod compatibility;
 pub mod diff;
 pub mod error;
+pub mod executor;
 pub mod plan;
 
 pub use analysis::{
@@ -21,6 +22,7 @@ pub use classify::{
 pub use compatibility::{check_flow_compatibility, check_flow_compatibility_static};
 pub use diff::{diff_bundles, BundleDiff, ConstructChange, ConstructSummary, DiffError, FieldDiff};
 pub use error::MigrationError;
+pub use executor::{execute_migration, EntityMigrationRecord, MigrationResult};
 pub use plan::{
     build_migration_plan, EntityStateMapping, FlowCompatibilityResult, IncompatibilityReason,
     LayerResults, MigrationPlan, MigrationPolicy,
