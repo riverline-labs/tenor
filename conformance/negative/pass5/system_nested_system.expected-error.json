@@ -1,0 +1,9 @@
+{
+  "construct_id": "outer_system",
+  "construct_kind": "System",
+  "field": "members",
+  "file": "system_nested_system.tenor",
+  "line": 5,
+  "message": "member 'inner' is a System file; nested Systems are not permitted",
+  "pass": 5
+}
