@@ -20,8 +20,14 @@ pub fn compute_etag(bundle: &Value) -> String {
 /// not matter — the map itself guarantees sorted output.
 pub fn build_manifest(bundle: Value) -> Value {
     let etag = compute_etag(&bundle);
+
+    let capabilities = serde_json::json!({
+        "migration_analysis_mode": "conservative"
+    });
+
     let mut map = Map::new();
     map.insert("bundle".to_string(), bundle);
+    map.insert("capabilities".to_string(), capabilities);
     map.insert("etag".to_string(), Value::String(etag));
     map.insert(
         "tenor".to_string(),

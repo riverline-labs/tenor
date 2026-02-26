@@ -8,6 +8,7 @@ description = "Tenor contract evaluator"
 async-trait = { workspace = true }
 tenor-core = { path = "../core" }
 tenor-interchange = { path = "../interchange" }
+tenor-storage = { path = "../storage" }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
