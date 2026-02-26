@@ -1070,6 +1070,32 @@ fn validate_system(
         }
     }
 
+    // C-SYS-03: Member file must not be a System file (no nested Systems).
+    // Collect file paths of all System constructs in the bundle.
+    let system_files: HashSet<&str> = constructs
+        .iter()
+        .filter_map(|c| match c {
+            RawConstruct::System { prov, .. } => Some(prov.file.as_str()),
+            _ => None,
+        })
+        .collect();
+    for (mid, path) in members {
+        if system_files.contains(path.as_str()) {
+            return Err(ElabError::new(
+                5,
+                Some("System"),
+                Some(id),
+                Some("members"),
+                &prov.file,
+                prov.line,
+                format!(
+                    "member '{}' is a System file; nested Systems are not permitted",
+                    mid
+                ),
+            ));
+        }
+    }
+
     // C-SYS-16: Shared persona contracts are members
     for (persona_id, contracts) in shared_personas {
         for cid in contracts {

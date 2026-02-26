@@ -275,7 +275,7 @@ type_check(v, Duration(unit, min, max)) = v ∈ ℤ ∧ min ≤ v ≤ max
 - Money arithmetic is same-currency only. Cross-currency operations require explicit Rule-level conversion.
 - Duration "day" means exactly 86,400 seconds. DST-affected calculations must be handled by adapters. Month and year are not supported Duration units.
 - DateTime subtraction produces Duration(seconds) with bounds derived from the operand DateTime types. The elaborator computes and materializes the result bounds.
-- TaggedUnion payload access uses tag-embedded paths. Mismatched tag access produces a typed absence value, which evaluates to false in predicate context. Absence is not a third logical value — the language is strictly two-valued (Bool). Absence is always coerced to false before any boolean operation. Consequently, `¬(union.tag.field > threshold)` evaluates to `¬false = true` when the tag does not match, not to unknown or absence. Contract authors must account for this: a negated predicate over a TaggedUnion field will evaluate to true for all non-matching variants. Where this is not the intended behavior, authors should gate the predicate with an explicit tag check.
+- TaggedUnion payload access uses tag-embedded paths. Mismatched tag access is an error: if a predicate or expression accesses a variant that does not match the runtime tag, the evaluator produces a type error. Contract authors must gate variant-specific predicates with an explicit tag check to avoid runtime errors on non-matching variants.
 
 ---
 
@@ -713,9 +713,9 @@ Operation = (
 )
 ```
 
-OutcomeLabel is a non-empty UTF-8 string, unique within the Operation's outcome set. The outcome set must be non-empty (`|outcomes| >= 1`). The outcome set and error_contract set must be disjoint: `outcomes INTERSECT error_contract = EMPTY`. Outcome labels are Operation-local: the label `"approved"` on one Operation is not related to the label `"approved"` on another.
+OutcomeLabel is a non-empty UTF-8 string, unique within the Operation's outcome set. The outcome set is optional for single-outcome Operations and mandatory for multi-outcome Operations (`|outcomes| >= 2`). When declared, the outcome set and error_contract set must be disjoint: `outcomes INTERSECT error_contract = EMPTY`. Outcome labels are Operation-local: the label `"approved"` on one Operation is not related to the label `"approved"` on another.
 
-When an Operation declares multiple outcomes and multiple effects, each effect must be associated with exactly one outcome. This association is part of the Operation declaration, not an executor determination.
+When an Operation declares multiple outcomes and multiple effects, each effect must be associated with exactly one outcome. This association is part of the Operation declaration, not an executor determination. For single-outcome Operations (zero or one declared outcome), effect-to-outcome association is implicit.
 
 **DSL syntax:**
 
@@ -1559,7 +1559,7 @@ Every TenorInterchange bundle includes a `tenor_version` field at the top level.
 
 The v0.3 to v1.0 transition is a major version bump. v1.0 interchange is not backward compatible with v0.3. Key breaking changes:
 - Persona constructs added to the `constructs` array (new construct kind).
-- Operation `outcomes` field added (required).
+- Operation `outcomes` field added (required for multi-outcome Operations).
 - Multi-outcome effect-to-outcome association added (new field on effect objects).
 - Per-construct `tenor` field updated from `"0.3"` to `"1.0"`.
 - Bundle-level `tenor_version` field added (required, not present in v0.3).
@@ -1971,6 +1971,8 @@ When a contract version transition contains BREAKING changes (per §18.2, classi
 The migration output between two contract versions is expressed as a hybrid representation (selected via CFFP, Candidate C — see `docs/cffp/migration-semantics.json`):
 
 **Primary output — DiffEntry JSON** (`tenor diff`): The authoritative diff output is structured JSON. Each change is a `DiffEntry` keyed by `(construct_kind, construct_id)` with field-level before/after values. The DiffEntry format is produced by `tenor diff` and is always complete, deterministic, and correct (MI1, MI2). The breaking change classification is a pure function applied to each DiffEntry field: `classify(kind, field, change_type)` returns the taxonomy classification from §18.2.
+
+**Classification composition.** A single construct may have multiple changed fields with different classifications. The construct-level classification is the supremum (join) in the total order NON_BREAKING < REQUIRES_ANALYSIS < BREAKING — equivalently, the maximum severity across all field-level classifications for that construct. The bundle-level migration decision (policy declaration required per M2) is derived from construct-level classifications: policy_required is true if any construct is classified BREAKING after resolving REQUIRES_ANALYSIS entries per M6. The DiffEntry JSON output includes both the field-level classifications (authoritative, per-field granularity) and the derived construct-level classifications (summary metadata). Construct-level classifications are always the raw supremum; resolution of REQUIRES_ANALYSIS via static analysis is internal to the bundle-level decision and does not produce a separate resolved construct-level classification.
 
 **Secondary output — Tenor migration contract** (`tenor diff --migration`): An optional supplementary output generates a valid Tenor contract from the diff. The migration contract uses existing v1.0 constructs with conventionalized naming:
 
@@ -2404,8 +2406,8 @@ These are conscious design decisions, not oversights.
 **AL1 — Fact ground property boundary** _(Fact 1.0)_
 Facts are ground within the evaluation model. Whether the source populating them is itself derived is outside the language's enforcement scope. Conforming executors must not populate Facts from internal evaluations.
 
-**AL5 — TaggedUnion absence semantics** _(BaseType)_
-Mismatched tag access produces a typed absence value, which evaluates to false in predicate context. Contract authors must account for this: a negated predicate over a TaggedUnion field evaluates to true for all non-matching variants (§4.4).
+**AL5 — TaggedUnion mismatched tag access is an error** _(BaseType)_
+Mismatched tag access produces a type error, not a typed absence value. Contract authors must gate variant-specific predicates with an explicit tag check. This is intentional: silent absence values hide bugs in predicate chains. Erroring immediately on mismatched variant access is safer and simpler (§4.4).
 
 **AL8 — List max is a conservative static bound** _(Fact extension)_
 Runtime lists may be smaller. Static complexity analysis uses the declared max.
@@ -2425,8 +2427,8 @@ Contracts written against v0.3 that use bare persona strings in Operation `allow
 **AL28 — Outcome labels carry no typed payload** _(Operation)_
 Outcome labels are bare strings with no associated payload data. If outcome-specific data is needed, it must be conveyed through entity state changes or separate Facts. Typed outcome payloads were rejected because payload values have no derivation chain within the closed-world evaluation model, violating C7 (provenance as semantics).
 
-**AL30 — Operation outcome declarations are mandatory in v1.0** _(Operation)_
-Contracts written against v0.3 that use ad-hoc outcome labels in Flow OperationSteps must add corresponding `outcomes` declarations to their Operations when migrating to v1.0. The migration path is additive: existing outcome labels become the declared outcome set on the referenced Operation.
+**AL30 — Operation outcome declarations are mandatory for multi-outcome Operations** _(Operation)_
+Outcome declarations are required when an Operation has two or more possible outcomes. Single-outcome Operations may omit the declaration — a single result carries no information content that requires explicit labeling. Contracts written against v0.3 that use ad-hoc outcome labels in Flow OperationSteps with multiple outcomes must add corresponding `outcomes` declarations when migrating to v1.0.
 
 **AL31 — Module federation deferred to v2** _(P5 Shared Type Library)_
 Inter-organization type sharing (type registries, versioned type packages, cross-repository type distribution) is explicitly out of scope for v1.0. The shared type library mechanism supports only direct file import within a single project.
@@ -2467,6 +2469,9 @@ Migration contract Facts use conventionalized source bindings (`system: "tenor-d
 **AL43 — Migration contract determinism requires canonical ordering** _(Migration)_
 Migration contract generation must follow canonical ordering rules to ensure deterministic output across different generators.
 
+**AL43a — Construct-level classification does not model semantic interaction between co-occurring field changes** _(Migration, §18.5)_
+The supremum composition treats each field change independently. Co-occurring changes within a construct that interact semantically (e.g., a state removal subsumed by an entity removal) are both reported at their individual severity. The construct-level classification may be conservatively correct but informationally redundant in such cases.
+
 **AL44 — Flow compatibility does not model time-based constraints** _(Flow Migration, §18.6)_
 The compatibility analysis does not account for timeout changes between contract versions. If v2 changes step-level or flow-level timeout values, the analysis treats timeouts as executor-level concerns outside the formal compatibility conditions.
 
@@ -2504,7 +2509,7 @@ Text equality (`=`, `≠`) compares UTF-8 byte sequences exactly. Two strings th
 The `migration_analysis_mode` field in `ExecutorCapabilities` is per-executor. An executor uses one analysis mode for all flow migration decisions. Per-flow-type capability granularity (e.g., aggressive analysis for some flows, conservative for others) is deferred to v2.
 
 **AL56 — Shared entity state set equality required** _(System, §12)_
-Shared entity state sets must be identical across all member contracts that share the entity. State set extension (one contract having additional states) is not supported in v1.0. If a contract needs additional states for a shared entity, all sharing contracts must declare the complete state set. State set extension semantics may be explored in a future spec version.
+Shared entity state sets must be identical across all member contracts that share the entity. State set extension (one contract having additional states) is not supported in v1.0. If a contract needs additional states for a shared entity, all sharing contracts must declare the complete state set. The validation constraint (C-SYS-14) is correct but is enforced only when multi-file elaboration is available — the standard single-file pipeline does not load member contracts. State set extension semantics may be explored in a future spec version.
 
 **AL57 — Shared persona identity by exact id only** _(System, §12)_
 Shared persona identity is based on exact persona id matching. There is no aliasing mechanism to map different persona names across contracts to the same identity. Contracts participating in a shared persona binding must use identical persona ids. Persona aliasing may be explored in a future spec version.
@@ -2519,7 +2524,7 @@ System member file paths are resolved relative to the System file's directory. N
 A System file may contain only one System declaration. Multiple System declarations in a single file are not permitted. One System per file maintains a clear file-level identity for the System construct, analogous to how a contract file contains constructs for one logical contract.
 
 **AL61 — No recursive System embedding** _(System, §12)_
-Recursive System embedding is not permitted. A System member must be a contract file, not another System file. Multi-level System composition is not supported in v1.0. Recursive composition would require defining System-of-Systems semantics, including transitive trigger propagation and multi-level persona resolution. This is deferred to post-v1.0.
+Recursive System embedding is not permitted. A System member must be a contract file, not another System file (C-SYS-03, enforced at Pass 5). Multi-level System composition is not supported in v1.0. Recursive composition would require defining System-of-Systems semantics, including transitive trigger propagation and multi-level persona resolution. This is deferred to post-v1.0.
 
 **AL62 — Shared entity transition compatibility not checked** _(System, §12)_
 Cross-contract entity relationship validation checks state set equality only. Transition compatibility (do the contracts' Operations produce consistent state transitions?) is not checked at elaboration time. This is an executor obligation. Transition compatibility analysis across contracts requires knowledge of Operation execution order and external triggers, which are runtime concerns.
