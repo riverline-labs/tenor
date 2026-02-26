@@ -381,6 +381,64 @@ mod tests {
         }
     }
 
+    fn decimal_type(precision: u32, scale: u32) -> TypeSpec {
+        TypeSpec {
+            base: "Decimal".to_string(),
+            precision: Some(precision),
+            scale: Some(scale),
+            currency: None,
+            min: None,
+            max: None,
+            max_length: None,
+            values: None,
+            fields: None,
+            element_type: None,
+            unit: None,
+            variants: None,
+        }
+    }
+
+    #[test]
+    fn assemble_decimal_plain_string() {
+        let contract = make_contract(vec![FactDecl {
+            id: "amount".to_string(),
+            fact_type: decimal_type(10, 2),
+            default: None,
+        }]);
+        let facts = serde_json::json!({ "amount": "200.75" });
+        let fs = assemble_facts(&contract, &facts).unwrap();
+        assert_eq!(
+            fs.get("amount"),
+            Some(&Value::Decimal(
+                rust_decimal::Decimal::from_str("200.75").unwrap()
+            ))
+        );
+    }
+
+    #[test]
+    fn assemble_decimal_structured_object() {
+        let contract = make_contract(vec![FactDecl {
+            id: "amount".to_string(),
+            fact_type: decimal_type(10, 2),
+            default: None,
+        }]);
+        let facts = serde_json::json!({
+            "amount": {
+                "kind": "decimal_value",
+                "precision": 10,
+                "scale": 2,
+                "value": "200.75"
+            }
+        });
+        let fs = assemble_facts(&contract, &facts).unwrap();
+        assert_eq!(
+            fs.get("amount"),
+            Some(&Value::Decimal(
+                rust_decimal::Decimal::from_str("200.75").unwrap()
+            ))
+        );
+    }
+
     #[test]
     fn assemble_money_fact() {
         let contract = make_contract(vec![FactDecl {

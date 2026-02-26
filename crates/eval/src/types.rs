@@ -600,9 +600,18 @@ pub fn parse_plain_value(v: &serde_json::Value, type_spec: &TypeSpec) -> Result<
             Ok(Value::Int(i))
         }
         "Decimal" => {
-            let s = v.as_str().ok_or_else(|| EvalError::DeserializeError {
-                message: "expected decimal string".to_string(),
-            })?;
+            // Handle two formats:
+            // 1. Plain string: "200.75"
+            // 2. Structured decimal_value: {"kind": "decimal_value", "value": "200.75", ...}
+            let s = if let Some(plain) = v.as_str() {
+                plain.to_string()
+            } else if let Some(inner) = v.get("value").and_then(|val| val.as_str()) {
+                inner.to_string()
+            } else {
+                return Err(EvalError::DeserializeError {
+                    message: "Decimal must be a string or structured decimal_value".to_string(),
+                });
+            };
             let d =
                 s.parse::<rust_decimal::Decimal>()
                     .map_err(|e| EvalError::DeserializeError {
