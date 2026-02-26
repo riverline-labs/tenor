@@ -13,3 +13,6 @@ dist/
 
 # Local protocol/process artifacts
 cffp.cue
+
+# GSD planning (local-only)
+.planning/

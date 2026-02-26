@@ -316,7 +316,7 @@ pub fn diff_bundles(t1: &Value, t2: &Value) -> Result<BundleDiff, DiffError> {
 // Breaking change classification (Section 17.2)
 // ──────────────────────────────────────────────
 
-/// Severity of a change per the CFFP taxonomy (Section 17.2).
+/// Severity of a change per the breaking change taxonomy (§18.2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ChangeSeverity {
     Breaking,
@@ -493,7 +493,7 @@ impl ClassifiedDiff {
     }
 }
 
-/// Classify a structural diff using the CFFP breaking change taxonomy (Section 17.2).
+/// Classify a structural diff using the breaking change taxonomy (§18.2).
 pub fn classify_diff(diff: &BundleDiff) -> ClassifiedDiff {
     let mut added = Vec::new();
     let mut removed = Vec::new();

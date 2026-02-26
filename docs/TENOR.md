@@ -2,19 +2,23 @@
 
 ## Tenor Language Specification v1.0
 
-**Status:** v1.0 — Spec frozen. All constructs canonicalized via [CFFP](https://github.com/riverline-labs/iap) (Constraint-First Formalization Protocol). AAP audit complete.
+**Status:** v1.0 — Spec frozen.
 **Method:** Human-AI collaborative design. See [`CONTRIBUTORS.md`](../CONTRIBUTORS.md).
 **Creator:** Brandon W. Bush
 
-> **Stability: Frozen (v1.0)**
-> This specification is frozen. No breaking changes to existing construct
-> semantics will occur without a new CFFP run. Additive changes (new analysis
-> results, new interchange metadata) are permitted.
+> **Stability: Frozen (v1.0) with additive amendments**
+> This specification is frozen at v1.0. No breaking changes to existing construct
+> semantics will occur. Additive changes (new constructs, new analysis results,
+> new interchange metadata) are permitted and tracked as named amendments.
 >
 > v1.0 includes the System construct — a composition layer for multi-contract
 > systems (shared persona identity, cross-contract flow triggers, cross-contract
-> entity relationships). System was designed via a dedicated CFFP run and
-> audited via AAP (Assumption Audit Protocol).
+> entity relationships).
+>
+> **Additive amendments (backward compatible):**
+> - **Source Declarations** — new `source` construct for structured external system declarations (§5A)
+> - **Multi-Instance Entities** — runtime instance model for entity types (§6.5, §9, §11, §15, §17)
+> - **Trust & Security** — trust obligations and optional attestation metadata (§17.4, §19.1)
 >
 > **Freeze date:** 2026-02-22
 
@@ -27,6 +31,7 @@
 3. Core Constructs Overview
 4. BaseType
 5. Fact
+5A. Source
 6. Entity
 7. Rule
 8. Persona
@@ -44,6 +49,7 @@
 15. Complete Evaluation Model
 16. Static Analysis Obligations
 17. Executor Obligations
+    - 17.4 Trust Obligations
 18. Versioning & Migration
     - 18.1 The Migration Problem
     - 18.2 Breaking Change Taxonomy
@@ -103,7 +109,7 @@ These constraints are non-negotiable. They are not guidelines. Any proposed feat
 
 ## 3. Core Constructs Overview
 
-The language defines thirteen constructs across three layers.
+The language defines fourteen constructs across four layers.
 
 **Semantic layer** (dependency order — each depends only on those above):
 
@@ -125,6 +131,14 @@ NumericModel        — fixed-point decimal with total promotion rules (cross-cu
 System              — multi-contract composition with shared personas, cross-contract triggers, and entity relationships
 ```
 
+**Infrastructure layer:**
+
+```
+Source              — named external system declarations for Fact provenance and adapter generation
+```
+
+> Source declarations are infrastructure metadata. They do not participate in the evaluation model — `assemble_facts`, `eval_strata`, `eval_pred`, and `execute` are unchanged. The evaluator ignores Source constructs entirely. Source declarations are consumed by adapters, provenance enrichment, automated tooling (`tenor connect`), and deployment infrastructure. This separation preserves C5 (closed-world semantics): all evaluation-relevant state is contract-contained; all execution-relevant state is declared, named, and inspectable — but never executed by the evaluator.
+
 Named type aliases (TypeDecl) are a DSL-layer convenience only. The elaborator resolves all named type references during Pass 3 and inlines the full BaseType structure at every point of use. TypeDecl does not appear in TenorInterchange output. TypeDecl definitions may be shared across contracts via shared type library files (§4.6). Shared type libraries are Tenor files containing only TypeDecl constructs, imported via the existing import mechanism.
 
 **Tooling layer:**
@@ -141,8 +155,8 @@ The evaluation model separates into a read path and a write path:
 
 ```
 Read path:     assemble_facts → eval_strata → resolve → ResolvedVerdictSet
-Write path:    execute(op, persona, verdict_set) → EntityState' | Error
-Orchestration: execute_flow(flow, persona, snapshot) → FlowOutcome
+Write path:    execute(op, persona, verdict_set, (entity_id, instance_id)) → EntityState' | Error
+Orchestration: execute_flow(flow, persona, snapshot, bindings) → FlowOutcome
                execute_parallel(branches, snapshot) → {BranchId → BranchOutcome}
                evaluate_join(join_policy, branch_outcomes) → StepTarget
 ```
@@ -400,13 +414,71 @@ A Fact is a named, typed, sourced value that forms the ground layer of the evalu
 Fact = (
   id:       FactId,
   type:     BaseType,
-  source:   SourceDecl,
+  source:   SourceDecl,      // FreetextSource | StructuredSource
   value?:   BaseType,
   default?: BaseType
 )
 ```
 
+The `SourceDecl` type is a tagged union:
+
+```
+SourceDecl = FreetextSource | StructuredSource
+
+FreetextSource = Text
+
+StructuredSource = (
+  source_id: SourceId,
+  path:      SourcePath
+)
+
+SourcePath = Text  // syntactically validated, not semantically validated
+```
+
+A Fact may use either form:
+
+```
+// Freetext source — backward compatible, no elaborator validation beyond non-empty
+fact buyer_requested_refund {
+  type:   Bool
+  source: "buyer_portal.refund_requested"
+}
+
+// Structured source — references a declared Source, elaborator validates reference
+fact escrow_amount {
+  type:   Money(currency: "USD")
+  source: order_service { path: "orders/{id}.balance" }
+}
+
+// Structured source — database protocol with query path
+fact compliance_threshold {
+  type:   Money(currency: "USD")
+  source: compliance_db { path: "compliance_thresholds.amount" }
+}
+```
+
 Every Fact has a declared source — an explicit statement of where the value comes from at runtime. A Fact without a declared source is inadmissible.
+
+**C-SRC-06 — Structured source reference resolution.** _(Pass 5)_
+If a Fact uses a StructuredSource, the `source_id` must reference a declared Source construct. Unresolved source references are elaboration errors: `"fact '<fact_id>' references undeclared source '<source_id>'"`.
+
+**Interchange representation for structured sources:** Freetext sources serialize as before (string value in `"source"` field). Structured sources serialize as an object:
+
+```json
+{
+  "default": { "amount": { "scale": 2, "unscaled": "1000000" }, "currency": "USD" },
+  "id": "compliance_threshold",
+  "kind": "Fact",
+  "source": {
+    "path": "compliance_thresholds.amount",
+    "source_id": "compliance_db"
+  },
+  "tenor": "1.0",
+  "type": { "..." : "..." }
+}
+```
+
+The `"source"` field is either a string (freetext) or an object with `"source_id"` and `"path"` (structured). Consumers distinguish by JSON type.
 
 ### 5.2 FactSet Assembly
 
@@ -440,13 +512,15 @@ Facts are the provenance origin points of the evaluation model. Every provenance
 ```
 FactProvenance = (
   id:               FactId,
-  source:           SourceDecl,
+  source:           SourceDecl,      // FreetextSource | StructuredSource
   value:            BaseType,
-  assertion_source: "external" | "contract"
+  assertion_source: "external" | "contract",
+  trust_domain?:    Text,            // E20 trust domain identifier (optional)
+  attestation?:     Text             // E19 authenticity claim, opaque (optional)
 )
 ```
 
-Facts do not carry derivation provenance — they are the root. When a default is used, `assertion_source` is `"contract"` to distinguish from externally asserted values.
+The `source` field in FactProvenance carries the full SourceDecl (freetext or structured). Facts do not carry derivation provenance — they are the root. When a default is used, `assertion_source` is `"contract"` to distinguish from externally asserted values. The optional `trust_domain` and `attestation` fields support trust verification (§17.4).
 
 ### 5.4 Constraints
 
@@ -480,6 +554,168 @@ fact requisition_total {
 
 ---
 
+## 5A. Source
+
+### 5A.1 Definition
+
+A Source is a named declaration of an external system from which Facts are populated at runtime. Sources carry connection metadata and protocol identity but do not describe the external system's schema. Schema validation is a runtime concern, not an elaboration concern.
+
+```
+Source = (
+  id:           SourceId,
+  protocol:     ProtocolTag,
+  description?: Text,
+  fields:       Map<FieldId, Text>
+)
+```
+
+SourceId is a non-empty UTF-8 string, unique within a contract. ProtocolTag is either a core protocol identifier or a namespaced extension identifier.
+
+### 5A.2 Core Protocol Tags
+
+The specification defines a closed core set of protocol tags. Each core tag has required fields and semantic description.
+
+| Protocol | Required Fields | Description |
+|----------|----------------|-------------|
+| `http` | `base_url` | HTTP/HTTPS REST API. Fields: `base_url`, `auth` (optional), `schema_ref` (optional). |
+| `database` | `dialect` | Relational database. Fields: `dialect` (e.g., `postgres`, `mysql`, `sqlite`), `schema_ref` (optional). |
+| `graphql` | `endpoint` | GraphQL API. Fields: `endpoint`, `auth` (optional), `schema_ref` (optional). |
+| `grpc` | `endpoint` | gRPC service. Fields: `endpoint`, `proto_ref` (optional). |
+| `static` | — | Static configuration or environment variable. No required fields. |
+| `manual` | — | Human-provided input. No required fields. |
+
+The `schema_ref` field, where available, is an optional pointer to the external system's own schema document (OpenAPI, GraphQL SDL, Protobuf, SQL DDL). It is not parsed or validated by the elaborator. It exists for tooling consumption (e.g., `tenor connect` uses it to introspect the external system).
+
+### 5A.3 Extension Protocol Tags
+
+Extension protocol tags use a namespaced identifier with the prefix `x_`. The namespace separator is `.`.
+
+```
+source risk_engine {
+  protocol: x_internal.event_bus
+  description: "Internal Kafka-backed risk engine"
+}
+```
+
+Extension tags have no elaborator-enforced required fields. The elaborator validates only that the tag is a non-empty string matching the pattern `x_[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*`. Required-field validation for extension protocols is deferred to adapter-level tooling.
+
+### 5A.4 DSL Syntax
+
+```
+source <source_id> {
+  protocol: <protocol_tag>
+  <field>:  <value>
+  ...
+}
+```
+
+**Examples:**
+
+```
+source order_service {
+  protocol:    http
+  base_url:    "https://api.orders.com/v2"
+  auth:        bearer_token
+  schema_ref:  "https://api.orders.com/v2/openapi.json"
+  description: "Order management REST API"
+}
+
+source compliance_db {
+  protocol:    database
+  dialect:     postgres
+  description: "Compliance reporting database"
+}
+
+source buyer_portal {
+  protocol: manual
+  description: "Human-provided input from buyer self-service portal"
+}
+```
+
+### 5A.5 Non-Goals
+
+The following are explicitly outside the scope of Source declarations:
+
+- **No fetch semantics.** A Source declaration does not cause the evaluator or elaborator to connect to, query, or fetch data from the declared system. Source declarations are metadata, not instructions.
+- **No schema declaration.** A Source does not describe the shape, fields, types, or structure of the external system's data. The `schema_ref` field is an opaque pointer for tooling, not a parseable schema definition.
+- **No credential storage.** Authentication fields (`auth`, etc.) declare the *type* of authentication required, not credentials themselves. Credentials are adapter/executor configuration, not contract content.
+- **No health checking.** A Source declaration does not imply that the external system is reachable, available, or conforming to any particular API contract.
+- **No evaluation impact.** Source declarations are invisible to `assemble_facts`, `eval_strata`, `eval_pred`, `execute`, and `execute_flow`. Removing all Source declarations from a contract produces identical evaluation behavior.
+
+### 5A.6 Constraints
+
+**C-SRC-01 — Unique source identifiers.** _(Pass 5)_
+Source identifiers are unique within a contract. Two Source declarations with the same id are an elaboration error: `"duplicate source declaration '<source_id>'"`.
+
+**C-SRC-02 — Source identifiers occupy a distinct namespace.** _(Pass 5)_
+A Source named `Foo` does not conflict with a Fact, Entity, Persona, or other construct named `Foo`. Source ids are in their own namespace.
+
+**C-SRC-03 — Core protocol required fields.** _(Pass 5)_
+For core protocol tags, the elaborator validates that all required fields (per §5A.2) are present. Missing required fields are elaboration errors: `"source '<source_id>' with protocol '<tag>' is missing required field '<field>'"`.
+
+**C-SRC-04 — Extension protocol tag format.** _(Pass 5)_
+Extension protocol tags must match `x_[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*`. Invalid extension tags are elaboration errors: `"invalid extension protocol tag '<tag>'"`.
+
+**C-SRC-05 — Source field values are strings.** _(Pass 5)_
+All source field values are Text. No typed field values (numbers, booleans, nested records) in Source declarations. This keeps Source declarations structurally simple and avoids introducing a secondary type system for infrastructure metadata.
+
+### 5A.7 Provenance
+
+```
+SourceProvenance = (
+  id:       SourceId,
+  protocol: ProtocolTag,
+  file:     string,
+  line:     nat
+)
+```
+
+Source provenance records the declaration site. Runtime source provenance (which adapter fetched which value from which source at which time) is an executor concern and is covered by the enriched FactProvenance in §5A.10.
+
+### 5A.8 Interchange Representation
+
+Source constructs appear as top-level items in the interchange bundle with `"kind": "Source"`. Sources are serialized in alphabetical order by id.
+
+```json
+{
+  "description": "Order management REST API",
+  "fields": {
+    "auth": "bearer_token",
+    "base_url": "https://api.orders.com/v2",
+    "schema_ref": "https://api.orders.com/v2/openapi.json"
+  },
+  "id": "order_service",
+  "kind": "Source",
+  "protocol": "http",
+  "provenance": { "file": "escrow.tenor", "line": 1 },
+  "tenor": "1.0"
+}
+```
+
+All JSON keys are sorted lexicographically. Protocol-specific fields are serialized under the `"fields"` object, not as top-level keys. The `description` field, if present, is a top-level key.
+
+### 5A.10 Runtime Source Provenance (Executor Concern)
+
+When an executor uses an adapter to fetch a Fact value from a declared Source, the executor SHOULD record enriched provenance:
+
+```
+EnrichedFactProvenance = (
+  id:               FactId,
+  source:           StructuredSource,
+  value:            BaseType,
+  assertion_source: "external",
+  adapter_id:       Text,
+  fetch_timestamp:  DateTime,
+  source_response?: Text   // optional raw response for audit
+)
+```
+
+Enriched provenance extends the provenance chain from `fact value → source declaration` to `fact value → source declaration → adapter identity → fetch timestamp → raw external data`. This is an executor capability, not an evaluator obligation. Executors that do not implement adapter infrastructure record standard FactProvenance.
+
+> Source declarations are infrastructure metadata. They do not participate in the evaluation model — `assemble_facts`, `eval_strata`, `eval_pred`, and `execute` are unchanged. The evaluator ignores Source constructs entirely. Source declarations are consumed by adapters, provenance enrichment, automated tooling (`tenor connect`), and deployment infrastructure. This separation preserves C5 (closed-world semantics): all evaluation-relevant state is contract-contained; all execution-relevant state is declared, named, and inspectable — but never executed by the evaluator.
+
+---
+
 ## 6. Entity
 
 ### 6.1 Definition
@@ -500,7 +736,7 @@ Entity = (
 
 Let E be the set of all entities in a contract:
 
-- |E| is finite and fixed at contract definition time. No dynamic entity creation is permitted.
+- |E| is finite and fixed at contract definition time. No dynamic entity *type* creation is permitted. The set of entity types is a contract-level invariant. Entity *instances* — runtime occurrences of declared entity types — are managed by the executor (§17, E15-E17). Instance multiplicity is a runtime property, not a contract property. The contract declares what kinds of entities exist and how they behave; the executor determines how many instances of each kind exist at any point in time.
 - For each entity e ∈ E, S(e) is finite and explicitly enumerated.
 - For each entity e ∈ E, T(e) ⊆ S(e) × S(e) is finite and explicitly declared.
 - The entity hierarchy forms a directed acyclic graph. The transitive closure of the parent relation must be irreflexive.
@@ -514,7 +750,23 @@ The entity partial order defines no implicit lattice join or meet operators. No 
 
 ### 6.4 State Machine Semantics
 
-Each entity e defines a finite non-empty set of states S(e), an explicitly declared initial state s₀(e) ∈ S(e), and an explicitly declared transition relation T(e) ⊆ S(e) × S(e). The current state of an entity instance is a value in S(e). State is not derived — it is stored and updated by Operations exclusively.
+Each entity e defines a finite non-empty set of states S(e), an explicitly declared initial state s₀(e) ∈ S(e), and an explicitly declared transition relation T(e) ⊆ S(e) × S(e). Each runtime instance of entity e has a current state that is a value in S(e). State is not derived — it is stored and updated by Operations exclusively. Multiple instances of the same entity type may exist simultaneously, each with an independent current state. Instance identity is an opaque runtime identifier (InstanceId); the contract does not declare, enumerate, or constrain instance identifiers.
+
+### 6.5 Instance Model
+
+**InstanceId** is a non-empty UTF-8 string that uniquely identifies a runtime instance of an entity type. The pair `(EntityId, InstanceId)` is globally unique within a contract's runtime environment. InstanceId values are assigned by the executor and are opaque to the contract and evaluator.
+
+**EntityStateMap** is the runtime mapping from entity instances to their current states:
+
+```
+EntityStateMap = Map<(EntityId, InstanceId), StateId>
+```
+
+For every entry `((e, i), s)` in the map, `s ∈ E[e].states` — every instance's current state must be a declared state of its entity type.
+
+**Single-instance degenerate case.** When the executor provides exactly one instance per entity type, the EntityStateMap contains one entry per EntityId. This is semantically identical to the pre-amendment model. No contract changes are required for single-instance operation. A conventional InstanceId for the single-instance case is `"_default"`, but any non-empty string is valid.
+
+**Instance absence.** If an instance is not present in the EntityStateMap provided to the evaluator, it does not exist from the evaluator's perspective. Instance deletion or archival is invisible to the evaluator — the executor simply omits the instance from the state map. The evaluator makes no distinction between "instance was deleted" and "instance never existed."
 
 ---
 
@@ -747,21 +999,25 @@ In the multi-outcome form, each effect tuple is extended with `-> OutcomeLabel` 
 ### 9.2 Evaluation
 
 ```
-execute : Operation × PersonaId × ResolvedVerdictSet × EntityState → (EntityState', OutcomeLabel) | Error
+execute : Operation × PersonaId × ResolvedVerdictSet × (EntityId, InstanceId) × EntityState
+        → (EntityState', OutcomeLabel) | Error
 
-execute(op, persona, verdict_set, entity_state) =
+execute(op, persona, verdict_set, (entity_id, instance_id), entity_state) =
   if persona ∉ op.allowed_personas:
     return Error(op.error_contract, "persona_rejected")
   if ¬eval_pred(op.precondition, FactSet, verdict_set):
     return Error(op.error_contract, "precondition_failed")
   // Executor obligation: validate entity_state matches transition source for each effect
+  // Instance identity is carried through for provenance
   // Determine which outcome to produce based on entity state and effect-to-outcome mapping
   outcome = determine_outcome(op, entity_state)
   // apply_atomic applies effects associated with the produced outcome atomically
-  apply_atomic(op.effects[outcome], entity_states) → entity_states'
-  emit_provenance(op, persona, verdict_set, entity_state, entity_state', outcome)
+  apply_atomic(op.effects[outcome], (entity_id, instance_id), entity_states) → entity_states'
+  emit_provenance(op, persona, verdict_set, (entity_id, instance_id), entity_state, entity_state', outcome)
   return (entity_state', outcome)
 ```
+
+For Operations with effects spanning multiple entity types, each effect targets a specific `(EntityId, InstanceId)` pair. The executor provides the full instance binding for all entities referenced by the Operation's effects.
 
 For single-outcome Operations, `determine_outcome` trivially returns the sole member of `op.outcomes`. For multi-outcome Operations, the outcome is determined by the effect-to-outcome mapping declared in the contract — the executor matches the current entity state against the declared effect source states and selects the outcome whose associated effects are applicable. This is not an executor discretion: the contract declares which effects belong to which outcome, and the entity state determines which effects are applicable.
 
@@ -817,17 +1073,20 @@ operation reject_requisition {
 
 ```
 OperationProvenance = (
-  op:            OperationId,
-  persona:       PersonaId,
-  outcome:       OutcomeLabel,
-  facts_used:    Set<FactId>,
-  verdicts_used: ResolvedVerdictSet,
-  state_before:  EntityState,
-  state_after:   EntityState'
+  op:               OperationId,
+  persona:          PersonaId,
+  outcome:          OutcomeLabel,
+  instance_binding: Map<EntityId, InstanceId>,  // which instances were affected
+  facts_used:       Set<FactId>,
+  verdicts_used:    ResolvedVerdictSet,
+  state_before:     Map<(EntityId, InstanceId), StateId>,  // per-instance
+  state_after:      Map<(EntityId, InstanceId), StateId>,  // per-instance
+  trust_domain?:    Text,       // E20 trust domain identifier (optional)
+  attestation?:     Text        // E19 authenticity claim, opaque (optional)
 )
 ```
 
-The `outcome` field records which declared outcome was produced by this execution. This enables provenance chains to track not just state transitions but which success-path result led to subsequent Flow routing decisions.
+The `outcome` field records which declared outcome was produced by this execution. This enables provenance chains to track not just state transitions but which success-path result led to subsequent Flow routing decisions. The `instance_binding` field records which specific instances were targeted. `state_before` and `state_after` are per-instance maps restricted to the affected instances. Provenance is fully instance-scoped: every transition is traceable to a specific instance. The optional `trust_domain` and `attestation` fields support trust verification (§17.4).
 
 ### 9.6 Interchange Representation
 
@@ -997,6 +1256,27 @@ Flow = (
 )
 ```
 
+A flow execution is parameterized by a FlowExecutionContext:
+
+```
+FlowExecutionContext = (
+  flow:              FlowId,
+  initiating_persona: PersonaId,
+  snapshot:          Snapshot,
+  instance_bindings: InstanceBindingMap
+)
+```
+
+**InstanceBindingMap** maps each entity type referenced in the flow's effects to a specific instance:
+
+```
+InstanceBindingMap = Map<EntityId, InstanceId>
+```
+
+The instance binding map is supplied by the executor at flow invocation time. It must provide a binding for every EntityId that appears in any OperationStep effect within the flow (and its sub-flows, transitively). Missing bindings are an execution error.
+
+For flows whose Operations reference multiple instances of the same entity type (e.g., a transfer between two Order instances), the InstanceBindingMap is insufficient — it maps EntityId to a single InstanceId. This case requires an extended binding mechanism. Extended instance binding syntax is deferred to a future amendment (see AL76). For now, flows that require multiple instances of the same entity type must be decomposed into sub-flows or use entity-type aliasing via separate Entity declarations.
+
 ### 11.2 Step Types
 
 ```
@@ -1068,18 +1348,20 @@ Every OperationStep and SubFlowStep must declare a FailureHandler. A missing Fai
 **Frozen verdict semantics:** Within a Flow, the ResolvedVerdictSet is computed once at Flow initiation and is not recomputed after intermediate Operation execution. Operations within a Flow do not see entity state changes produced by preceding steps in the same Flow. This is a fundamental semantic commitment: Flows are pure decision graphs over a stable logical universe. The consequence is that a Rule whose inputs include entity state will not reflect mid-Flow transitions — such patterns must be expressed across Flow boundaries, not within them.
 
 ```
-execute_flow : Flow × PersonaId × Snapshot → FlowOutcome
+execute_flow : Flow × PersonaId × Snapshot × InstanceBindingMap → FlowOutcome
 
-execute_flow(flow, initiating_persona, snapshot) =
+execute_flow(flow, initiating_persona, snapshot, bindings) =
   current = flow.entry
   loop:
     step = flow.steps[current]
     match step:
       OperationStep →
-        result = execute(step.op, step.persona, snapshot.verdict_set)
+        // Resolve instance targets from bindings
+        instance_targets = resolve_bindings(step.op, bindings)
+        result = execute(step.op, step.persona, snapshot.verdict_set, instance_targets)
         match result:
           (state', outcome_label) →
-            emit_provenance(step, result)
+            emit_provenance(step, result, instance_targets)
             current = step.outcomes[outcome_label]
           Error →
             handle_failure(step.on_failure)
@@ -1091,14 +1373,16 @@ execute_flow(flow, initiating_persona, snapshot) =
         emit_handoff_record(step)
         current = step.next
       SubFlowStep →
-        // snapshot inherited — not re-taken at sub-flow initiation
-        result  = execute_flow(lookup(step.flow), step.persona, snapshot)
+        // Sub-flow inherits parent's instance bindings
+        result  = execute_flow(lookup(step.flow), step.persona, snapshot, bindings)
         emit_provenance(step, result)
         current = if success(result) then step.on_success
                   else handle_failure(step.on_failure)
       Terminal →
         return step.outcome
 ```
+
+Key change: `resolve_bindings` maps the Operation's entity effect targets to specific instances using the flow's InstanceBindingMap. Sub-flows inherit the parent flow's bindings (consistent with snapshot inheritance, §11.5).
 
 The key change from v0.3: when an OperationStep executes, the result is a `(state', outcome_label)` pair on success. The Flow routes on `outcome_label` by looking it up directly in the step's `outcomes` map — there is no `classify()` function. The outcome label comes from the Operation's declared outcome set, ensuring type-safe routing. Error results continue to be handled by `on_failure`.
 
@@ -1460,6 +1744,7 @@ Input: DSL source text (UTF-8). Output: Parse tree.
 - Tokenize per Tenor lexer spec. `->` and `→` are the same token.
 - Strip `//` and `/* */` comments. Stripped comments do not appear in the parse tree.
 - Parse per Tenor grammar. Non-conforming input is rejected with errors satisfying I4.
+- The parser recognizes the `source` keyword and parses Source declarations. Source declarations produce `RawSource` parse tree nodes.
 - Record source file and line for every parse tree node.
 
 **Pass 1 — Import resolution and bundle assembly**
@@ -1468,6 +1753,7 @@ Input: Parse trees from all DSL files. Output: Unified parse tree.
 - Resolve all `import` declarations. Missing files are elaboration errors.
 - Detect import cycles. Cycles are elaboration errors.
 - Identify shared type library files: any imported file containing only TypeDecl constructs (no Fact, Entity, Rule, Persona, Operation, Flow) is a type library. Type library files may not contain import declarations — if present, this is an elaboration error (§4.6).
+- Source declarations from imported files are merged into the unified parse tree. Source id uniqueness is checked across all files (C-SRC-01).
 - Merge parse trees into a unified bundle. Duplicate construct ids across files are elaboration errors. This includes TypeDecl ids: an imported TypeDecl id that conflicts with a local TypeDecl id or another imported TypeDecl id is an elaboration error.
 
 **Pass 2 — Construct indexing**
@@ -1505,12 +1791,13 @@ Input: Typed ASTs, construct index, type environment. Output: Validation report.
 - Rule: stratum ≥ 0; all refs resolve; verdict_refs reference strata < this rule's stratum; produce clauses reference declared VerdictType ids (unresolved VerdictType references are Pass 5 errors); no two Rules may produce the same VerdictType name (S8 — verdict uniqueness).
 - Flow: entry exists; all step refs resolve; all step persona fields resolve to declared Persona constructs; step graph acyclic; flow reference graph acyclic; all OperationSteps and SubFlowSteps declare FailureHandlers; all OperationStep outcome map keys are members of the referenced Operation's declared outcomes; OperationStep outcome handling is exhaustive (map keys = Operation's declared outcomes).
 - Parallel: branch sub-DAGs acyclic; no overlapping entity effect sets across branches (transitively resolved).
+- Source validation: validate C-SRC-01 (Source id uniqueness); validate C-SRC-03 (core protocol required fields); validate C-SRC-04 (extension protocol tag format); validate C-SRC-05 (source field values are strings); validate C-SRC-06 (structured source references on Facts resolve to declared Sources); validate path structural shape for structured source references (per protocol).
 - **Error attribution:** errors are reported at the source line of the specific field or sub-expression responsible for the violation (e.g., the `initial:` field line, not the `Entity` keyword line; the `verdict_present(...)` call line, not the enclosing `Rule` keyword line). This requires AST nodes at all levels — RawExpr variants, RawStep variants, construct sub-field lines — to carry their own source line, set by the parser at token consumption time and treated as immutable by all elaboration passes.
 
 **Pass 6 — Interchange serialization**
 Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON bundle.
 
-- Canonical construct order: Personas (alphabetical), VerdictTypes, Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical). "Alphabetical" means lexicographic ordering of UTF-8 encoded byte sequences.
+- Canonical construct order: Personas (alphabetical), VerdictTypes, Sources (alphabetical), Facts, Entities, Rules (ascending stratum, alphabetical within stratum), Operations (alphabetical), Flows (alphabetical). "Alphabetical" means lexicographic ordering of UTF-8 encoded byte sequences.
 - Serialize Operation `outcomes` as an array of strings preserving declaration order. For multi-outcome Operations, serialize each effect with an `"outcome"` field associating it with the declared outcome label.
 - Serialize Flow steps as an array. Entry step is first; remaining steps follow in topological order of the step DAG.
 - Sort all JSON object keys lexicographically within each construct document.
@@ -1636,21 +1923,25 @@ The following checks are performed when a contract is loaded. A contract that fa
 
 ```
 snapshot = take_snapshot(contract, current_rules, current_entity_states)
-// Point-in-time. Rule evolution after this point does not affect the Flow.
+bindings = executor_provided_instance_bindings
+// Point-in-time. Instance states in the snapshot reflect the moment of initiation.
+// New instances created after snapshot are invisible to this flow.
+// Rule evolution after this point does not affect the Flow.
 ```
 
 ### 15.3 Per-Evaluation Sequence
 
 ```
 // Read path
-facts       = assemble_facts(contract, external_inputs)   // → FactSet | Abort
-verdicts    = eval_strata(contract.rules, facts)           // → ResolvedVerdictSet
+facts       = assemble_facts(contract, external_inputs)             // → FactSet | Abort
+verdicts    = eval_strata(contract.rules, facts)                     // → ResolvedVerdictSet
 
-// Write path (per Operation invocation)
-(state', outcome_label) = execute(op, persona, verdicts, state) // → (EntityState', OutcomeLabel) | Error
+// Write path (per Operation invocation — now instance-targeted)
+(state', outcome) = execute(op, persona, verdicts, (entity_id, instance_id), state)
+                                                                     // → (EntityState', OutcomeLabel) | Error
 
-// Orchestration
-outcome     = execute_flow(flow, persona, snapshot)        // → FlowOutcome
+// Orchestration (now with instance bindings)
+outcome     = execute_flow(flow, persona, snapshot, bindings)        // → FlowOutcome
 ```
 
 ### 15.4 Provenance Chain
@@ -1661,16 +1952,17 @@ Every terminal outcome has a complete provenance chain:
 FlowOutcome
   └─ [StepRecord]
        └─ OperationProvenance
+            ├─ instance_binding: {Order: "ord-001", ...}     ← instance-scoped
             ├─ ResolvedVerdictSet
             │    └─ [VerdictInstance]
             │         └─ VerdictProvenance
             │              └─ [FactId]
             │                   └─ FactProvenance  ← root
-            ├─ EntityState (before)
-            └─ EntityState (after)
+            ├─ state_before: {(Order, "ord-001"): "submitted"}
+            └─ state_after:  {(Order, "ord-001"): "approved"}
 ```
 
-Every chain terminates at Facts. Facts are the provenance roots. No derivation precedes them.
+Every provenance chain now records which specific instances were affected. Instance identity is part of the audit trail. Every chain terminates at Facts. Facts are the provenance roots. No derivation precedes them.
 
 At the System level, TriggerProvenance records link source flow terminal outcomes to target flow initiations. A complete System-level audit trail is the union of individual contract provenance chains plus all TriggerProvenance records. Every triggered flow initiation must be traceable to the source flow terminal outcome that caused it.
 
@@ -1704,6 +1996,43 @@ rule active_delegation {
   produce: delegation_active(true)
 }
 ```
+
+### 15.6 Action Space
+
+The action space computation (`compute_action_space`) receives the instance-keyed EntityStateMap and produces per-instance results.
+
+```
+compute_action_space : Contract × FactSet × EntityStateMap × PersonaId
+                     → ActionSpace
+
+ActionSpace = (
+  actions:          Set<Action>,
+  blocked_actions:  Set<BlockedAction>,
+  current_verdicts: ResolvedVerdictSet
+)
+
+Action = (
+  flow_id:           FlowId,
+  instance_bindings: Map<EntityId, Set<InstanceId>>,  // instances in valid source states
+  verdicts_enabling: Set<VerdictInstance>,
+  personas:          Set<PersonaId>
+)
+
+BlockedAction = (
+  flow_id:           FlowId,
+  instance_bindings: Map<EntityId, Set<InstanceId>>,  // instances that block
+  reason:            BlockReason
+)
+```
+
+For each flow, the action space reports:
+
+- **Available:** which instances are in states that satisfy the flow's effect source states, AND verdicts/preconditions are met.
+- **Blocked:** which instances are in states that block the flow, with the specific reason.
+
+An action is available for a *specific combination* of instance bindings. The `instance_bindings` on an Action lists, per entity type, the set of instances for which the action's effects are applicable. The agent (or UI) selects a specific binding from these sets.
+
+**Action space size.** The action space is finite and bounded: |flows| x product of (|instances per entity type|). For large instance counts, the action space may be large. Implementations MAY provide grouped or filtered views of the action space. Grouping must be lossless — expandable to per-instance actions without information loss. The semantic unit remains: "this flow is executable for this specific instance binding."
 
 ---
 
@@ -1745,9 +2074,9 @@ Tenor's formal guarantees hold **conditional on executor conformance**. The lang
 
 **Logic conformance** means the executor correctly implements the contract's logic as expressed in the interchange JSON. Given the same interchange bundle and the same FactSet, a logic-conforming executor produces the same verdicts, the same entity state transitions, and the same flow outcomes as any other logic-conforming executor. Logic conformance is verifiable against the artifact — the conformance test suite exercises it with known-input/expected-output triples.
 
-**Operational conformance** means the executor honors E1–E14 under real production conditions. Atomicity under failure (E3). Snapshot isolation under concurrency (E4). External source integrity across network boundaries (E1). Branch isolation in parallel execution (E8). These obligations cannot be verified from the artifact alone — they depend on the executor's storage substrate, concurrency model, network topology, and failure recovery semantics.
+**Operational conformance** means the executor honors E1–E20 under real production conditions. Atomicity under failure (E3). Snapshot isolation under concurrency (E4). External source integrity across network boundaries (E1). Branch isolation in parallel execution (E8). Instance lifecycle management (E15-E17). Trust attestation capabilities (E18-E20). These obligations cannot be verified from the artifact alone — they depend on the executor's storage substrate, concurrency model, network topology, and failure recovery semantics.
 
-The distinction: a conforming elaborator plus a signed interchange artifact **proves** logic conformance. It makes **no claims** about operational conformance. Operational conformance is the executor's responsibility and must be verified separately — through integration testing, formal verification of the runtime, or independent audit of the executor's implementation against E1–E14.
+The distinction: a conforming elaborator plus a signed interchange artifact **proves** logic conformance. It makes **no claims** about operational conformance. Operational conformance is the executor's responsibility and must be verified separately — through integration testing, formal verification of the runtime, or independent audit of the executor's implementation against E1–E20.
 
 Obligations marked _(trust boundary)_ in § 17.2 and § 17.3 are specifically those where logic conformance and operational conformance diverge. The language specifies what must happen; only the executor can ensure it does.
 
@@ -1756,11 +2085,11 @@ Obligations marked _(trust boundary)_ in § 17.2 and § 17.3 are specifically th
 **E1 — External source integrity** _(trust boundary)_  
 Facts are populated from genuinely external sources as declared. An executor must not populate Facts from internal computations or cross-Fact dependencies. Violation of E1 corrupts the provenance root — every chain built on a non-externally-sourced Fact is semantically invalid, but the language cannot detect this.
 
-**E2 — Transition source validation.**  
-Before applying an Operation's effects, the executor must validate that the current entity state matches the transition source for each declared effect `(entity_id, from_state, to_state)`. A mismatched transition source must abort the Operation with a typed error.
+**E2 — Transition source validation.**
+Before applying an Operation's effects, the executor must validate that the current state of the *targeted instance* matches the transition source for each declared effect `(entity_id, from_state, to_state)`. The targeted instance is identified by the `(EntityId, InstanceId)` pair from the flow's instance binding map. A mismatched transition source must abort the Operation with a typed error.
 
-**E3 — Atomicity enforcement** _(trust boundary)_  
-An Operation's effect set must be applied atomically. Either all declared state transitions occur, or none do. Partial application is not permitted. Atomicity depends on the executor's storage substrate. The language defines what atomicity means but cannot verify that it was achieved. Partial application that is not detected produces invalid entity states that subsequent Operations may act upon, silently compounding the error.
+**E3 — Atomicity enforcement** _(trust boundary)_
+An Operation's effect set must be applied atomically *across all targeted instances*. If an Operation's effects span multiple entity types (and therefore potentially multiple instances), either all declared state transitions for all targeted instances occur, or none do. Partial application across instances is not permitted. Atomicity depends on the executor's storage substrate. The language defines what atomicity means but cannot verify that it was achieved. Partial application that is not detected produces invalid entity states that subsequent Operations may act upon, silently compounding the error.
 
 **E4 — Snapshot isolation** _(trust boundary)_  
 A Flow's snapshot must not be modified after initiation. Rule evolution during Flow execution must not affect an in-progress Flow. Snapshot isolation depends on the executor's concurrency model. In a concurrent environment, a non-isolated snapshot may cause a Flow to make decisions against a logical universe that no longer exists.
@@ -1780,7 +2109,20 @@ Parallel branches execute under the parent Flow's snapshot. No branch sees entit
 **E9 — Join evaluation after full branch completion.**
 The join step evaluates after all branches have reached a terminal state. The join condition is evaluated against the set of branch terminal outcomes. Order of branch completion does not affect join outcome.
 
-> **Migration obligations:** When deploying updated contract versions, executors have additional obligations beyond E1-E9. See §18.3 for migration-specific obligations M1-M8, including breaking change detection, migration policy declaration, and entity state migration.
+**E15 — Instance creation.**
+An executor that creates new entity instances MUST initialize them in the entity's declared initial state (`Entity.initial`). Instances MUST NOT be created in arbitrary states. An instance that appears in the EntityStateMap in a state other than `Entity.initial` without a provenance chain of Operations that transitioned it there is a conformance violation.
+
+**E16 — Instance identity stability.**
+An InstanceId MUST remain stable for the lifetime of the instance. The executor MUST NOT reassign an InstanceId to a different logical instance. InstanceId reuse after instance deletion is permitted only if the executor guarantees that no provenance records, in-flight flows, or external references refer to the deleted instance.
+
+**E17 — Instance enumeration.**
+The executor MUST be able to enumerate all instances of a given entity type and their current states, for evaluator consumption. The `EntityStateMap` provided to the evaluator MUST be complete — it must contain every active instance. Omitting an active instance from the state map is a conformance violation (it makes the instance invisible to evaluation, potentially enabling actions that should be blocked).
+
+> **Migration obligations:** When deploying updated contract versions, executors have additional obligations beyond E1-E17. See §18.3 for migration-specific obligations M1-M8, including breaking change detection, migration policy declaration, and entity state migration.
+
+**Optional executor capability — source_adapters:** An executor that implements adapter infrastructure for Source declarations SHOULD advertise this capability via the manifest `capabilities` object: `"source_adapters": true`. An executor advertising `source_adapters: true` indicates that it can resolve structured source references to live data via adapters, and that it records enriched fact provenance (§5A.10).
+
+**Optional executor capability — multi_instance_entities:** An executor that supports multi-instance entities SHOULD advertise this capability via the manifest `capabilities` object: `"multi_instance_entities": true`. An executor advertising `multi_instance_entities: false` (or omitting the field) operates in single-instance mode: exactly one instance per entity type, with a default InstanceId.
 
 ### 17.3 System Executor Obligations
 
@@ -1825,6 +2167,69 @@ The executor MUST satisfy the following:
 
 > **System obligations summary:** E-SYS-01 through E-SYS-04 extend the single-contract executor model to multi-contract Systems. E-SYS-01 (trigger execution) and E-SYS-03 (shared persona) are deterministic obligations — the executor's behavior is fully specified. E-SYS-02 (entity coordination) and E-SYS-04 (cross-contract snapshot) are trust boundaries — the language specifies the required guarantees but the executor's implementation mechanism is not constrained.
 
+### 17.4 Trust Obligations
+
+**E18 — Artifact integrity attestation.**
+A conforming executor MUST be able to produce a cryptographic attestation that a given interchange bundle is identical to the one used during evaluation. The attestation binds the bundle content to a verifiable identity (the signer).
+
+**Requirements:**
+
+- The attestation MUST cover the complete interchange bundle (all constructs, all metadata).
+- The attestation MUST be independently verifiable without access to the executor's runtime state.
+- The bundle's existing `etag` field (SHA-256 of canonical JSON bytes, §19.2) provides content identity. The attestation binds this content identity to a signer identity.
+
+**Non-requirements:**
+
+- The spec does not prescribe the signing algorithm, key format, or signature encoding.
+- The spec does not prescribe who signs (author, build system, deployment pipeline, executor itself).
+- The spec does not prescribe key distribution, revocation, or trust anchor establishment.
+- A single-developer local deployment MAY omit attestation. The capability must exist in the executor implementation; its activation is an operational decision.
+
+**E19 — Provenance authenticity.**
+When an executor records provenance (FactProvenance, OperationProvenance, FlowOutcome, TriggerProvenance), it MUST be able to associate provenance entries with an authenticity claim. The authenticity claim asserts that the provenance record was produced by the identified executor and has not been modified since recording.
+
+**Requirements:**
+
+- The authenticity claim MUST be verifiable independently of the executor that produced it.
+- The authenticity mechanism MUST be tamper-evident: modification of a provenance record after attestation MUST be detectable.
+- Provenance entries without authenticity claims are valid but unattested. Tools and auditors MAY distinguish between attested and unattested provenance.
+
+**Non-requirements:**
+
+- The spec does not prescribe the authenticity mechanism (digital signatures, append-only logs, blockchain, trusted timestamping, etc.).
+- The spec does not prescribe per-record vs. batch attestation granularity.
+- The spec does not prescribe retention or availability of authenticity claims.
+
+**E20 — Trust domain identification.**
+An executor MAY declare a trust domain identifier. The trust domain identifies the organizational, environmental, or deployment boundary within which the executor operates.
+
+**When declared:**
+
+- The trust domain identifier MUST be included in all provenance records produced by the executor.
+- The trust domain identifier MUST be included in TriggerProvenance records (§12.4) for cross-contract triggers, enabling auditors to trace trust boundaries across System compositions.
+- The trust domain identifier MUST be stable for the lifetime of a deployment. Changing the trust domain identifier constitutes a new deployment from a trust perspective.
+
+**Format:**
+
+- A trust domain identifier is a non-empty UTF-8 string. The spec does not prescribe naming conventions.
+- Recommended convention: `{organization}.{environment}.{region}` (e.g., `acme.prod.us-east-1`). This is non-normative.
+
+**Non-requirements:**
+
+- Trust domain declaration is optional. An executor without a declared trust domain is not non-conforming.
+- The spec does not prescribe trust domain registration, uniqueness verification, or hierarchical relationships between trust domains.
+
+> **Obligation summary (E15-E20):**
+
+| Obligation | Description |
+|------------|-------------|
+| **E15** | Instance creation. The executor MUST initialize new entity instances in the declared initial state. |
+| **E16** | Instance identity stability. InstanceIds MUST remain stable for the lifetime of the instance. |
+| **E17** | Instance enumeration. The EntityStateMap provided to the evaluator MUST be complete. |
+| **E18** | Artifact integrity attestation. The executor MUST be capable of producing a cryptographic attestation binding the interchange bundle to a signer identity. Attestation activation is an operational decision. |
+| **E19** | Provenance authenticity. The executor MUST be capable of associating provenance records with a tamper-evident authenticity claim. Unattested provenance is valid but unverifiable. |
+| **E20** | Trust domain identification (optional). The executor MAY declare a trust domain identifier included in provenance records and TriggerProvenance for cross-executor auditability. |
+
 ---
 
 ## 18. Versioning & Migration
@@ -1835,11 +2240,19 @@ Tenor's closed-world semantics (C5) mean that any change to a contract's content
 
 ### 18.2 Breaking Change Taxonomy
 
-Changes between two contract versions are classified into three categories:
+Changes between two contract versions are classified into four categories:
 
 - **BREAKING**: The change may invalidate existing executor behavior, entity state, or in-flight flows. Executors deploying a contract version with BREAKING changes must declare a migration policy (§18.4).
 - **NON_BREAKING**: The change is safe — no existing executor behavior is affected. Executors may deploy the new version without a migration policy declaration.
 - **REQUIRES_ANALYSIS**: The change's impact depends on value-level analysis (typically predicate strength comparison) that cannot be resolved by structural inspection alone. Changes classified as REQUIRES_ANALYSIS must be treated as BREAKING unless static analysis (S1-S7 per §16) proves them non-breaking for the specific contract pair.
+- **INFRASTRUCTURE**: The change does not affect evaluation semantics or verdicts, but requires coordinated updates to runtime infrastructure, adapters, credentials, or deployment configuration. INFRASTRUCTURE changes must not be auto-applied by tooling that only reasons about evaluation correctness. They may require staged rollout or dual-running.
+
+The classification hierarchy for migration policy declaration:
+
+- **BREAKING** — migration policy MUST be declared (M2)
+- **REQUIRES_ANALYSIS** — treated as BREAKING unless proven otherwise (M6)
+- **INFRASTRUCTURE** — no migration policy required; operator notification required
+- **NON_BREAKING** — no action required
 
 For each change, the taxonomy separately assesses: impact on **new flow initiations** (flows started under the new contract version) versus impact on **in-flight flows** (flows initiated under the old contract version that have not yet reached a terminal state). Frozen verdict semantics (§15) provide natural isolation at the verdict layer — in-flight flow snapshot verdicts are immutable, so Rule and Fact changes do not affect in-flight flow verdicts. However, Operation execution against live entity state IS affected by Entity state changes and Operation definition changes.
 
@@ -1851,7 +2264,7 @@ The taxonomy is exhaustive: every (construct_kind, field, change_type) triple th
 |-------|--------------|-----------------|-------------|
 | id | NON_BREAKING: No existing construct references a new Fact. | BREAKING: Rules and Operations may reference this Fact via `fact_ref`; in-flight flows with frozen snapshots referencing this Fact lose their data source. | N/A (id is identity) |
 | type | N/A (part of add) | N/A (part of remove) | **Widen** (larger range, more Enum values): NON_BREAKING — all existing values remain valid. **Narrow** (smaller range, fewer Enum values): BREAKING — existing values may be invalid. **Base type change**: BREAKING — expression type-checking changes. In-flight: verdict-layer isolated (frozen snapshot), but new flow initiations affected. |
-| source | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Source is executor metadata (§5.2), not evaluation semantics. Changing `source.system` or `source.field` does not affect `eval_pred` or `eval_strata`. |
+| source | N/A (part of add) | N/A (part of remove) | **Freetext to freetext**: NON_BREAKING. **Freetext to structured**: NON_BREAKING (additive machine-readability). **Structured to freetext**: INFRASTRUCTURE (loss of machine-readability; adapters and tooling must be updated). **Change source_id**: INFRASTRUCTURE (adapter wiring changes). **Change path**: INFRASTRUCTURE (adapter wiring changes). **Change protocol** (via referenced Source): INFRASTRUCTURE. |
 | default | N/A (part of add) | N/A (part of remove) | **Add default**: NON_BREAKING — provides fallback where none existed. **Remove default**: BREAKING — Facts without values now fail assembly. **Change default value**: REQUIRES_ANALYSIS — may change evaluation outcomes depending on whether the default is exercised. |
 | provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Provenance is debugging metadata, not evaluation semantics. |
 | kind | N/A | N/A | N/A (discriminator constant, cannot change within same construct type). |
@@ -1929,6 +2342,28 @@ The taxonomy is exhaustive: every (construct_kind, field, change_type) triple th
 | triggers | Add trigger: NON_BREAKING — new cross-contract coordination path. Remove trigger: BREAKING — target flow will never be initiated from this source. In-flight flows expecting the trigger to fire are affected. | N/A | Change any trigger field: BREAKING. |
 | shared_entities | Add entry: NON_BREAKING. Remove entry: BREAKING — cross-contract entity state coordination ceases. | N/A | Change contracts list: BREAKING. |
 
+#### 18.2.8 Source Changes
+
+| Field | Add Construct | Remove Construct | Change Value |
+|-------|--------------|-----------------|-------------|
+| id | NON_BREAKING: No existing evaluation behavior references a new Source. | INFRASTRUCTURE if Facts still reference it (C-SRC-06 will fail at elaboration — this is actually a compile error, not a runtime migration). NON_BREAKING if no Facts reference it. | N/A (id is identity) |
+| protocol | N/A (part of add) | N/A (part of remove) | INFRASTRUCTURE: Adapter wiring changes. |
+| fields (base_url, dialect, endpoint, etc.) | N/A (part of add) | N/A (part of remove) | INFRASTRUCTURE: Connection configuration changes. |
+| description | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Documentation metadata. |
+| provenance | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Debugging metadata. |
+| kind | N/A | N/A | N/A (discriminator constant). |
+| tenor | N/A (part of add) | N/A (part of remove) | NON_BREAKING: Version annotation. |
+
+#### 18.2.9 Trust Metadata Changes
+
+| Field | Add | Remove | Change |
+|-------|-----|--------|--------|
+| trust (manifest) | NON_BREAKING | NON_BREAKING | NON_BREAKING |
+| trust_domain (provenance) | NON_BREAKING | INFRASTRUCTURE (auditors may depend on trust domain continuity) | INFRASTRUCTURE (trust chain continuity affected) |
+| attestation_format | NON_BREAKING | NON_BREAKING | INFRASTRUCTURE (consumers of attestations must update verification) |
+
+Trust metadata changes never affect evaluation semantics. They are NON_BREAKING or INFRASTRUCTURE depending on whether operational consumers depend on them.
+
 ### 18.3 Executor Migration Obligations
 
 The following obligations parallel E1-E9 in §17.2 but are specific to contract version transitions. An executor that supports deploying updated contract versions must satisfy these obligations.
@@ -1939,7 +2374,7 @@ The following obligations parallel E1-E9 in §17.2 but are specific to contract 
 
 - **M3 — No silent breaking deployment.** An executor MUST NOT silently deploy a contract version with BREAKING changes without migration policy declaration. Deployment of a breaking change without a declared policy is a conformance violation (MI5).
 
-- **M4 — Entity state migration.** An executor MUST validate that all entities in states removed by the new contract version have been migrated before completing the transition. Entities in removed states are orphaned — no Operation in the new contract can transition them, and no Flow step can reference them.
+- **M4 — Entity state migration.** An executor MUST validate that all *instances* of entities in states removed by the new contract version have been migrated before completing the transition. Instances in removed states are orphaned — no Operation in the new contract can transition them, and no Flow step can reference them.
 
 - **M5 — In-flight flow coverage.** An executor MUST validate that all in-flight flows referencing removed or changed constructs are handled per the declared migration policy. No in-flight flow may be silently abandoned or left in an inconsistent state (MI7).
 
@@ -1968,7 +2403,7 @@ When a contract version transition contains BREAKING changes (per §18.2, classi
 
 ### 18.5 Migration Contract Representation
 
-The migration output between two contract versions is expressed as a hybrid representation (selected via CFFP, Candidate C — see `docs/cffp/migration-semantics.json`):
+The migration output between two contract versions is expressed as a hybrid representation:
 
 **Primary output — DiffEntry JSON** (`tenor diff`): The authoritative diff output is structured JSON. Each change is a `DiffEntry` keyed by `(construct_kind, construct_id)` with field-level before/after values. The DiffEntry format is produced by `tenor diff` and is always complete, deterministic, and correct (MI1, MI2). The breaking change classification is a pure function applied to each DiffEntry field: `classify(kind, field, change_type)` returns the taxonomy classification from §18.2.
 
@@ -2159,13 +2594,24 @@ TenorManifest = {
   tenor:          string,               // manifest schema version, e.g. "1.1"
   etag:           string,               // SHA-256 hex digest of canonical bundle bytes
   bundle:         TenorInterchange,     // the full interchange bundle, inlined
-  capabilities?:  ExecutorCapabilities  // optional executor capability advertisement
+  capabilities?:  ExecutorCapabilities, // optional executor capability advertisement
+  trust?:         TrustMetadata         // optional trust attestation and domain identity
 }
 
 ExecutorCapabilities = {
-  migration_analysis_mode: "conservative" | "aggressive"
+  migration_analysis_mode: "conservative" | "aggressive",
+  multi_instance_entities?: bool,       // supports multiple runtime instances per entity type
+  source_adapters?:         bool        // resolves structured source references via adapters
+}
+
+TrustMetadata = {
+  bundle_attestation?: string,          // opaque attestation binding bundle to signer identity
+  trust_domain?:       string,          // trust domain identifier per E20
+  attestation_format?: string           // identifier for the attestation scheme used
 }
 ```
+
+The `trust` field is optional. Its presence or absence does not affect correctness, evaluation, or any contract-level behavior. The evaluator ignores the `trust` field entirely. Tools, auditors, and operators MAY surface trust metadata. If `bundle_attestation` is present, `attestation_format` MUST also be present. If `trust_domain` is present, it MUST match the trust domain included in provenance records (E20).
 
 The `capabilities` field is optional. Static file servers and pre-v1.1 manifests
 omit it. Dynamic executors that evaluate Operations, execute Flows, and apply
@@ -2389,6 +2835,8 @@ to the authoritative audit log.
 
 ### 19.7 Executor Obligation Summary (E10-E14)
 
+> **Note:** For E15-E17 (instance lifecycle) and E18-E20 (trust), see §17.2 and §17.4.
+
 | Obligation | Description |
 |------------|-------------|
 | **E10** | Serve a valid TenorManifest at `/.well-known/tenor` with `Content-Type: application/json` and an `ETag` response header matching the manifest's `etag` field. |
@@ -2544,6 +2992,57 @@ Trigger at-most-once delivery is stated as a guarantee (E-SYS-01) but the enforc
 **AL67 — Cross-contract provenance retention policy not prescribed** _(System, §12)_
 Cross-contract provenance traceability requires that all TriggerProvenance records are retained alongside individual contract provenance chains. The spec defines TriggerProvenance (§12.4) but does not prescribe storage or retention obligations. Executors must document their provenance retention policy.
 
+**AL68 — Source declarations do not validate external schema compatibility** _(Source, §5A)_
+The elaborator validates that structured source references resolve to declared Sources and that paths conform to syntactic structural shapes. It does not validate that paths resolve to actual fields in the external system, that field types are compatible with Fact types, or that the external system is reachable. Schema compatibility is a runtime/adapter concern. Contracts with structurally valid source declarations may fail at adapter-generation or runtime if the external system's schema has changed.
+
+**AL69 — Source path validation is syntactic, not semantic** _(Source, §5A)_
+Path validation checks structural shape (dot-separated identifiers, valid parameter segments) but not field existence, cardinality, or type compatibility. A path `orders.nonexistent_field` passes elaboration if it matches the structural pattern. This is a deliberate design choice: the contract declares *logical* source bindings; the adapter validates *physical* compatibility.
+
+**AL70 — Extension protocol tags have no elaborator-enforced required fields** _(Source, §5A)_
+Extension protocol tags (`x_*`) bypass required-field validation. An extension source with no fields beyond `protocol` is valid. Required-field enforcement for extensions is deferred to adapter-level tooling. This may result in extension sources that are structurally valid but operationally incomplete.
+
+**AL71 — Source field values are untyped strings** _(Source, §5A)_
+All source field values are Text. There is no typed field system for Source declarations (no integers for port numbers, no booleans for TLS flags, no nested records for complex configuration). Typed source fields would introduce a secondary type system for infrastructure metadata, adding spec complexity for marginal elaboration-time benefit. Adapters parse field values from strings.
+
+**AL72 — Enriched fact provenance is not an executor obligation** _(Source, §5A)_
+EnrichedFactProvenance (§5A.10) is a SHOULD, not a MUST. Executors that do not implement adapter infrastructure record standard FactProvenance. This means provenance chains may terminate at the Fact level without extending to the external system, even when structured source declarations exist.
+
+**AL73 — No Source construct in System composition** _(Source, §5A; System, §12)_
+Source declarations are per-contract. The System construct (§12) does not support shared Source declarations across member contracts. Two member contracts referencing the same external system must each declare their own Source. Shared Source declarations would require cross-contract Source identity semantics, which are deferred to a future version.
+
+**AL74 — Instance multiplicity is runtime-only** _(Entity, §6)_
+The contract cannot declare that an entity type is single-instance or multi-instance. Instance multiplicity is a runtime property managed by the executor. If a contract author intends single-instance semantics, this must be enforced operationally (by the executor providing only one instance) or conventionally (by documentation), not by the contract language.
+
+**AL75 — No cross-instance preconditions** _(Entity, §6; PredicateExpression, §10)_
+Preconditions and rule conditions operate over Facts and Verdicts, not entity instance states. A rule cannot express "if Order/ord-001 is in state X and Order/ord-002 is in state Y." Cross-instance state dependencies must be expressed as externally-provided Facts (e.g., `all_related_orders_ready: Bool`). This is consistent with §5.5 (no aggregate computation) and the principle that derived values arrive as Facts.
+
+**AL76 — Flow-level instance binding syntax deferred** _(Flow, §11)_
+Flows do not declare instance bindings in the contract DSL. Instance bindings are provided by the executor at flow invocation time. This means the contract cannot express "steps A and B must target the same Order instance" declaratively — the executor must ensure binding consistency. Explicit flow-level `bind:` syntax (allowing contracts to declare instance parameters and bind steps to them) is deferred to a future amendment. The `InstanceBindingMap` concept in the execution model is designed to accommodate this future syntax additively.
+
+**AL77 — No multi-instance-of-same-type flow binding** _(Flow, §11)_
+The `InstanceBindingMap` maps `EntityId → InstanceId` — one instance per entity type per flow. Flows that require multiple instances of the same entity type (e.g., transferring between two Order instances) cannot express this in the current binding model. Such flows must be decomposed into sub-flows, use separate Entity declarations as aliases, or rely on executor-level extended binding mechanisms. Multi-binding support is deferred to a future amendment alongside explicit flow binding syntax (AL76).
+
+**AL78 — Instance creation is not an Operation** _(Entity, §6; Operation, §9)_
+Instance creation is an executor concern, not a contract-level Operation. There is no `create_instance` operation in the contract language. The contract declares initial states; the executor creates instances in those states. This means instance creation is not precondition-guarded, not persona-gated, and not provenance-tracked at the contract level. If contract-level instance creation control is needed, it must be modeled indirectly (e.g., a "request creation" Fact that triggers an executor-side creation workflow).
+
+**AL79 — Action space size scales with instance count** _(Entity, §6)_
+The action space is O(|flows| x product of |instances per entity type|). For contracts with many entity types and many instances per type, the action space may be very large. Implementations may provide grouped, filtered, or paginated views. The spec does not prescribe action space presentation strategies — only that the semantic content is per-instance and that any grouping is lossless.
+
+**AL80 — Trust obligations are capability requirements, not activation requirements** _(Trust, §17.4)_
+E18 and E19 require the executor to be *capable* of producing attestations and authenticity claims. They do not require attestations to be produced for every bundle or provenance record. An executor that is capable but never activated is conformant but unattested. This is a deliberate design choice: trust infrastructure should not be a barrier to adoption. Development, testing, and simulation deployments routinely operate without trust attestation.
+
+**AL81 — Attestation format is not standardized** _(Trust, §17.4)_
+The `attestation_format` field is a free-text identifier. There is no registry of attestation formats, no required format, and no interoperability guarantee between executors using different formats. An auditor encountering an unrecognized attestation format must treat it as opaque. Format standardization may be addressed by a future community convention or registry, not by the spec.
+
+**AL82 — Trust domain uniqueness is not enforced** _(Trust, §17.4)_
+Two independent executors may declare the same trust domain identifier. The spec does not provide a uniqueness mechanism. Trust domain identity is asserted, not verified. In multi-executor deployments, organizational processes must ensure trust domain uniqueness.
+
+**AL83 — No trust chain verification in the evaluator** _(Trust, §17.4)_
+The evaluator never verifies attestations, authenticity claims, or trust domain identity. Trust verification is exclusively an auditor, operator, and tooling concern. An evaluator that attempts to verify trust metadata is not non-conforming, but the spec does not require or specify this behavior.
+
+**AL84 — Cross-executor trust interoperability not specified** _(Trust, §17.4; System, §12)_
+When System triggers cross executor boundaries, each executor may use different attestation formats, different signing keys, and different trust domains. The spec provides the structure for trust metadata to travel (TriggerProvenance trust fields, manifest trust section) but does not specify how cross-executor trust verification works. This is an integration concern that depends on the specific trust infrastructure deployed.
+
 ---
 
 ## 21. Appendix B — Worked Example: Escrow Release Contract
@@ -2603,33 +3102,67 @@ persona escrow_agent
 
 ---
 
+### D.2.2 Source Declarations
+
+```
+source escrow_service {
+  protocol:    http
+  base_url:    "https://api.escrow.com/v1"
+  auth:        bearer_token
+  description: "Escrow account management API"
+}
+
+source delivery_service {
+  protocol:    http
+  base_url:    "https://delivery.internal/api"
+  auth:        api_key
+  description: "Delivery tracking service"
+}
+
+source order_service {
+  protocol:    http
+  base_url:    "https://api.orders.com/v2"
+  auth:        bearer_token
+  schema_ref:  "https://api.orders.com/v2/openapi.json"
+  description: "Order management REST API"
+}
+
+source compliance_service {
+  protocol:    database
+  dialect:     postgres
+  description: "Compliance reporting database"
+}
+```
+
+---
+
 ### D.3 Facts
 
 ```
 fact escrow_amount {
   type:   Money("USD")
-  source: "escrow_service.current_balance"
+  source: escrow_service { path: "accounts.{id}.balance" }
 }
 
 fact delivery_status {
   type:   Enum(["pending", "confirmed", "failed"])
-  source: "delivery_service.status"
+  source: delivery_service { path: "shipments.{id}.status" }
 }
 
 fact line_items {
   type:   List(element_type: LineItemRecord, max: 100)
-  source: "order_service.line_items"
+  source: order_service { path: "orders.{id}.line_items" }
 }
 
 fact compliance_threshold {
   type:    Money("USD")
-  source:  "compliance_service.release_threshold"
+  source:  compliance_service { path: "compliance_thresholds.release_amount" }
   default: Money { amount: Decimal(10000.00), currency: "USD" }
 }
 
 fact buyer_requested_refund {
   type:    Bool
-  source:  "buyer_portal.refund_requested"
+  source:  "buyer_portal.refund_requested"  // freetext still works
   default: false
 }
 ```
@@ -3046,30 +3579,76 @@ This is the frozen verdict semantic commitment in concrete form.
 
 ---
 
+### D.11 Multi-Instance Operation
+
+The escrow contract supports multiple simultaneous escrow transactions. Each `(EscrowAccount, instance_id)` and `(DeliveryRecord, instance_id)` pair tracks an independent transaction.
+
+**Example instance state map:**
+
+```
+EntityStateMap = {
+  (EscrowAccount, "esc-001"): held,
+  (EscrowAccount, "esc-002"): held,
+  (EscrowAccount, "esc-003"): released,
+  (DeliveryRecord, "del-001"): confirmed,
+  (DeliveryRecord, "del-002"): pending,
+  (DeliveryRecord, "del-003"): confirmed
+}
+```
+
+**Action space (for persona `escrow_agent`):**
+
+The `release_escrow` operation requires `verdict_present(release_approved)` and effect `EscrowAccount: held → released`. Given the instance map above:
+
+- `release_escrow` is **available** for instances `esc-001` and `esc-002` (both in state `held`), subject to verdict satisfaction.
+- `release_escrow` is **blocked** for instance `esc-003` (already in state `released` — source state mismatch).
+
+**Flow invocation with instance binding:**
+
+```
+execute_flow(
+  flow: escrow_release_flow,
+  persona: escrow_agent,
+  snapshot: <frozen>,
+  bindings: {
+    EscrowAccount: "esc-001",
+    DeliveryRecord: "del-001"
+  }
+)
+```
+
+This executes the release flow for escrow transaction esc-001 with delivery record del-001. Instance esc-002 is unaffected. The provenance records `instance_binding: {EscrowAccount: "esc-001", DeliveryRecord: "del-001"}`.
+
+---
+
 ## 22. Appendix C — Glossary
 
 | Term | Definition |
 |------|------------|
-| **ADP** | [Adversarial Design Protocol](https://github.com/riverline-labs/iap). Design space mapping method used when the solution space is unknown and must be explored before formalization. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
 | **Agent** | Any software component that reads a Tenor contract to understand a system's behavior. Agents discover contracts via the manifest (§19) and reason about the contract without reading implementation code. |
+| **Attestation** | A cryptographic claim binding content (a bundle, a provenance record) to a signer identity. Format is mechanism-specific and declared by `attestation_format`. The evaluator ignores attestations (§17.4). |
 | **BaseType** | One of twelve primitive types in Tenor's type system: Bool, Int, Decimal, Money, Text, Date, DateTime, Duration, Enum, List, Record, TaggedUnion (§4). |
 | **Bundle** | The top-level interchange document produced by the elaborator. Contains all constructs from a contract and its imports, serialized as canonical JSON (§14). |
-| **CFFP** | [Constraint-First Formalization Protocol](https://github.com/riverline-labs/iap). The design method used for all Tenor construct additions: invariant declaration, candidate formalisms, pressure testing via counterexamples, canonical form selection. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
 | **Cold-Start** | The sequence an agent follows from a bare URL to complete understanding of a system. Requires one fetch of the manifest at `/.well-known/tenor` (§19.4). |
 | **Conformance Suite** | The set of test fixtures (`conformance/`) that validate elaborator behavior. Positive tests verify correct output; negative tests verify correct error reporting. |
-| **Construct** | A top-level declaration in Tenor: Fact, Entity, Rule, Persona, Operation, Flow, or System (§3). |
+| **Construct** | A top-level declaration in Tenor: Fact, Entity, Rule, Persona, Operation, Flow, Source, or System (§3). |
 | **Contract** | A complete Tenor specification of a system's behavior, comprising one or more `.tenor` source files that elaborate into a single interchange bundle. |
 | **Dry-Run** | A read-only evaluation of an Operation that executes steps (1)-(3) of the execution sequence without applying effects. Responses carry `"simulation": true` (§19.6). |
 | **Effect** | An entity state transition produced by an Operation. Effects are atomic — all effects of an Operation are applied together or none are (§9). |
 | **Elaboration** | The six-pass transformation from `.tenor` source text to canonical JSON interchange: lex, parse, bundle, index, type-check, validate, serialize (§14). |
 | **Elaborator** | The tool that performs elaboration. The reference elaborator is `tenor-core`. |
-| **Entity** | A finite state machine representing a domain object. Declares states, an initial state, and permitted transitions (§6). |
+| **EnrichedFactProvenance** | An extended provenance record that traces a Fact value through its adapter back to the external system, including adapter identity and fetch timestamp. An executor capability, not an evaluator obligation (§5A.10). |
+| **Entity** | A finite state machine representing a domain object *type*. Declares states, an initial state, and permitted transitions. Multiple runtime *instances* of each entity type may exist, each with independent state (§6). |
+| **EntityStateMap** | The runtime mapping from (EntityId, InstanceId) pairs to current StateId values. Provided to the evaluator as input. Contains all active instances (§6.5). |
 | **Etag** | A SHA-256 hex digest of the canonical interchange bundle bytes. Used for change detection. Changes if and only if the bundle changes (§19.2). |
-| **Executor** | A runtime system that evaluates Tenor contracts against live data. Subject to executor obligations E1-E14 (§17, §19.7) and System obligations E-SYS-01 through E-SYS-04 (§17.3). |
+| **Executor** | A runtime system that evaluates Tenor contracts against live data. Subject to executor obligations E1-E20 (§17, §17.4, §19.7) and System obligations E-SYS-01 through E-SYS-04 (§17.3). |
 | **Fact** | A ground truth value sourced from an external system. Facts are inputs to the evaluation model — they are asserted, not derived (§5). |
 | **FactSet** | The complete set of Fact values assembled for a single evaluation. Each Fact has exactly one value (asserted or default). |
 | **Flow** | A directed acyclic graph of steps orchestrating Operations, with snapshot isolation and persona handoffs (§11). |
 | **Frozen Verdict Semantics** | The guarantee that a Flow's verdict set is computed once at initiation and never recomputed mid-Flow. All predicate evaluations within a Flow use the snapshot (§11). |
+| **INFRASTRUCTURE** | A migration classification for changes that do not affect evaluation semantics but require coordinated updates to runtime infrastructure, adapters, credentials, or deployment configuration (§18.2). |
+| **InstanceBindingMap** | A mapping from EntityId to InstanceId that specifies which entity instances a flow execution targets. Supplied by the executor at flow invocation time (§11). |
+| **InstanceId** | A non-empty UTF-8 string that uniquely identifies a runtime instance of an entity type. The pair (EntityId, InstanceId) is globally unique within a contract's runtime environment. Assigned by the executor, opaque to the contract (§6.5). |
 | **Interchange Format** | The canonical JSON representation of a Tenor contract, produced by the elaborator. Defined by `docs/interchange-schema.json` (§14). |
 | **Manifest** | A JSON document (TenorManifest) that wraps an interchange bundle with an etag and spec version. Served at `/.well-known/tenor` (§19.1). |
 | **NumericModel** | The specification of arithmetic behavior: fixed-point decimal arithmetic with the bounds specified in §13.6, `MidpointNearestEven` rounding, no floating-point anywhere in the evaluation path (§13). |
@@ -3079,16 +3658,20 @@ This is the frozen verdict semantic commitment in concrete form.
 | **Persona** | A declared identity token representing an actor class. Pure identity with no metadata. Operations declare which Personas may invoke them (§8). |
 | **Precondition** | A predicate expression on an Operation that must evaluate to true for the Operation to execute. Evaluated against the FactSet and frozen VerdictSet (§9). |
 | **PredicateExpression** | A quantifier-free first-order logic formula over ground terms. The expression language for preconditions, rule conditions, and branch conditions (§10). |
+| **ProtocolTag** | A core protocol identifier (`http`, `database`, `graphql`, `grpc`, `static`, `manual`) or a namespaced extension identifier (`x_*`) declared on a Source construct (§5A.2, §5A.3). |
 | **Provenance** | The complete derivation chain for a verdict or operation result. Every verdict records which Facts and Rules produced it. Provenance is part of the evaluation relation, not a runtime feature (§15). |
-| **RCP** | [Reconciliation Protocol](https://github.com/riverline-labs/iap). Verifies consistency across multiple protocol run outputs. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap)  suite. |
 | **ResolvedVerdictSet** | The set of all verdicts produced by evaluating all Rules against the current FactSet. Each verdict carries its payload and provenance. |
 | **Rule** | A verdict-producing declaration with a `when` predicate and a `produce` clause. Rules are stratified — higher strata can reference verdicts from lower strata but not the same or higher (§7). |
 | **Snapshot** | The frozen state captured at Flow initiation: the FactSet and ResolvedVerdictSet at that point in time. Immutable for the duration of the Flow (§11). |
-| **System** | A top-level composition construct declared in a dedicated `.tenor` file. Declares member contracts, shared persona bindings, cross-contract flow triggers, and cross-contract entity relationships (§12). |
+| **Source** | A named declaration of an external system from which Facts are populated at runtime. Carries connection metadata and protocol identity. Does not participate in evaluation. Consumed by adapters, tooling, and provenance enrichment (§5A). |
+| **SourcePath** | A syntactically validated path string on a structured source reference, identifying a logical location within the external system's data. Not semantically validated at elaboration time (§5A). |
+| **StructuredSource** | A Fact source declaration that references a declared Source construct by id and provides a path. Elaborator-validated for reference resolution and path syntax (§5A). |
 | **Stratum** | The stratification level of a Rule. Rules at stratum N can only reference verdicts produced at strata < N. Guarantees termination (§7). |
+| **System** | A top-level composition construct declared in a dedicated `.tenor` file. Declares member contracts, shared persona bindings, cross-contract flow triggers, and cross-contract entity relationships (§12). |
 | **TenorManifest** | The JSON document format for contract discovery: `{ bundle, etag, tenor }` with keys sorted lexicographically (§19.1). |
 | **Transition** | A permitted state change in an Entity, expressed as a (from, to) pair (§6). |
 | **TriggerProvenance** | A runtime provenance record linking a source flow's terminal outcome to a target flow initiation via a cross-contract trigger (§12.4). Captures source/target contract and flow ids, terminal outcome, persona, target flow instance id, and status (initiated or failed). |
+| **Trust Domain** | An organizational, environmental, or deployment boundary within which an executor operates. Declared per E20 and included in provenance records for cross-executor auditability (§17.4). |
 | **TypeDecl** | A named type declaration (Record or TaggedUnion) that can be used as a Fact type or nested within other types (§4). |
 | **TypeEnv** | The type environment built during Pass 3 of elaboration. Maps type names to their resolved definitions (§14). |
 | **Verdict** | A derived value produced by a Rule. Verdicts have a VerdictType (label) and a typed payload. They are the outputs of the evaluation model (§7). |
