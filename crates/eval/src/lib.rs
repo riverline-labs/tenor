@@ -11,6 +11,7 @@ pub mod action_space;
 pub mod assemble;
 pub mod fact_provider;
 pub mod flow;
+pub mod migration;
 pub mod numeric;
 pub mod operation;
 pub mod policy;

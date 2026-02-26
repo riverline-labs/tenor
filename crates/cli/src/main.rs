@@ -3,6 +3,7 @@ mod ambiguity;
 mod diff;
 mod explain;
 mod manifest;
+mod migrate;
 mod runner;
 mod serve;
 mod tap;
@@ -14,7 +15,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 /// Output format for CLI responses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum OutputFormat {
+pub(crate) enum OutputFormat {
     Text,
     Json,
 }
@@ -90,6 +91,17 @@ enum Commands {
         /// Classify changes as breaking/non-breaking using Section 17.2 taxonomy
         #[arg(long)]
         breaking: bool,
+    },
+
+    /// Analyze migration between two contract versions
+    Migrate {
+        /// Path to the v1 contract (.tenor or .json)
+        v1: PathBuf,
+        /// Path to the v2 contract (.tenor or .json)
+        v2: PathBuf,
+        /// Skip confirmation prompt
+        #[arg(long)]
+        yes: bool,
     },
 
     /// Run static analysis checks on a .tenor file
@@ -202,6 +214,9 @@ fn main() {
         }
         Commands::Diff { t1, t2, breaking } => {
             cmd_diff(&t1, &t2, breaking, cli.output, cli.quiet);
+        }
+        Commands::Migrate { v1, v2, yes } => {
+            migrate::cmd_migrate(&v1, &v2, yes, cli.output, cli.quiet);
         }
         Commands::Check { file, analysis } => {
             cmd_check(&file, analysis.as_deref(), cli.output, cli.quiet);
@@ -1204,7 +1219,7 @@ fn cmd_generate(command: GenerateCommands, output: OutputFormat, quiet: bool) {
     }
 }
 
-fn report_error(msg: &str, output: OutputFormat, quiet: bool) {
+pub(crate) fn report_error(msg: &str, output: OutputFormat, quiet: bool) {
     if quiet {
         return;
     }

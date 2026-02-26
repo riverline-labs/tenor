@@ -1,0 +1,581 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenor-lang.org/schema/tenor-interchange-v1.0.json",
+  "title": "Tenor Interchange Bundle v1.0",
+  "description": "JSON Schema for the Tenor Interchange format v1.0. Validates bundles produced by the Tenor elaborator.",
+  "type": "object",
+  "required": ["id", "kind", "tenor", "tenor_version", "constructs"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Bundle identifier"
+    },
+    "kind": {
+      "const": "Bundle"
+    },
+    "tenor": {
+      "type": "string",
+      "description": "Tenor language version"
+    },
+    "tenor_version": {
+      "type": "string",
+      "description": "Tenor toolchain version"
+    },
+    "constructs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Construct"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Construct": {
+      "oneOf": [
+        { "$ref": "#/$defs/Fact" },
+        { "$ref": "#/$defs/Entity" },
+        { "$ref": "#/$defs/Persona" },
+        { "$ref": "#/$defs/Rule" },
+        { "$ref": "#/$defs/Operation" },
+        { "$ref": "#/$defs/Flow" },
+        { "$ref": "#/$defs/System" },
+        { "$ref": "#/$defs/Source" }
+      ]
+    },
+
+    "Provenance": {
+      "type": "object",
+      "required": ["file", "line"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+
+    "TypeExpr": {
+      "type": "object",
+      "required": ["base"],
+      "properties": {
+        "base": { "type": "string" },
+        "precision": { "type": "integer" },
+        "scale": { "type": "integer" },
+        "currency": { "type": "string" },
+        "values": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/TypeExpr" }
+        },
+        "element_type": { "$ref": "#/$defs/TypeExpr" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "max_length": { "type": "integer" },
+        "unit": { "type": "string" },
+        "variants": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/TypeExpr" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "Expression": {
+      "oneOf": [
+        { "$ref": "#/$defs/ComparisonExpr" },
+        { "$ref": "#/$defs/LogicalExpr" },
+        { "$ref": "#/$defs/NotExpr" },
+        { "$ref": "#/$defs/FactRefExpr" },
+        { "$ref": "#/$defs/VerdictPresentExpr" },
+        { "$ref": "#/$defs/FieldRefExpr" },
+        { "$ref": "#/$defs/QuantifierExpr" },
+        { "$ref": "#/$defs/LiteralExpr" },
+        { "$ref": "#/$defs/MultiplyExpr" }
+      ]
+    },
+
+    "ComparisonExpr": {
+      "type": "object",
+      "required": ["left", "op", "right"],
+      "properties": {
+        "left": { "$ref": "#/$defs/Expression" },
+        "op": {
+          "type": "string",
+          "enum": ["=", "!=", "<", "<=", ">", ">="]
+        },
+        "right": { "$ref": "#/$defs/Expression" },
+        "comparison_type": { "$ref": "#/$defs/TypeExpr" }
+      },
+      "additionalProperties": false
+    },
+
+    "LogicalExpr": {
+      "type": "object",
+      "required": ["left", "op", "right"],
+      "properties": {
+        "left": { "$ref": "#/$defs/Expression" },
+        "op": {
+          "type": "string",
+          "enum": ["and", "or"]
+        },
+        "right": { "$ref": "#/$defs/Expression" }
+      },
+      "additionalProperties": false
+    },
+
+    "NotExpr": {
+      "type": "object",
+      "required": ["op", "operand"],
+      "properties": {
+        "op": { "const": "not" },
+        "operand": { "$ref": "#/$defs/Expression" }
+      },
+      "additionalProperties": false
+    },
+
+    "FactRefExpr": {
+      "type": "object",
+      "required": ["fact_ref"],
+      "properties": {
+        "fact_ref": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "VerdictPresentExpr": {
+      "type": "object",
+      "required": ["verdict_present"],
+      "properties": {
+        "verdict_present": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "FieldRefExpr": {
+      "type": "object",
+      "required": ["field_ref"],
+      "properties": {
+        "field_ref": {
+          "type": "object",
+          "required": ["field", "var"],
+          "properties": {
+            "field": { "type": "string" },
+            "var": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "QuantifierExpr": {
+      "type": "object",
+      "required": ["quantifier", "variable", "variable_type", "domain", "body"],
+      "properties": {
+        "quantifier": {
+          "type": "string",
+          "enum": ["forall", "exists"]
+        },
+        "variable": { "type": "string" },
+        "variable_type": { "$ref": "#/$defs/TypeExpr" },
+        "domain": { "$ref": "#/$defs/Expression" },
+        "body": { "$ref": "#/$defs/Expression" }
+      },
+      "additionalProperties": false
+    },
+
+    "LiteralExpr": {
+      "type": "object",
+      "required": ["literal", "type"],
+      "properties": {
+        "literal": {},
+        "type": { "$ref": "#/$defs/TypeExpr" }
+      },
+      "additionalProperties": false
+    },
+
+    "MultiplyExpr": {
+      "type": "object",
+      "required": ["left", "op", "literal", "result_type"],
+      "properties": {
+        "left": { "$ref": "#/$defs/Expression" },
+        "op": { "const": "*" },
+        "literal": { "type": "number" },
+        "result_type": { "$ref": "#/$defs/TypeExpr" }
+      },
+      "additionalProperties": false
+    },
+
+    "Effect": {
+      "type": "object",
+      "required": ["entity_id", "from", "to"],
+      "properties": {
+        "entity_id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "outcome": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "StepTarget": {
+      "oneOf": [
+        { "type": "string" },
+        { "$ref": "#/$defs/TerminalTarget" },
+        { "$ref": "#/$defs/TerminateTarget" },
+        { "$ref": "#/$defs/CompensateTarget" }
+      ]
+    },
+
+    "TerminalTarget": {
+      "type": "object",
+      "required": ["kind", "outcome"],
+      "properties": {
+        "kind": { "const": "Terminal" },
+        "outcome": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "TerminateTarget": {
+      "type": "object",
+      "required": ["kind", "outcome"],
+      "properties": {
+        "kind": { "const": "Terminate" },
+        "outcome": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "CompensateTarget": {
+      "type": "object",
+      "required": ["kind", "steps", "then"],
+      "properties": {
+        "kind": { "const": "Compensate" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CompensationStep" }
+        },
+        "then": { "$ref": "#/$defs/StepTarget" }
+      },
+      "additionalProperties": false
+    },
+
+    "CompensationStep": {
+      "type": "object",
+      "required": ["op", "persona", "on_failure"],
+      "properties": {
+        "op": { "type": "string" },
+        "persona": { "type": "string" },
+        "on_failure": { "$ref": "#/$defs/StepTarget" }
+      },
+      "additionalProperties": false
+    },
+
+    "FlowStep": {
+      "oneOf": [
+        { "$ref": "#/$defs/OperationStep" },
+        { "$ref": "#/$defs/BranchStep" },
+        { "$ref": "#/$defs/HandoffStep" }
+      ]
+    },
+
+    "OperationStep": {
+      "type": "object",
+      "required": ["id", "kind", "op", "persona", "outcomes", "on_failure"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "OperationStep" },
+        "op": { "type": "string" },
+        "persona": { "type": "string" },
+        "outcomes": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/StepTarget" }
+        },
+        "on_failure": { "$ref": "#/$defs/StepTarget" }
+      },
+      "additionalProperties": false
+    },
+
+    "BranchStep": {
+      "type": "object",
+      "required": ["id", "kind", "condition", "persona", "if_true", "if_false"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "BranchStep" },
+        "condition": { "$ref": "#/$defs/Expression" },
+        "persona": { "type": "string" },
+        "if_true": { "$ref": "#/$defs/StepTarget" },
+        "if_false": { "$ref": "#/$defs/StepTarget" }
+      },
+      "additionalProperties": false
+    },
+
+    "HandoffStep": {
+      "type": "object",
+      "required": ["id", "kind", "from_persona", "to_persona", "next"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "HandoffStep" },
+        "from_persona": { "type": "string" },
+        "to_persona": { "type": "string" },
+        "next": { "$ref": "#/$defs/StepTarget" }
+      },
+      "additionalProperties": false
+    },
+
+    "Trigger": {
+      "type": "object",
+      "required": ["source_contract", "source_flow", "target_contract", "target_flow", "persona", "on"],
+      "properties": {
+        "source_contract": { "type": "string" },
+        "source_flow": { "type": "string" },
+        "target_contract": { "type": "string" },
+        "target_flow": { "type": "string" },
+        "persona": { "type": "string" },
+        "on": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "SharedEntity": {
+      "type": "object",
+      "required": ["entity", "contracts"],
+      "properties": {
+        "entity": { "type": "string" },
+        "contracts": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "SharedPersona": {
+      "type": "object",
+      "required": ["persona", "contracts"],
+      "properties": {
+        "persona": { "type": "string" },
+        "contracts": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "SystemMember": {
+      "type": "object",
+      "required": ["id", "path"],
+      "properties": {
+        "id": { "type": "string" },
+        "path": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "RuleBody": {
+      "type": "object",
+      "required": ["when", "produce"],
+      "properties": {
+        "when": { "$ref": "#/$defs/Expression" },
+        "produce": { "$ref": "#/$defs/RuleProduce" }
+      },
+      "additionalProperties": false
+    },
+
+    "RuleProduce": {
+      "type": "object",
+      "required": ["verdict_type", "payload"],
+      "properties": {
+        "verdict_type": { "type": "string" },
+        "payload": { "$ref": "#/$defs/RulePayload" }
+      },
+      "additionalProperties": false
+    },
+
+    "RulePayload": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "$ref": "#/$defs/TypeExpr" },
+        "value": {}
+      },
+      "additionalProperties": false
+    },
+
+    "FactSource": {
+      "type": "object",
+      "required": ["field", "system"],
+      "properties": {
+        "field": { "type": "string" },
+        "system": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "Fact": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance", "source", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Fact" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "source": { "$ref": "#/$defs/FactSource" },
+        "type": { "$ref": "#/$defs/TypeExpr" },
+        "default": {
+          "description": "Default value for the fact. Can be any JSON value: a literal, a decimal_value object, a money_value object, a bool_literal object, etc."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "Entity": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance", "initial", "states", "transitions"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Entity" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "initial": { "type": "string" },
+        "states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "parent": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "Persona": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Persona" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" }
+      },
+      "additionalProperties": false
+    },
+
+    "Rule": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance", "stratum", "body"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Rule" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "stratum": { "type": "integer", "minimum": 0 },
+        "body": { "$ref": "#/$defs/RuleBody" }
+      },
+      "additionalProperties": false
+    },
+
+    "Operation": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance", "allowed_personas", "precondition", "effects", "error_contract"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Operation" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "allowed_personas": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "precondition": { "$ref": "#/$defs/Expression" },
+        "effects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Effect" }
+        },
+        "error_contract": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outcomes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "Flow": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance", "entry", "snapshot", "steps"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Flow" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "entry": { "type": "string" },
+        "snapshot": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FlowStep" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "System": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance", "members", "shared_entities", "shared_personas", "triggers"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "System" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SystemMember" }
+        },
+        "shared_entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedEntity" }
+        },
+        "shared_personas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedPersona" }
+        },
+        "triggers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Trigger" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "Source": {
+      "type": "object",
+      "required": ["id", "kind", "tenor", "provenance", "protocol"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "Source" },
+        "tenor": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "protocol": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
