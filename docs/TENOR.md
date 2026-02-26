@@ -2,22 +2,20 @@
 
 ## Tenor Language Specification v1.0
 
-**Status:** v1.0 — Spec frozen. All constructs canonicalized via [CFFP](https://github.com/riverline-labs/iap) (Constraint-First Formalization Protocol). AAP audit complete.
+**Status:** v1.0 — Spec frozen.
 **Method:** Human-AI collaborative design. See [`CONTRIBUTORS.md`](../CONTRIBUTORS.md).
 **Creator:** Brandon W. Bush
 
 > **Stability: Frozen (v1.0) with additive amendments**
 > This specification is frozen at v1.0. No breaking changes to existing construct
-> semantics will occur without a new CFFP run. Additive changes (new constructs,
-> new analysis results, new interchange metadata) are permitted and tracked as
-> named amendments.
+> semantics will occur. Additive changes (new constructs, new analysis results,
+> new interchange metadata) are permitted and tracked as named amendments.
 >
 > v1.0 includes the System construct — a composition layer for multi-contract
 > systems (shared persona identity, cross-contract flow triggers, cross-contract
-> entity relationships). System was designed via a dedicated CFFP run and
-> audited via AAP (Assumption Audit Protocol).
+> entity relationships).
 >
-> **Additive amendments (CFFP-designed, backward compatible):**
+> **Additive amendments (backward compatible):**
 > - **Source Declarations** — new `source` construct for structured external system declarations (§5A)
 > - **Multi-Instance Entities** — runtime instance model for entity types (§6.5, §9, §11, §15, §17)
 > - **Trust & Security** — trust obligations and optional attestation metadata (§17.4, §19.1)
@@ -2405,7 +2403,7 @@ When a contract version transition contains BREAKING changes (per §18.2, classi
 
 ### 18.5 Migration Contract Representation
 
-The migration output between two contract versions is expressed as a hybrid representation (selected via CFFP, Candidate C — see `docs/cffp/migration-semantics.json`):
+The migration output between two contract versions is expressed as a hybrid representation:
 
 **Primary output — DiffEntry JSON** (`tenor diff`): The authoritative diff output is structured JSON. Each change is a `DiffEntry` keyed by `(construct_kind, construct_id)` with field-level before/after values. The DiffEntry format is produced by `tenor diff` and is always complete, deterministic, and correct (MI1, MI2). The breaking change classification is a pure function applied to each DiffEntry field: `classify(kind, field, change_type)` returns the taxonomy classification from §18.2.
 
@@ -3627,7 +3625,7 @@ This executes the release flow for escrow transaction esc-001 with delivery reco
 | **Attestation** | A cryptographic claim binding content (a bundle, a provenance record) to a signer identity. Format is mechanism-specific and declared by `attestation_format`. The evaluator ignores attestations (§17.4). |
 | **BaseType** | One of twelve primitive types in Tenor's type system: Bool, Int, Decimal, Money, Text, Date, DateTime, Duration, Enum, List, Record, TaggedUnion (§4). |
 | **Bundle** | The top-level interchange document produced by the elaborator. Contains all constructs from a contract and its imports, serialized as canonical JSON (§14). |
-| **CFFP** | [Constraint-First Formalization Protocol](https://github.com/riverline-labs/iap). The design method used for all Tenor construct additions: invariant declaration, candidate formalisms, pressure testing via counterexamples, canonical form selection. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
+| **CFFP** | [Constraint-First Formalization Protocol](https://github.com/riverline-labs/iap). Dialectical selection method: candidate formalisms compete under declared constraints; one survivor emerges. Used for Tenor construct formalization. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
 | **Cold-Start** | The sequence an agent follows from a bare URL to complete understanding of a system. Requires one fetch of the manifest at `/.well-known/tenor` (§19.4). |
 | **Conformance Suite** | The set of test fixtures (`conformance/`) that validate elaborator behavior. Positive tests verify correct output; negative tests verify correct error reporting. |
 | **Construct** | A top-level declaration in Tenor: Fact, Entity, Rule, Persona, Operation, Flow, Source, or System (§3). |
