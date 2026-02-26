@@ -9,6 +9,7 @@
 
 pub mod action_space;
 pub mod assemble;
+pub mod fact_provider;
 pub mod flow;
 pub mod numeric;
 pub mod operation;
@@ -22,6 +23,7 @@ pub use action_space::{
     compute_action_space, Action, ActionSpace, BlockedAction, BlockedReason, EntitySummary,
     VerdictSummary,
 };
+pub use fact_provider::{FactProvider, FactProviderError, StaticFactProvider};
 pub use flow::{FlowEvalResult, FlowResult, Snapshot, StepRecord};
 pub use operation::{
     EffectRecord, EntityStateMap, OperationError, OperationProvenance, OperationResult,
