@@ -3620,12 +3620,10 @@ This executes the release flow for escrow transaction esc-001 with delivery reco
 
 | Term | Definition |
 |------|------------|
-| **ADP** | [Adversarial Design Protocol](https://github.com/riverline-labs/iap). Design space mapping method used when the solution space is unknown and must be explored before formalization. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
 | **Agent** | Any software component that reads a Tenor contract to understand a system's behavior. Agents discover contracts via the manifest (§19) and reason about the contract without reading implementation code. |
 | **Attestation** | A cryptographic claim binding content (a bundle, a provenance record) to a signer identity. Format is mechanism-specific and declared by `attestation_format`. The evaluator ignores attestations (§17.4). |
 | **BaseType** | One of twelve primitive types in Tenor's type system: Bool, Int, Decimal, Money, Text, Date, DateTime, Duration, Enum, List, Record, TaggedUnion (§4). |
 | **Bundle** | The top-level interchange document produced by the elaborator. Contains all constructs from a contract and its imports, serialized as canonical JSON (§14). |
-| **CFFP** | [Constraint-First Formalization Protocol](https://github.com/riverline-labs/iap). Dialectical selection method: candidate formalisms compete under declared constraints; one survivor emerges. Used for Tenor construct formalization. Part of the [Interpretive Adjudication Protocols](https://github.com/riverline-labs/iap) suite. |
 | **Cold-Start** | The sequence an agent follows from a bare URL to complete understanding of a system. Requires one fetch of the manifest at `/.well-known/tenor` (§19.4). |
 | **Conformance Suite** | The set of test fixtures (`conformance/`) that validate elaborator behavior. Positive tests verify correct output; negative tests verify correct error reporting. |
 | **Construct** | A top-level declaration in Tenor: Fact, Entity, Rule, Persona, Operation, Flow, Source, or System (§3). |
