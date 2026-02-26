@@ -61,7 +61,7 @@ pub fn check_flow_compatibility(
 
     // Layer 3: Structure (FMC1 + FMC2 minus verdicts) -- short-circuit if Layer 2 fails
     let layer3 = if layer2 {
-        let (l3_pass, l3_reasons) = check_layer3_structure(v1, v2, v1_flow, v2_flow, &reachable);
+        let (l3_pass, l3_reasons) = check_layer3_structure(v2, v1_flow, v2_flow, &reachable);
         reasons.extend(l3_reasons);
         l3_pass
     } else {
@@ -184,8 +184,7 @@ fn compute_reachable_steps(flow: &Flow, position: &str) -> Vec<String> {
                     stack.push(branch.entry.clone());
                     // Also traverse steps within branches
                     for branch_step in &branch.steps {
-                        let bid = step_id_of(branch_step);
-                        stack.push(bid);
+                        stack.push(step_id_of(branch_step).to_string());
                     }
                 }
             }
@@ -196,13 +195,13 @@ fn compute_reachable_steps(flow: &Flow, position: &str) -> Vec<String> {
 }
 
 /// Extract the step ID from a FlowStep.
-fn step_id_of(step: &FlowStep) -> String {
+fn step_id_of(step: &FlowStep) -> &str {
     match step {
-        FlowStep::OperationStep { id, .. } => id.clone(),
-        FlowStep::BranchStep { id, .. } => id.clone(),
-        FlowStep::HandoffStep { id, .. } => id.clone(),
-        FlowStep::SubFlowStep { id, .. } => id.clone(),
-        FlowStep::ParallelStep { id, .. } => id.clone(),
+        FlowStep::OperationStep { id, .. }
+        | FlowStep::BranchStep { id, .. }
+        | FlowStep::HandoffStep { id, .. }
+        | FlowStep::SubFlowStep { id, .. }
+        | FlowStep::ParallelStep { id, .. } => id,
     }
 }
 
@@ -287,7 +286,6 @@ fn check_layer2_entity_states(
 /// - Verify the step references the same operation ID in v2
 /// - Verify the step's persona is authorized under v2's operation
 fn check_layer3_structure(
-    _v1: &Contract,
     v2: &Contract,
     v1_flow: &Flow,
     v2_flow: Option<&Flow>,
