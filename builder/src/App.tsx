@@ -9,6 +9,8 @@ import { EntityEditor } from "./components/editors/EntityEditor";
 import { FactEditor } from "./components/editors/FactEditor";
 import { PersonaEditor } from "./components/editors/PersonaEditor";
 import { SourceEditor } from "./components/editors/SourceEditor";
+import { RuleEditor } from "./components/editors/RuleEditor";
+import { OperationEditor } from "./components/editors/OperationEditor";
 import { useElaborationStore } from "./store/elaboration";
 
 // Placeholder for editors not yet implemented
@@ -40,11 +42,8 @@ export default function App() {
           <Route path="sources" element={<SourceEditor />} />
           <Route path="facts" element={<FactEditor />} />
           <Route path="entities" element={<EntityEditor />} />
-          <Route path="rules" element={<PlaceholderPage title="Rules" />} />
-          <Route
-            path="operations"
-            element={<PlaceholderPage title="Operations" />}
-          />
+          <Route path="rules" element={<RuleEditor />} />
+          <Route path="operations" element={<OperationEditor />} />
           <Route path="flows" element={<PlaceholderPage title="Flows" />} />
           <Route
             path="systems"
