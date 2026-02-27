@@ -5,6 +5,7 @@ mod components;
 mod generate;
 mod hooks;
 mod templates;
+mod theme;
 mod types_gen;
 
 use std::path::Path;
