@@ -1,5 +1,6 @@
 mod agent;
 mod ambiguity;
+mod connect;
 mod diff;
 mod explain;
 mod manifest;
@@ -165,6 +166,21 @@ enum Commands {
         file: PathBuf,
     },
 
+    /// Introspect sources and generate adapter scaffolding
+    Connect {
+        /// Path to the .tenor source file or interchange JSON
+        contract: PathBuf,
+        /// Path to external schema document (OpenAPI, etc.)
+        #[arg(long)]
+        environment: Option<PathBuf>,
+        /// Output directory for generated adapter scaffolding
+        #[arg(long, default_value = "./tenor-connect-output")]
+        out: PathBuf,
+        /// Show proposed mappings without generating files
+        #[arg(long)]
+        dry_run: bool,
+    },
+
     /// Start the Language Server Protocol server over stdio
     Lsp,
 }
@@ -257,6 +273,21 @@ fn main() {
         }
         Commands::Agent { file } => {
             agent::run_agent(&file);
+        }
+        Commands::Connect {
+            contract,
+            environment,
+            out,
+            dry_run,
+        } => {
+            connect::cmd_connect(
+                &contract,
+                environment.as_deref(),
+                &out,
+                dry_run,
+                cli.output,
+                cli.quiet,
+            );
         }
         Commands::Lsp => {
             if let Err(e) = tenor_lsp::run() {
