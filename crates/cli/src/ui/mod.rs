@@ -1,8 +1,11 @@
 //! `tenor ui` — Generate a React application from a Tenor contract.
 
 mod api_client;
+mod components;
 mod generate;
+mod hooks;
 mod templates;
+mod types_gen;
 
 use std::path::Path;
 
