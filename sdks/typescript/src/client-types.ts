@@ -1,3 +1,17 @@
+/**
+ * HTTP API types for the TenorClient.
+ *
+ * Types that overlap with the WASM SDK types (Verdict, VerdictProvenance,
+ * InterchangeBundle) are re-exported from ./types. HTTP-specific types
+ * (HealthResponse, ContractSummary, EvalResult, FlowEvalResult, etc.)
+ * are defined here with their original shapes.
+ */
+
+import type { Verdict, VerdictProvenance, InterchangeBundle } from "./types";
+
+// Re-export shared types so HTTP-client consumers can import from one place
+export type { Verdict, VerdictProvenance, InterchangeBundle };
+
 /** Health check response from GET /health */
 export interface HealthResponse {
   status: string;
@@ -45,40 +59,19 @@ export interface OperationsResponse {
   operations: OperationInfo[];
 }
 
-/**
- * Verdict from evaluation.
- *
- * Field names match VerdictSet::to_json() output in crates/eval/src/types.rs:
- * - `type` (not "verdict_type") -- the JSON key is "type"
- * - `payload` (not "value") -- the JSON key is "payload"
- * - `provenance.rule` (not "rule_id") -- the JSON key is "rule"
- */
-export interface Verdict {
-  type: string;
-  payload: unknown;
-  provenance: VerdictProvenance;
-}
-
-export interface VerdictProvenance {
-  rule: string;
-  stratum: number;
-  facts_used: string[];
-  verdicts_used: string[];
-}
-
 /** Rule-only evaluation result from POST /evaluate (no flow_id) */
 export interface EvalResult {
   verdicts: Verdict[];
 }
 
-/** Step record from flow execution */
+/** Step record from flow execution (HTTP API shape) */
 export interface StepRecord {
   step_id: string;
   result: string;
 }
 
-/** Entity state change from flow execution */
-export interface EntityStateChange {
+/** Entity state change from flow execution (HTTP API shape) */
+export interface HttpEntityStateChange {
   entity_id: string;
   from: string;
   to: string;
@@ -89,15 +82,12 @@ export interface FlowEvalResult {
   flow_id: string;
   outcome: string;
   initiating_persona: string | null;
-  entity_state_changes: EntityStateChange[];
+  entity_state_changes: HttpEntityStateChange[];
   steps_executed: StepRecord[];
   verdicts: {
     verdicts: Verdict[];
   };
 }
-
-/** Elaborate response (interchange JSON bundle) from POST /elaborate */
-export type InterchangeBundle = Record<string, unknown>;
 
 /** Options for evaluate requests */
 export interface EvaluateOptions {

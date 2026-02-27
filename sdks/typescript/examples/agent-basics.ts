@@ -8,7 +8,7 @@
  *   npx tsx examples/agent-basics.ts
  *   # or: node --experimental-strip-types examples/agent-basics.ts
  */
-import { TenorClient } from '../src/index.ts';
+import { TenorClient } from '../src/index';
 
 async function main() {
   const client = new TenorClient({ baseUrl: 'http://localhost:8080' });

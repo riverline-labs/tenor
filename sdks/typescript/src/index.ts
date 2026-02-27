@@ -1,8 +1,13 @@
 /**
  * @tenor/sdk — TypeScript/JavaScript SDK for the Tenor contract evaluator.
  *
+ * Two entry points:
+ * - TenorEvaluator: WASM-based local contract evaluation (no server needed)
+ * - TenorClient: HTTP client for a running `tenor serve` instance
+ *
  * @example
  * ```typescript
+ * // WASM evaluator (local, no server)
  * import { TenorEvaluator, isFlowAvailable } from '@tenor/sdk';
  *
  * const evaluator = TenorEvaluator.fromJson(bundleJson);
@@ -20,8 +25,19 @@
  * } finally {
  *   evaluator.free();
  * }
+ *
+ * // HTTP client (requires running `tenor serve`)
+ * import { TenorClient } from '@tenor/sdk';
+ *
+ * const client = new TenorClient({ baseUrl: 'http://localhost:8080' });
+ * const contracts = await client.listContracts();
+ * const result = await client.invoke(contracts[0].id, { is_active: true });
  * ```
  */
+
+// ---------------------------------------------------------------------------
+// WASM evaluator
+// ---------------------------------------------------------------------------
 
 export { TenorEvaluator } from "./evaluator";
 
@@ -60,8 +76,8 @@ export type {
   InspectRule,
   // Bundle type
   InterchangeBundle,
-  // Error type
-  TenorError,
+  // WASM error type
+  WasmErrorResponse,
 } from "./types";
 
 export {
@@ -74,3 +90,35 @@ export {
   blockedFlowIds,
   hasVerdict,
 } from "./action-space";
+
+// ---------------------------------------------------------------------------
+// HTTP client
+// ---------------------------------------------------------------------------
+
+export { TenorClient } from "./client";
+export type { TenorClientOptions } from "./client";
+
+export {
+  TenorError,
+  ConnectionError,
+  ContractNotFoundError,
+  EvaluationError,
+  ElaborationError,
+} from "./errors";
+
+export type {
+  // HTTP API types
+  HealthResponse,
+  ContractSummary,
+  ContractsResponse,
+  OperationEffect,
+  OperationInfo,
+  OperationsResponse,
+  EvalResult,
+  StepRecord,
+  HttpEntityStateChange,
+  FlowEvalResult,
+  EvaluateOptions,
+  ExplainResult,
+  ErrorResponse,
+} from "./client-types";

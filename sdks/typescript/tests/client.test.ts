@@ -1,5 +1,4 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, expect } from 'vitest';
 import {
   TenorClient,
   ConnectionError,
@@ -7,8 +6,8 @@ import {
   EvaluationError,
   ElaborationError,
   TenorError,
-} from '../src/index.ts';
-import type { EvalResult } from '../src/index.ts';
+} from '../src/index';
+import type { EvalResult } from '../src/index';
 
 // ──────────────────────────────────────────────
 // Unit tests (no server needed)
@@ -19,74 +18,74 @@ describe('TenorClient', () => {
     it('uses default base URL', () => {
       const client = new TenorClient();
       // Access private via any to verify default
-      assert.equal((client as any).baseUrl, 'http://localhost:8080');
+      expect((client as any).baseUrl).toBe('http://localhost:8080');
     });
 
     it('accepts custom base URL', () => {
       const client = new TenorClient({ baseUrl: 'http://example.com:9090' });
-      assert.equal((client as any).baseUrl, 'http://example.com:9090');
+      expect((client as any).baseUrl).toBe('http://example.com:9090');
     });
 
     it('strips trailing slash from base URL', () => {
       const client = new TenorClient({ baseUrl: 'http://example.com:9090/' });
-      assert.equal((client as any).baseUrl, 'http://example.com:9090');
+      expect((client as any).baseUrl).toBe('http://example.com:9090');
     });
 
     it('uses default timeout of 30000ms', () => {
       const client = new TenorClient();
-      assert.equal((client as any).timeout, 30000);
+      expect((client as any).timeout).toBe(30000);
     });
 
     it('accepts custom timeout', () => {
       const client = new TenorClient({ timeout: 5000 });
-      assert.equal((client as any).timeout, 5000);
+      expect((client as any).timeout).toBe(5000);
     });
   });
 
   describe('error classes', () => {
     it('TenorError has correct name and message', () => {
       const err = new TenorError('test error');
-      assert.equal(err.name, 'TenorError');
-      assert.equal(err.message, 'test error');
-      assert.ok(err instanceof Error);
+      expect(err.name).toBe('TenorError');
+      expect(err.message).toBe('test error');
+      expect(err).toBeInstanceOf(Error);
     });
 
     it('ConnectionError includes URL', () => {
       const err = new ConnectionError('http://localhost:9090');
-      assert.equal(err.name, 'ConnectionError');
-      assert.equal(err.url, 'http://localhost:9090');
-      assert.match(err.message, /Failed to connect/);
-      assert.ok(err instanceof TenorError);
+      expect(err.name).toBe('ConnectionError');
+      expect(err.url).toBe('http://localhost:9090');
+      expect(err.message).toMatch(/Failed to connect/);
+      expect(err).toBeInstanceOf(TenorError);
     });
 
     it('ConnectionError includes cause', () => {
       const cause = new Error('ECONNREFUSED');
       const err = new ConnectionError('http://localhost:9090', cause);
-      assert.equal(err.cause, cause);
+      expect(err.cause).toBe(cause);
     });
 
     it('EvaluationError includes details', () => {
       const err = new EvaluationError('bad input', { field: 'facts' });
-      assert.equal(err.name, 'EvaluationError');
-      assert.equal(err.message, 'bad input');
-      assert.deepEqual(err.details, { field: 'facts' });
-      assert.ok(err instanceof TenorError);
+      expect(err.name).toBe('EvaluationError');
+      expect(err.message).toBe('bad input');
+      expect(err.details).toEqual({ field: 'facts' });
+      expect(err).toBeInstanceOf(TenorError);
     });
 
     it('ElaborationError includes details', () => {
       const err = new ElaborationError('parse error', { line: 5 });
-      assert.equal(err.name, 'ElaborationError');
-      assert.equal(err.message, 'parse error');
-      assert.deepEqual(err.details, { line: 5 });
-      assert.ok(err instanceof TenorError);
+      expect(err.name).toBe('ElaborationError');
+      expect(err.message).toBe('parse error');
+      expect(err.details).toEqual({ line: 5 });
+      expect(err).toBeInstanceOf(TenorError);
     });
 
     it('ContractNotFoundError includes contractId', () => {
       const err = new ContractNotFoundError('my_contract');
-      assert.equal(err.name, 'ContractNotFoundError');
-      assert.equal(err.contractId, 'my_contract');
-      assert.match(err.message, /my_contract/);
-      assert.ok(err instanceof TenorError);
+      expect(err.name).toBe('ContractNotFoundError');
+      expect(err.contractId).toBe('my_contract');
+      expect(err.message).toMatch(/my_contract/);
+      expect(err).toBeInstanceOf(TenorError);
     });
   });
 
@@ -96,14 +95,7 @@ describe('TenorClient', () => {
         baseUrl: 'http://127.0.0.1:19999',
         timeout: 1000,
       });
-      await assert.rejects(
-        () => client.health(),
-        (err: unknown) => {
-          assert.ok(err instanceof ConnectionError);
-          assert.match(err.url, /19999/);
-          return true;
-        },
-      );
+      await expect(client.health()).rejects.toThrow(ConnectionError);
     });
   });
 });
@@ -126,58 +118,50 @@ if (!serverUrl) {
 
     it('health() returns valid response', async () => {
       const health = await client.health();
-      assert.equal(health.status, 'ok');
-      assert.ok(typeof health.tenor_version === 'string');
-      assert.ok(health.tenor_version.length > 0);
+      expect(health.status).toBe('ok');
+      expect(typeof health.tenor_version).toBe('string');
+      expect(health.tenor_version.length).toBeGreaterThan(0);
     });
 
     it('listContracts() returns an array', async () => {
       const contracts = await client.listContracts();
-      assert.ok(Array.isArray(contracts));
-      // Server should have at least one pre-loaded contract
-      assert.ok(contracts.length > 0, 'expected at least one contract');
+      expect(Array.isArray(contracts)).toBe(true);
+      expect(contracts.length).toBeGreaterThan(0);
       const first = contracts[0];
-      assert.ok(typeof first.id === 'string');
-      assert.ok(typeof first.construct_count === 'number');
-      assert.ok(Array.isArray(first.facts));
-      assert.ok(Array.isArray(first.operations));
-      assert.ok(Array.isArray(first.flows));
+      expect(typeof first.id).toBe('string');
+      expect(typeof first.construct_count).toBe('number');
+      expect(Array.isArray(first.facts)).toBe(true);
+      expect(Array.isArray(first.operations)).toBe(true);
+      expect(Array.isArray(first.flows)).toBe(true);
     });
 
     it('getOperations() returns operations for a known contract', async () => {
       const contracts = await client.listContracts();
-      assert.ok(contracts.length > 0, 'need at least one contract');
+      expect(contracts.length).toBeGreaterThan(0);
       const contractId = contracts[0].id;
 
       const operations = await client.getOperations(contractId);
-      assert.ok(Array.isArray(operations));
-      // The contract should have operations
+      expect(Array.isArray(operations)).toBe(true);
       if (operations.length > 0) {
         const op = operations[0];
-        assert.ok(typeof op.id === 'string');
-        assert.ok(Array.isArray(op.allowed_personas));
-        assert.ok(Array.isArray(op.effects));
-        assert.ok(typeof op.preconditions_summary === 'string');
+        expect(typeof op.id).toBe('string');
+        expect(Array.isArray(op.allowed_personas)).toBe(true);
+        expect(Array.isArray(op.effects)).toBe(true);
+        expect(typeof op.preconditions_summary).toBe('string');
       }
     });
 
     it('getOperations() throws ContractNotFoundError for unknown contract', async () => {
-      await assert.rejects(
-        () => client.getOperations('nonexistent_contract_xyz'),
-        (err: unknown) => {
-          assert.ok(err instanceof ContractNotFoundError);
-          assert.equal(err.contractId, 'nonexistent_contract_xyz');
-          return true;
-        },
-      );
+      await expect(
+        client.getOperations('nonexistent_contract_xyz'),
+      ).rejects.toThrow(ContractNotFoundError);
     });
 
     it('invoke() evaluates rules against facts', async () => {
       const contracts = await client.listContracts();
-      assert.ok(contracts.length > 0, 'need at least one contract');
+      expect(contracts.length).toBeGreaterThan(0);
       const contractId = contracts[0].id;
 
-      // Provide all required facts for the saas_subscription contract
       const facts = {
         current_seat_count: 5,
         subscription_plan: 'professional',
@@ -192,42 +176,33 @@ if (!serverUrl) {
         cancellation_requested: false,
       };
       const result = await client.invoke(contractId, facts);
-      // Rule-only evaluation returns { verdicts: [...] }
-      assert.ok('verdicts' in result);
+      expect('verdicts' in result).toBe(true);
       const evalResult = result as EvalResult;
-      assert.ok(Array.isArray(evalResult.verdicts));
+      expect(Array.isArray(evalResult.verdicts)).toBe(true);
     });
 
     it('invoke() throws ContractNotFoundError for unknown bundle_id', async () => {
-      await assert.rejects(
-        () => client.invoke('nonexistent_contract_xyz', {}),
-        (err: unknown) => {
-          assert.ok(err instanceof ContractNotFoundError);
-          return true;
-        },
-      );
+      await expect(
+        client.invoke('nonexistent_contract_xyz', {}),
+      ).rejects.toThrow(ContractNotFoundError);
     });
 
     it('explain() returns summary and verbose for a known contract', async () => {
       const contracts = await client.listContracts();
-      assert.ok(contracts.length > 0, 'need at least one contract');
+      expect(contracts.length).toBeGreaterThan(0);
       const contractId = contracts[0].id;
 
       const explanation = await client.explain(contractId);
-      assert.ok(typeof explanation.summary === 'string');
-      assert.ok(typeof explanation.verbose === 'string');
-      assert.ok(explanation.summary.length > 0);
-      assert.ok(explanation.verbose.length > 0);
+      expect(typeof explanation.summary).toBe('string');
+      expect(typeof explanation.verbose).toBe('string');
+      expect(explanation.summary.length).toBeGreaterThan(0);
+      expect(explanation.verbose.length).toBeGreaterThan(0);
     });
 
     it('explain() throws ContractNotFoundError for unknown contract', async () => {
-      await assert.rejects(
-        () => client.explain('nonexistent_contract_xyz'),
-        (err: unknown) => {
-          assert.ok(err instanceof ContractNotFoundError);
-          return true;
-        },
-      );
+      await expect(
+        client.explain('nonexistent_contract_xyz'),
+      ).rejects.toThrow(ContractNotFoundError);
     });
 
     it('elaborate() processes valid .tenor source', async () => {
@@ -250,19 +225,15 @@ rule check_active {
 }
 `;
       const bundle = await client.elaborate(source, 'test.tenor');
-      assert.ok(typeof bundle === 'object');
-      assert.ok('id' in bundle || 'constructs' in bundle);
+      expect(typeof bundle).toBe('object');
+      expect('id' in bundle || 'constructs' in bundle).toBe(true);
     });
 
     it('elaborate() throws ElaborationError for invalid source', async () => {
       const badSource = 'this is not valid tenor syntax @@@ {{{';
-      await assert.rejects(
-        () => client.elaborate(badSource),
-        (err: unknown) => {
-          assert.ok(err instanceof ElaborationError);
-          return true;
-        },
-      );
+      await expect(
+        client.elaborate(badSource),
+      ).rejects.toThrow(ElaborationError);
     });
   });
 }

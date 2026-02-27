@@ -265,7 +265,7 @@ export interface InspectResult {
 // ---------------------------------------------------------------------------
 
 /** Error response from the WASM module. */
-export interface TenorError {
+export interface WasmErrorResponse {
   error: string;
 }
 

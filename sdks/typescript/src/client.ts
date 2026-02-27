@@ -9,7 +9,7 @@ import type {
   EvaluateOptions,
   ExplainResult,
   InterchangeBundle,
-} from './types.ts';
+} from './client-types';
 
 import {
   TenorError,
@@ -17,7 +17,7 @@ import {
   ContractNotFoundError,
   EvaluationError,
   ElaborationError,
-} from './errors.ts';
+} from './errors';
 
 /** Configuration options for the TenorClient. */
 export interface TenorClientOptions {
