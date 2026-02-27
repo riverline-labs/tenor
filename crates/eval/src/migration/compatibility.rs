@@ -113,7 +113,13 @@ pub fn check_flow_compatibility_static(
     // Build default entity states from v1's entity initial states
     let mut entity_states = EntityStateMap::new();
     for entity in &v1.entities {
-        entity_states.insert(entity.id.clone(), entity.initial.clone());
+        entity_states.insert(
+            (
+                entity.id.clone(),
+                crate::operation::DEFAULT_INSTANCE_ID.to_string(),
+            ),
+            entity.initial.clone(),
+        );
     }
 
     check_flow_compatibility(v1, v2, flow_id, &entry, &entity_states)
@@ -218,8 +224,10 @@ fn check_layer2_entity_states(
 ) -> (bool, Vec<IncompatibilityReason>) {
     let mut reasons = Vec::new();
 
-    // Check all entities that have current states in entity_states
-    for (entity_id, current_state) in entity_states {
+    // Check all entities that have current states in entity_states.
+    // The key is (entity_id, instance_id) — we check entity-level state validity,
+    // so we use entity_id from the composite key.
+    for ((entity_id, _instance_id), current_state) in entity_states {
         // Find the entity in v2
         let v2_entity = v2.entities.iter().find(|e| e.id == *entity_id);
 

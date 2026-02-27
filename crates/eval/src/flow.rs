@@ -573,9 +573,18 @@ pub fn execute_flow(
                     } = bo
                     {
                         entity_changes_all.extend(entity_changes.clone());
-                        // Apply branch's final entity states to parent
+                        // Apply branch's final entity states to parent.
+                        // EffectRecord.entity_id is a plain entity ID; use DEFAULT_INSTANCE_ID
+                        // for the composite key. Multi-instance support (Plan 04-02) will extend
+                        // EffectRecord to carry instance_id.
                         for change in entity_changes {
-                            entity_states.insert(change.entity_id.clone(), change.to_state.clone());
+                            entity_states.insert(
+                                (
+                                    change.entity_id.clone(),
+                                    crate::operation::DEFAULT_INSTANCE_ID.to_string(),
+                                ),
+                                change.to_state.clone(),
+                            );
                         }
                         // Also apply any entity states that were modified but not
                         // captured as EffectRecords (safety: merge all branch state)

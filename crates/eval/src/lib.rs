@@ -36,7 +36,8 @@ pub use adapter::{
 pub use fact_provider::{FactProvider, FactProviderError, StaticFactProvider};
 pub use flow::{FlowEvalResult, FlowResult, Snapshot, StepRecord};
 pub use operation::{
-    EffectRecord, EntityStateMap, OperationError, OperationProvenance, OperationResult,
+    get_instance_state, single_instance, EffectRecord, EntityStateMap, OperationError,
+    OperationProvenance, OperationResult, DEFAULT_INSTANCE_ID,
 };
 pub use policy::{AgentPolicy, AgentSnapshot, FirstAvailablePolicy, PriorityPolicy, RandomPolicy};
 pub use types::{Contract, EvalError, FactSet, Value, VerdictInstance, VerdictSet};

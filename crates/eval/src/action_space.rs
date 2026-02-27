@@ -139,9 +139,15 @@ pub fn compute_action_space(
         }
 
         // Check 3: Entity states
+        // Use DEFAULT_INSTANCE_ID for single-instance lookups.
+        // Multi-instance support (Plan 04-02) will extend this to check per-instance state.
         let mut entity_blocked = false;
         for effect in &operation.effects {
-            let current = entity_states.get(&effect.entity_id);
+            let key = (
+                effect.entity_id.clone(),
+                crate::operation::DEFAULT_INSTANCE_ID.to_string(),
+            );
+            let current = entity_states.get(&key);
             match current {
                 Some(state) if state != &effect.from => {
                     blocked_actions.push(BlockedAction {
@@ -191,8 +197,12 @@ pub fn compute_action_space(
             .effects
             .iter()
             .map(|effect| {
+                let key = (
+                    effect.entity_id.clone(),
+                    crate::operation::DEFAULT_INSTANCE_ID.to_string(),
+                );
                 let current_state = entity_states
-                    .get(&effect.entity_id)
+                    .get(&key)
                     .cloned()
                     .unwrap_or_else(|| "(unknown)".to_string());
                 let possible_transitions = contract

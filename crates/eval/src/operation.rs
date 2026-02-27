@@ -19,8 +19,32 @@ use crate::types::{EvalError, FactSet, Operation, VerdictSet};
 // Operation execution types
 // ──────────────────────────────────────────────
 
-/// Map of entity_id -> current state name.
-pub type EntityStateMap = BTreeMap<String, String>;
+/// Default instance ID for single-instance entities per §6.5 degenerate case.
+pub const DEFAULT_INSTANCE_ID: &str = "_default";
+
+/// Map of (entity_id, instance_id) -> current state name.
+///
+/// Per §6.5: every entity instance is identified by a composite key.
+/// Single-instance contracts use `_default` as the instance_id.
+pub type EntityStateMap = BTreeMap<(String, String), String>;
+
+/// Create a single-instance state map from entity_id -> state (backward compat).
+/// Each entity gets the `_default` instance ID per §6.5 degenerate case.
+pub fn single_instance(states: BTreeMap<String, String>) -> EntityStateMap {
+    states
+        .into_iter()
+        .map(|(entity_id, state)| ((entity_id, DEFAULT_INSTANCE_ID.to_string()), state))
+        .collect()
+}
+
+/// Get state for a specific (entity_id, instance_id) pair.
+pub fn get_instance_state<'a>(
+    states: &'a EntityStateMap,
+    entity_id: &str,
+    instance_id: &str,
+) -> Option<&'a String> {
+    states.get(&(entity_id.to_string(), instance_id.to_string()))
+}
 
 /// Record of a single entity state transition applied by an operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,11 +147,15 @@ impl From<EvalError> for OperationError {
 
 /// Initialize entity states from contract entity declarations.
 ///
-/// Each entity starts in its declared initial state.
+/// Each entity starts in its declared initial state with the `_default` instance ID.
+/// Multi-instance support (Plan 04-02) will extend this to accept instance IDs.
 pub fn init_entity_states(contract: &crate::types::Contract) -> EntityStateMap {
     let mut map = EntityStateMap::new();
     for entity in &contract.entities {
-        map.insert(entity.id.clone(), entity.initial.clone());
+        map.insert(
+            (entity.id.clone(), DEFAULT_INSTANCE_ID.to_string()),
+            entity.initial.clone(),
+        );
     }
     map
 }
@@ -171,8 +199,11 @@ pub fn execute_operation(
     let mut outcome_from_effects: Option<String> = None;
 
     for effect in &op.effects {
+        // Use DEFAULT_INSTANCE_ID for single-instance lookups.
+        // Multi-instance support (Plan 04-02) will thread instance_id through Operation effects.
+        let key = (effect.entity_id.clone(), DEFAULT_INSTANCE_ID.to_string());
         let current_state = entity_states
-            .get(&effect.entity_id)
+            .get(&key)
             .ok_or_else(|| OperationError::EntityNotFound {
                 entity_id: effect.entity_id.clone(),
             })?
@@ -187,7 +218,7 @@ pub fn execute_operation(
         }
 
         // Apply state transition
-        entity_states.insert(effect.entity_id.clone(), effect.to.clone());
+        entity_states.insert(key, effect.to.clone());
         effects_applied.push(EffectRecord {
             entity_id: effect.entity_id.clone(),
             from_state: effect.from.clone(),
