@@ -145,3 +145,20 @@ None beyond the auto-fixed TypeScript type mismatches above.
 ---
 *Phase: 09-builder*
 *Completed: 2026-02-27*
+
+## Self-Check: PASSED
+
+All created files verified present:
+- `builder/src/components/visualizations/StateMachine.tsx` — FOUND
+- `builder/src/components/editors/EntityEditor.tsx` — FOUND
+- `builder/src/components/editors/FactEditor.tsx` — FOUND
+- `builder/src/components/editors/PersonaEditor.tsx` — FOUND
+- `builder/src/components/editors/SourceEditor.tsx` — FOUND
+
+All task commits verified in git log:
+- `3367a8f` — FOUND
+- `1fab08d` — FOUND
+- `3690060` — FOUND
+- `d1acf32` — FOUND
+- `3eb5b00` — FOUND
+- `f9fa06c` — FOUND

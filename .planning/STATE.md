@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 9 of 11 — Builder SPA
-**Plan**: 6 of 7 completed in current phase
-**Status**: Phase 9 in progress
-**Last activity**: 2026-02-27 — Phase 9 Plan 6 complete (Import/Export dialogs, tenor builder CLI, contract pre-loading)
+**Phase**: 9 of 11 — Builder SPA — COMPLETE
+**Plan**: 7 of 7 completed in current phase
+**Status**: Phase 9 complete, ready for Phase 10
+**Last activity**: 2026-02-27 — Phase 9 Plan 7 complete (Builder test suite: 153 tests, production build verified)
 
-Progress: ██████████████████░░ 72% (Phases 1-8 complete, Phase 9 started)
+Progress: ████████████████████░░ 78% (Phases 1-9 complete)
 
 ## Decisions
 
@@ -123,6 +123,8 @@ Progress: ██████████████████░░ 72% (Phas
 - [Phase 09-06]: ContractPreLoader placed inside BrowserRouter to access useNavigate() — checks ?contract= then VITE_TENOR_CONTRACT_PATH
 - [Phase 09-06]: tenor builder Ctrl+C relies on OS SIGINT propagation to child process group; no ctrlc crate added
 - [Phase 09-06]: BuilderCommands::Build uses --out flag to avoid clap global arg conflict with --output OutputFormat
+- [Phase 09]: happy-dom used over jsdom: jsdom v27 requires Node >=20.19; happy-dom works on Node 20.17
+- [Phase 09]: [09-07] WASM evaluator mocked in setup.ts via vi.mock() — WASM cannot run in jsdom/happy-dom test environment
 
 ## Blockers/Concerns
 
@@ -145,6 +147,7 @@ Progress: ██████████████████░░ 72% (Phas
 | 05 | 05 | 847 | 7 | 7 |
 | 05 | 06 | ~10800 | 9 | 15 |
 | Phase 09 P03 | 408 | 6 tasks | 6 files |
+| Phase 09 P07 | 754 | 8 tasks | 12 files |
 
 ## Performance Metrics (continued)
 
@@ -167,8 +170,10 @@ Progress: ██████████████████░░ 72% (Phas
 | 09 | 05 | 437 | 7 | 8 |
 | 09 | 06 | 592 | 7 | 8 |
 
+| 09 | 07 | 754 | 8 | 12 |
+
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 09-06-PLAN.md (Import/Export dialogs, tenor builder CLI, contract pre-loading)
-Next action: Phase 9 Plan 7 (final plan)
+Stopped at: Completed 09-07-PLAN.md (Builder test suite: 153 tests, vitest, happy-dom, WASM mocks, production build verified)
+Next action: Phase 10
