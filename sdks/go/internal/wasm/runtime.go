@@ -2,9 +2,10 @@
 // It loads the embedded tenor_eval.wasm binary and exposes methods for
 // calling its exported C-ABI functions.
 //
-// The WASM binary is produced by crates/tenor-wasm-bridge (wasm32-unknown-unknown).
+// The WASM binary is produced by crates/tenor-wasm-bridge (wasm32-wasip1).
 // It uses an alloc/dealloc/get_result_ptr/get_result_len memory protocol for
 // passing strings without wasm-bindgen or JS glue code.
+// WASI imports are satisfied by wazero's built-in WASI snapshot_preview1 module.
 package wasm
 
 import (
@@ -15,6 +16,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
 // tenor_eval.wasm is the compiled WASM bridge binary.
@@ -38,10 +40,17 @@ type Runtime struct {
 func NewRuntime(ctx context.Context) (*Runtime, error) {
 	r := wazero.NewRuntime(ctx)
 
-	// Instantiate with an empty module name so it does not conflict with
-	// other instances in the same runtime if one is ever shared.
+	// The WASM bridge is compiled for wasm32-wasip1, so it imports WASI
+	// functions. Instantiate the WASI snapshot_preview1 host module first.
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
+
+	// Instantiate the Tenor evaluator module. WithStartFunctions("") prevents
+	// wazero from calling _start (the WASI entry point), since our module is
+	// a library, not a CLI program — it has no _start function.
 	mod, err := r.InstantiateWithConfig(ctx, wasmBinary,
-		wazero.NewModuleConfig().WithName("tenor-eval"))
+		wazero.NewModuleConfig().
+			WithName("tenor-eval").
+			WithStartFunctions()) // empty = don't call _start
 	if err != nil {
 		_ = r.Close(ctx)
 		return nil, fmt.Errorf("failed to instantiate Tenor WASM module: %w", err)

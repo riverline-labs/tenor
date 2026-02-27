@@ -4,7 +4,7 @@
 name = "tenor-wasm-bridge"
 version = "0.1.0"
 edition = "2021"
-description = "Tenor WASM bridge for the Go SDK — exports C-ABI functions callable via wazero"
+description = "Tenor WASM bridge for the Go SDK — exports C-ABI functions callable via wazero via WASI"
 
 [lib]
 crate-type = ["cdylib"]
@@ -13,10 +13,6 @@ crate-type = ["cdylib"]
 tenor-eval = { path = "../../../crates/eval", default-features = false }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 slab = "0.4"
-# getrandom with "js" feature is needed for wasm32-unknown-unknown targets
-# because rand (used by tenor-eval) depends on getrandom, which requires "js"
-# feature for browser/unknown WASM targets.
-getrandom = { version = "0.2", features = ["js"] }
 
 [profile.release]
 opt-level = "z"
