@@ -39,10 +39,12 @@ pub use operation::{
     get_instance_state, resolve_instance_id, single_instance, EffectRecord, EntityStateMap,
     InstanceBindingMap, OperationError, OperationProvenance, OperationResult, DEFAULT_INSTANCE_ID,
 };
+#[cfg(feature = "anthropic")]
+pub use policy::AnthropicClient;
 pub use policy::{
     AgentPolicy, AgentSnapshot, ApprovalChannel, ApprovalResult, CallbackApprovalChannel,
-    FirstAvailablePolicy, HumanInTheLoopPolicy, PriorityPolicy, RandomPolicy, StdinApprovalChannel,
-    TimeoutBehavior,
+    FirstAvailablePolicy, HumanInTheLoopPolicy, LlmClient, LlmError, LlmPolicy, Message,
+    PriorityPolicy, RandomPolicy, StdinApprovalChannel, TimeoutBehavior,
 };
 pub use types::{Contract, EvalError, FactSet, Value, VerdictInstance, VerdictSet};
 
