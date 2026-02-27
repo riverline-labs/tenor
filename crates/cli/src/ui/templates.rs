@@ -240,33 +240,6 @@ export function Layout() {{
     )
 }
 
-/// Generate a stub placeholder component.
-pub(super) fn stub_component(name: &str) -> String {
-    format!(
-        r#"export function {name}() {{
-  return <div>{name} - coming soon</div>;
-}}
-"#,
-        name = name,
-    )
-}
-
-/// Generate a stub hook placeholder.
-pub(super) fn stub_hook(name: &str, return_type: &str, default_value: &str) -> String {
-    format!(
-        r#"import {{ useState }} from 'react';
-
-export function {name}() {{
-  const [data] = useState<{return_type}>({default_value});
-  return data;
-}}
-"#,
-        name = name,
-        return_type = return_type,
-        default_value = default_value,
-    )
-}
-
 /// Convert a title string to kebab-case for use as a package name.
 fn to_kebab(s: &str) -> String {
     s.chars()
