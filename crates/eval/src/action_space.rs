@@ -1,7 +1,9 @@
 //! Action space extraction — computes the set of actions available to a persona.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::assemble;
-use crate::operation::EntityStateMap;
+use crate::operation::{EntityStateMap, DEFAULT_INSTANCE_ID};
 use crate::rules;
 use crate::types::{Contract, EvalError, FlowStep, Predicate, VerdictSet};
 use serde::{Deserialize, Serialize};
@@ -15,6 +17,10 @@ pub struct Action {
     pub enabling_verdicts: Vec<VerdictSummary>,
     pub affected_entities: Vec<EntitySummary>,
     pub description: String,
+    /// Per §15.6: entity_id → set of instance_ids that are in a valid source state
+    /// for this flow's entry operation effects. For single-instance contracts, this
+    /// will contain `_default` for each entity.
+    pub instance_bindings: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// Summary of a verdict for action space context.
@@ -48,6 +54,9 @@ pub struct ActionSpace {
 pub struct BlockedAction {
     pub flow_id: String,
     pub reason: BlockedReason,
+    /// Per §15.6: entity_id → set of instance_ids that are blocking this action.
+    /// Populated when the reason is EntityNotInSourceState. Empty otherwise.
+    pub instance_bindings: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// Why an action is blocked.
@@ -73,6 +82,10 @@ pub enum BlockedReason {
 /// Pure function. No IO. No side effects. No state mutation.
 ///
 /// Answers: "What can this persona do right now, and why?"
+///
+/// Per §15.6: the action space is instance-keyed. For each flow, we determine which
+/// specific instances are in valid source states for the flow's entry operation effects.
+/// The `instance_bindings` field on `Action` maps entity_id → set of valid instance_ids.
 pub fn compute_action_space(
     contract: &Contract,
     facts: &serde_json::Value,
@@ -116,6 +129,7 @@ pub fn compute_action_space(
             blocked_actions.push(BlockedAction {
                 flow_id: flow.id.clone(),
                 reason: BlockedReason::PersonaNotAuthorized,
+                instance_bindings: BTreeMap::new(),
             });
             continue;
         }
@@ -134,46 +148,97 @@ pub fn compute_action_space(
                 reason: BlockedReason::PreconditionNotMet {
                     missing_verdicts: missing,
                 },
+                instance_bindings: BTreeMap::new(),
             });
             continue;
         }
 
-        // Check 3: Entity states
-        // Use DEFAULT_INSTANCE_ID for single-instance lookups.
-        // Multi-instance support (Plan 04-02) will extend this to check per-instance state.
+        // Check 3: Entity states — per §15.6, check per-instance availability.
+        //
+        // For each entity referenced by the entry operation's effects, collect
+        // all instance_ids that are in the required source state. An action is
+        // available if every required entity has at least one instance in the
+        // correct source state. The instance_bindings map captures which instances
+        // are valid.
+        //
+        // For single-instance contracts (only `_default` per entity), this behaves
+        // identically to the pre-multi-instance check.
         let mut entity_blocked = false;
+        let mut blocking_instance_bindings: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut valid_instance_bindings: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+
         for effect in &operation.effects {
-            let key = (
-                effect.entity_id.clone(),
-                crate::operation::DEFAULT_INSTANCE_ID.to_string(),
-            );
-            let current = entity_states.get(&key);
-            match current {
-                Some(state) if state != &effect.from => {
+            let entity_id = &effect.entity_id;
+
+            // Collect all instances of this entity and their states
+            let mut valid_instances: BTreeSet<String> = BTreeSet::new();
+            let mut blocking_instances: BTreeSet<String> = BTreeSet::new();
+            let mut found_any = false;
+
+            for ((eid, iid), state) in entity_states {
+                if eid != entity_id {
+                    continue;
+                }
+                found_any = true;
+                if state == &effect.from {
+                    valid_instances.insert(iid.clone());
+                } else {
+                    blocking_instances.insert(iid.clone());
+                }
+            }
+
+            if !found_any {
+                // No instances found for this entity — treat as blocked
+                blocking_instance_bindings
+                    .entry(entity_id.clone())
+                    .or_default()
+                    .insert(DEFAULT_INSTANCE_ID.to_string());
+                blocked_actions.push(BlockedAction {
+                    flow_id: flow.id.clone(),
+                    reason: BlockedReason::EntityNotInSourceState {
+                        entity_id: entity_id.clone(),
+                        current_state: "(unknown)".to_string(),
+                        required_state: effect.from.clone(),
+                    },
+                    instance_bindings: blocking_instance_bindings.clone(),
+                });
+                entity_blocked = true;
+                break;
+            }
+
+            if valid_instances.is_empty() {
+                // All instances of this entity are in wrong states
+                if let Some(((_, iid), state)) =
+                    entity_states.iter().find(|((eid, _), _)| eid == entity_id)
+                {
+                    blocking_instance_bindings
+                        .entry(entity_id.clone())
+                        .or_default()
+                        .insert(iid.clone());
                     blocked_actions.push(BlockedAction {
                         flow_id: flow.id.clone(),
                         reason: BlockedReason::EntityNotInSourceState {
-                            entity_id: effect.entity_id.clone(),
+                            entity_id: entity_id.clone(),
                             current_state: state.clone(),
                             required_state: effect.from.clone(),
                         },
+                        instance_bindings: blocking_instance_bindings.clone(),
                     });
-                    entity_blocked = true;
-                    break;
                 }
-                None => {
-                    blocked_actions.push(BlockedAction {
-                        flow_id: flow.id.clone(),
-                        reason: BlockedReason::EntityNotInSourceState {
-                            entity_id: effect.entity_id.clone(),
-                            current_state: "(unknown)".to_string(),
-                            required_state: effect.from.clone(),
-                        },
-                    });
-                    entity_blocked = true;
-                    break;
-                }
-                _ => {}
+                entity_blocked = true;
+                break;
+            }
+
+            // Some or all instances are valid — record them
+            *valid_instance_bindings
+                .entry(entity_id.clone())
+                .or_default() = valid_instances;
+
+            // Also record blocking instances for information
+            if !blocking_instances.is_empty() {
+                *blocking_instance_bindings
+                    .entry(entity_id.clone())
+                    .or_default() = blocking_instances;
             }
         }
         if entity_blocked {
@@ -197,10 +262,15 @@ pub fn compute_action_space(
             .effects
             .iter()
             .map(|effect| {
-                let key = (
-                    effect.entity_id.clone(),
-                    crate::operation::DEFAULT_INSTANCE_ID.to_string(),
-                );
+                // For affected_entities summary, pick any valid instance's state.
+                // We use DEFAULT_INSTANCE_ID for single-instance backward compat,
+                // but for multi-instance we pick the first valid instance.
+                let valid_set = valid_instance_bindings.get(&effect.entity_id);
+                let lookup_instance = valid_set
+                    .and_then(|s| s.iter().next())
+                    .map(|s| s.as_str())
+                    .unwrap_or(DEFAULT_INSTANCE_ID);
+                let key = (effect.entity_id.clone(), lookup_instance.to_string());
                 let current_state = entity_states
                     .get(&key)
                     .cloned()
@@ -225,6 +295,7 @@ pub fn compute_action_space(
 
         let description = build_description(&flow.id, op_id, &operation.effects);
 
+        // If no effects, instance_bindings is empty (no entity constraints)
         actions.push(Action {
             flow_id: flow.id.clone(),
             persona_id: persona_id.to_string(),
@@ -232,6 +303,7 @@ pub fn compute_action_space(
             enabling_verdicts,
             affected_entities,
             description,
+            instance_bindings: valid_instance_bindings,
         });
     }
 
@@ -526,6 +598,12 @@ mod tests {
         assert_eq!(result.actions[0].flow_id, "approval_flow");
         assert_eq!(result.actions[0].entry_operation_id, "approve_order");
         assert_eq!(result.blocked_actions.len(), 0);
+
+        // Instance bindings: Order -> {_default}
+        let bindings = &result.actions[0].instance_bindings;
+        assert_eq!(bindings.len(), 1);
+        assert!(bindings.contains_key("Order"));
+        assert!(bindings["Order"].contains(DEFAULT_INSTANCE_ID));
     }
 
     #[test]
@@ -548,6 +626,8 @@ mod tests {
             &result.blocked_actions[0].reason,
             BlockedReason::PersonaNotAuthorized
         ));
+        // No instance bindings for persona-blocked actions
+        assert!(result.blocked_actions[0].instance_bindings.is_empty());
     }
 
     #[test]
@@ -690,5 +770,108 @@ mod tests {
         // is_active has no default, so assemble_facts should fail
         let result = compute_action_space(&contract, &facts, &entity_states, "admin");
         assert!(result.is_err());
+    }
+
+    // ── Per-instance action space tests ──
+
+    #[test]
+    fn multi_instance_action_shows_valid_instances() {
+        // Two Order instances: order-1 in pending (valid), order-2 in approved (blocked).
+        // Action should be available with instance_bindings["Order"] = {"order-1"}.
+        let bundle = test_bundle();
+        let contract = make_contract(&bundle);
+        let facts = serde_json::json!({ "is_active": true });
+
+        let mut entity_states = EntityStateMap::new();
+        entity_states.insert(
+            ("Order".to_string(), "order-1".to_string()),
+            "pending".to_string(),
+        );
+        entity_states.insert(
+            ("Order".to_string(), "order-2".to_string()),
+            "approved".to_string(),
+        );
+
+        let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
+
+        // Action should be available because order-1 is in "pending"
+        assert_eq!(result.actions.len(), 1, "action should be available");
+        let bindings = &result.actions[0].instance_bindings;
+        assert!(
+            bindings.contains_key("Order"),
+            "Order should be in instance_bindings"
+        );
+        assert!(
+            bindings["Order"].contains("order-1"),
+            "order-1 should be valid"
+        );
+        assert!(
+            !bindings["Order"].contains("order-2"),
+            "order-2 should not be valid"
+        );
+    }
+
+    #[test]
+    fn multi_instance_blocked_when_no_valid_instance() {
+        // Two Order instances: both in "approved" (not "pending"). Action should be blocked.
+        let bundle = test_bundle();
+        let contract = make_contract(&bundle);
+        let facts = serde_json::json!({ "is_active": true });
+
+        let mut entity_states = EntityStateMap::new();
+        entity_states.insert(
+            ("Order".to_string(), "order-1".to_string()),
+            "approved".to_string(),
+        );
+        entity_states.insert(
+            ("Order".to_string(), "order-2".to_string()),
+            "approved".to_string(),
+        );
+
+        let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
+
+        assert_eq!(
+            result.actions.len(),
+            0,
+            "no valid actions when all instances wrong state"
+        );
+        assert_eq!(result.blocked_actions.len(), 1);
+        match &result.blocked_actions[0].reason {
+            BlockedReason::EntityNotInSourceState {
+                entity_id,
+                required_state,
+                ..
+            } => {
+                assert_eq!(entity_id, "Order");
+                assert_eq!(required_state, "pending");
+            }
+            other => panic!("expected EntityNotInSourceState, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn multi_instance_all_instances_valid() {
+        // Two Order instances: both in "pending". Both should appear in instance_bindings.
+        let bundle = test_bundle();
+        let contract = make_contract(&bundle);
+        let facts = serde_json::json!({ "is_active": true });
+
+        let mut entity_states = EntityStateMap::new();
+        entity_states.insert(
+            ("Order".to_string(), "order-1".to_string()),
+            "pending".to_string(),
+        );
+        entity_states.insert(
+            ("Order".to_string(), "order-2".to_string()),
+            "pending".to_string(),
+        );
+
+        let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
+
+        assert_eq!(result.actions.len(), 1, "action available");
+        let bindings = &result.actions[0].instance_bindings;
+        assert_eq!(bindings["Order"].len(), 2, "both instances valid");
+        assert!(bindings["Order"].contains("order-1"));
+        assert!(bindings["Order"].contains("order-2"));
     }
 }

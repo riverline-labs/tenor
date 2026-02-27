@@ -137,6 +137,7 @@ mod tests {
             enabling_verdicts: vec![],
             affected_entities: vec![],
             description: format!("Execute {}", flow_id),
+            instance_bindings: std::collections::BTreeMap::new(),
         }
     }
 
