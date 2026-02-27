@@ -1,7 +1,7 @@
 /**
  * Application shell layout with sidebar navigation, toolbar, and error panel.
  */
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   useContractStore,
@@ -12,7 +12,8 @@ import {
 } from "@/store/contract";
 import { useElaborationStore } from "@/store/elaboration";
 import { ErrorPanel } from "./shared/ErrorPanel";
-import { generateDsl } from "@/utils/dsl-generator";
+import { ExportDialog } from "./shared/ExportDialog";
+import { ImportDialog } from "./shared/ImportDialog";
 import type { ValidationError } from "@/store/elaboration";
 
 interface NavItem {
@@ -65,55 +66,15 @@ function SidebarLink({ item }: { item: NavItem }) {
   );
 }
 
-function Toolbar() {
+interface ToolbarProps {
+  onOpenExport: () => void;
+  onOpenImport: () => void;
+}
+
+function Toolbar({ onOpenExport, onOpenImport }: ToolbarProps) {
   const bundle = useContractStore((s) => s.bundle);
-  const navigate = useNavigate();
   const undoable = canUndo();
   const redoable = canRedo();
-
-  function handleExportDsl() {
-    const dsl = generateDsl(bundle);
-    const blob = new Blob([dsl], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${bundle.id || "contract"}.tenor`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleExportJson() {
-    const json = JSON.stringify(bundle, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${bundle.id || "contract"}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleImportJson() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const bundle = JSON.parse(ev.target?.result as string);
-          useContractStore.getState().loadBundle(bundle);
-          navigate("/");
-        } catch {
-          alert("Invalid interchange JSON file.");
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  }
 
   return (
     <div className="flex h-12 items-center justify-between border-b border-gray-200 bg-white px-4">
@@ -151,24 +112,18 @@ function Toolbar() {
       {/* Right: Import/Export */}
       <div className="flex items-center gap-2">
         <button
-          onClick={handleImportJson}
+          onClick={onOpenImport}
           className="rounded border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+          title="Import contract (Ctrl+I)"
         >
-          Import JSON
+          Import
         </button>
-        <div className="relative">
-          <button
-            onClick={handleExportDsl}
-            className="rounded border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-600 hover:bg-blue-100"
-          >
-            Export .tenor
-          </button>
-        </div>
         <button
-          onClick={handleExportJson}
-          className="rounded border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+          onClick={onOpenExport}
+          className="rounded border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-600 hover:bg-blue-100"
+          title="Export contract (Ctrl+E)"
         >
-          Export JSON
+          Export
         </button>
       </div>
     </div>
@@ -176,6 +131,27 @@ function Toolbar() {
 }
 
 export function Layout() {
+  const navigate = useNavigate();
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Keyboard shortcuts: Ctrl+E for export, Ctrl+I for import
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        setExportOpen(true);
+      }
+      if (e.key === "i" || e.key === "I") {
+        e.preventDefault();
+        setImportOpen(true);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   function handleNavigateToError(error: ValidationError) {
     // Navigate to the relevant editor based on construct kind
     const kindToRoute: Record<string, string> = {
@@ -192,15 +168,22 @@ export function Layout() {
       ? kindToRoute[error.construct_kind]
       : null;
     if (route) {
-      // Navigate — router handles this
       window.location.href = route;
     }
+  }
+
+  function handleImported() {
+    // Navigate to overview after successful import
+    navigate("/");
   }
 
   return (
     <div className="flex h-screen flex-col">
       {/* Top toolbar */}
-      <Toolbar />
+      <Toolbar
+        onOpenExport={() => setExportOpen(true)}
+        onOpenImport={() => setImportOpen(true)}
+      />
 
       {/* Body: sidebar + main content */}
       <div className="flex flex-1 overflow-hidden">
@@ -222,6 +205,17 @@ export function Layout() {
           <ErrorPanel onNavigateToError={handleNavigateToError} />
         </div>
       </div>
+
+      {/* Modals */}
+      {exportOpen && (
+        <ExportDialog onClose={() => setExportOpen(false)} />
+      )}
+      {importOpen && (
+        <ImportDialog
+          onClose={() => setImportOpen(false)}
+          onImported={handleImported}
+        />
+      )}
     </div>
   );
 }
