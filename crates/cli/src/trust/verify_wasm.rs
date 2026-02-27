@@ -146,12 +146,14 @@ pub fn cmd_verify_wasm(wasm_path: &Path, sig_path: &Path, pubkey_path: &Path) {
 
 /// Result of an in-memory WASM verification.
 #[derive(Debug, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum VerifyWasmResult {
     Ok,
     Fail(String),
 }
 
 /// Verify a WASM binary against its attestation JSON in memory.
+#[allow(dead_code)]
 pub fn verify_wasm_bytes(
     wasm_bytes: &[u8],
     attestation: &serde_json::Value,
