@@ -27,7 +27,11 @@ fn hsl_to_hex(h: u16, s: f64, l: f64) -> String {
     let (r, g, b) = if s == 0.0 {
         (l, l, l)
     } else {
-        let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
+        let q = if l < 0.5 {
+            l * (1.0 + s)
+        } else {
+            l + s - l * s
+        };
         let p = 2.0 * l - q;
         (
             hue_to_rgb(p, q, hf + 1.0 / 3.0),
@@ -248,7 +252,10 @@ mod tests {
         assert!(output.contains("tablet:"), "must have tablet breakpoint");
         assert!(output.contains("desktop:"), "must have desktop breakpoint");
         // TypeScript export
-        assert!(output.contains("export type Theme"), "must export Theme type");
+        assert!(
+            output.contains("export type Theme"),
+            "must export Theme type"
+        );
     }
 
     #[test]
