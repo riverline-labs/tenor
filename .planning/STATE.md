@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 9 of 11 — Builder SPA
-**Plan**: 3 of 7 completed in current phase
+**Plan**: 4 of 7 completed in current phase
 **Status**: Phase 9 in progress
-**Last activity**: 2026-02-27 — Phase 9 Plan 3 complete (Rule editor + Operation editor + PredicateBuilder + StratumView + AuthorityMatrix)
+**Last activity**: 2026-02-27 — Phase 9 Plan 4 complete (FlowDag + FlowEditor + SystemEditor)
 
 Progress: ██████████████████░░ 72% (Phases 1-8 complete, Phase 9 started)
 
@@ -111,6 +111,10 @@ Progress: ██████████████████░░ 72% (Phas
 - [Phase 09]: StratumView compact mode auto-triggers when > 8 rules to avoid horizontal overflow
 - [Phase 09]: Rule conditions filter availableVerdicts to strata < current rule stratum; operation mode passes all verdicts
 - [Phase 09]: AuthorityMatrix toggles dispatch directly to updateConstruct on OperationConstruct (operation owns allowed_personas)
+- [Phase 09-04]: FlowDag uses SVG viewBox pan/zoom — no external graph library dependency
+- [Phase 09-04]: Step detail panel shown as right sidebar when step selected in DAG
+- [Phase 09-04]: FlowConstruct.steps is FlowStep[] (array) not Record<string,FlowStep> — PM plan had stale assumption
+- [Phase 09-04]: ParallelStep branches rendered as swim lanes within a single node (not recursive sub-DAG)
 
 ## Blockers/Concerns
 
@@ -151,9 +155,10 @@ Progress: ██████████████████░░ 72% (Phas
 | 09 | 01 | 746 | 10 | 21 |
 | 09 | 02 | 403 | 6 | 6 |
 | 09 | 03 | 408 | 6 | 6 |
+| 09 | 04 | 474 | 5 | 4 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 09-03-PLAN.md (Rule editor + Operation editor + PredicateBuilder + StratumView + AuthorityMatrix)
-Next action: Phase 9 Plan 4 — Flow editor
+Stopped at: Completed 09-04-PLAN.md (FlowDag + FlowEditor + SystemEditor)
+Next action: Phase 9 Plan 5 — Simulation panel
