@@ -513,8 +513,11 @@ mod tests {
         let bundle = test_bundle();
         let contract = make_contract(&bundle);
         let facts = serde_json::json!({ "is_active": true });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending".to_string());
+        let entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
 
@@ -530,8 +533,11 @@ mod tests {
         let bundle = test_bundle();
         let contract = make_contract(&bundle);
         let facts = serde_json::json!({ "is_active": true });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending".to_string());
+        let entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = compute_action_space(&contract, &facts, &entity_states, "guest").unwrap();
 
@@ -549,8 +555,11 @@ mod tests {
         let bundle = test_bundle();
         let contract = make_contract(&bundle);
         let facts = serde_json::json!({ "is_active": false });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending".to_string());
+        let entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
 
@@ -570,8 +579,11 @@ mod tests {
         let bundle = test_bundle();
         let contract = make_contract(&bundle);
         let facts = serde_json::json!({ "is_active": true });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "approved".to_string());
+        let entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "approved".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
 
@@ -611,8 +623,11 @@ mod tests {
         let bundle = test_bundle();
         let contract = make_contract(&bundle);
         let facts = serde_json::json!({ "is_active": true });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending".to_string());
+        let entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
 
@@ -628,8 +643,11 @@ mod tests {
         let bundle = test_bundle();
         let contract = make_contract(&bundle);
         let facts = serde_json::json!({ "is_active": true });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending".to_string());
+        let entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
 
@@ -650,8 +668,11 @@ mod tests {
         let bundle = test_bundle();
         let contract = make_contract(&bundle);
         let facts = serde_json::json!({ "is_active": true });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending".to_string());
+        let entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = compute_action_space(&contract, &facts, &entity_states, "admin").unwrap();
 

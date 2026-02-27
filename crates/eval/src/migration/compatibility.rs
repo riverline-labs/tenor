@@ -377,6 +377,15 @@ mod tests {
     // Test helpers
     // ────────────────────────────────────────────
 
+    /// Helper: create a single-instance EntityStateMap with one entity.
+    fn si(entity_id: &str, state: &str) -> EntityStateMap {
+        crate::operation::single_instance(
+            [(entity_id.to_string(), state.to_string())]
+                .into_iter()
+                .collect(),
+        )
+    }
+
     fn make_type_spec() -> TypeSpec {
         TypeSpec {
             base: "Bool".to_string(),
@@ -534,8 +543,7 @@ mod tests {
         let v1 = make_contract(vec![entity.clone()], vec![op.clone()], vec![flow.clone()]);
         let v2 = make_contract(vec![entity], vec![op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
@@ -585,8 +593,7 @@ mod tests {
         let v1 = make_contract(vec![v1_entity], vec![op.clone()], vec![flow.clone()]);
         let v2 = make_contract(vec![v2_entity], vec![op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
@@ -634,8 +641,7 @@ mod tests {
         let v1 = make_contract(vec![v1_entity], vec![op.clone()], vec![flow.clone()]);
         let v2 = make_contract(vec![v2_entity], vec![op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending_review".to_string());
+        let entity_states = si("Order", "pending_review");
 
         let result = check_flow_compatibility(&v1, &v2, "review_flow", "step1", &entity_states);
 
@@ -710,8 +716,7 @@ mod tests {
         let v1 = make_contract(vec![entity.clone()], vec![op.clone()], vec![v1_flow]);
         let v2 = make_contract(vec![entity], vec![op], vec![v2_flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
@@ -779,8 +784,7 @@ mod tests {
         let v1 = make_contract(vec![entity.clone()], vec![v1_op], vec![v1_flow]);
         let v2 = make_contract(vec![entity], vec![v2_op], vec![v2_flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
@@ -834,8 +838,7 @@ mod tests {
         let v1 = make_contract(vec![entity.clone()], vec![v1_op], vec![flow.clone()]);
         let v2 = make_contract(vec![entity], vec![v2_op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
@@ -892,8 +895,7 @@ mod tests {
         let v1 = make_contract(vec![v1_entity], vec![op.clone()], vec![flow.clone()]);
         let v2 = make_contract(vec![v2_entity], vec![op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "pending_review".to_string());
+        let entity_states = si("Order", "pending_review");
 
         let result = check_flow_compatibility(&v1, &v2, "review_flow", "step1", &entity_states);
 
@@ -940,8 +942,7 @@ mod tests {
         let v1 = make_contract(vec![entity.clone()], vec![op.clone()], vec![flow.clone()]);
         let v2 = make_contract(vec![entity], vec![op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
@@ -1060,14 +1061,12 @@ mod tests {
         );
 
         // At step1: step2 is reachable, step2 uses "approve" but v2 uses "approve_v2" -> incompatible
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
         let result_at_step1 =
             check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
         // At step3: step2 is NOT reachable (already past it) -> compatible
-        let mut entity_states_at_step3 = EntityStateMap::new();
-        entity_states_at_step3.insert("Order".to_string(), "approved".to_string());
+        let entity_states_at_step3 = si("Order", "approved");
         let result_at_step3 =
             check_flow_compatibility(&v1, &v2, "order_flow", "step3", &entity_states_at_step3);
 
@@ -1125,8 +1124,7 @@ mod tests {
         let v1 = make_contract(vec![v1_entity], vec![op.clone()], vec![flow.clone()]);
         let v2 = make_contract(vec![v2_entity], vec![op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 
@@ -1233,8 +1231,7 @@ mod tests {
         );
         let v2 = make_contract(vec![entity], vec![submit_op, approve_op], vec![flow]);
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "draft".to_string());
+        let entity_states = si("Order", "draft");
 
         let result = check_flow_compatibility(&v1, &v2, "order_flow", "step1", &entity_states);
 

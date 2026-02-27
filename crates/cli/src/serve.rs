@@ -804,13 +804,20 @@ fn simulate_flow_inner(
         verdicts: verdict_set.clone(),
     };
 
-    // Build entity states: start from contract defaults, override with request
+    // Build entity states: start from contract defaults, override with request.
+    // Overrides use DEFAULT_INSTANCE_ID since the API takes plain entity_id -> state.
     let mut entity_states = tenor_eval::operation::init_entity_states(&contract);
     if let Some(es_input) = entity_states_input {
         if let Some(obj) = es_input.as_object() {
             for (entity_id, state_info) in obj {
                 if let Some(state) = state_info.get("state").and_then(|v| v.as_str()) {
-                    entity_states.insert(entity_id.clone(), state.to_string());
+                    entity_states.insert(
+                        (
+                            entity_id.clone(),
+                            tenor_eval::DEFAULT_INSTANCE_ID.to_string(),
+                        ),
+                        state.to_string(),
+                    );
                 }
             }
         }
@@ -1028,10 +1035,12 @@ async fn handle_actions(
             Err(e) => return Err(format!("invalid contract: {}", e)),
         };
 
+        // Convert flat entity_id -> state map to composite (entity_id, instance_id) key format.
+        let entity_states = tenor_eval::single_instance(entity_states_input);
         tenor_eval::action_space::compute_action_space(
             &contract,
             &facts,
-            &entity_states_input,
+            &entity_states,
             &persona_id,
         )
         .map_err(|e| format!("{}", e))

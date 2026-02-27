@@ -122,8 +122,12 @@ pub fn simulate_flow(
         };
 
         let mut entity_states = tenor_eval::operation::init_entity_states(&stored.contract);
+        // entity_overrides is a flat entity_id -> state map; convert to composite key.
         for (key, state) in &entity_overrides {
-            entity_states.insert(key.clone(), state.clone());
+            entity_states.insert(
+                (key.clone(), tenor_eval::DEFAULT_INSTANCE_ID.to_string()),
+                state.clone(),
+            );
         }
 
         let target_flow = match stored.contract.get_flow(flow_id) {
@@ -208,10 +212,12 @@ pub fn compute_action_space(
         };
 
     with_contract(handle, |stored| {
+        // Convert flat entity_id -> state map to composite (entity_id, instance_id) key format.
+        let entity_states = tenor_eval::single_instance(entity_overrides.clone());
         let result = tenor_eval::action_space::compute_action_space(
             &stored.contract,
             &facts,
-            &entity_overrides,
+            &entity_states,
             persona_id,
         );
 

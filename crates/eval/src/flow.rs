@@ -795,8 +795,11 @@ mod tests {
             verdicts: VerdictSet::new(),
         };
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "pending".to_string());
+        let mut entity_states = crate::operation::single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "order_approved");
@@ -804,7 +807,15 @@ mod tests {
         assert_eq!(result.steps_executed[0].step_type, "operation");
         assert_eq!(result.steps_executed[0].result, "approved");
         assert_eq!(result.entity_state_changes.len(), 1);
-        assert_eq!(entity_states.get("order").unwrap(), "approved");
+        assert_eq!(
+            crate::operation::get_instance_state(
+                &entity_states,
+                "order",
+                crate::operation::DEFAULT_INSTANCE_ID
+            )
+            .unwrap(),
+            "approved"
+        );
     }
 
     // ──────────────────────────────────────
@@ -997,8 +1008,11 @@ mod tests {
             verdicts,
         };
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "pending".to_string());
+        let mut entity_states = crate::operation::single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
 
@@ -1012,7 +1026,15 @@ mod tests {
         );
 
         // Verify the entity state DID change (operation was executed)
-        assert_eq!(entity_states.get("order").unwrap(), "rejected");
+        assert_eq!(
+            crate::operation::get_instance_state(
+                &entity_states,
+                "order",
+                crate::operation::DEFAULT_INSTANCE_ID
+            )
+            .unwrap(),
+            "rejected"
+        );
 
         // Verify both steps executed
         assert_eq!(result.steps_executed.len(), 2);
@@ -1130,8 +1152,11 @@ mod tests {
             verdicts,
         };
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "approved".to_string());
+        let mut entity_states = crate::operation::single_instance(
+            [("order".to_string(), "approved".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result =
             execute_flow(&parent_flow, &contract, &snapshot, &mut entity_states, None).unwrap();
@@ -1212,8 +1237,11 @@ mod tests {
         };
 
         // Entity is in "draft", not "pending" -- operation will fail
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "draft".to_string());
+        let mut entity_states = crate::operation::single_instance(
+            [("order".to_string(), "draft".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "failure_handled");
@@ -1306,13 +1334,24 @@ mod tests {
             verdicts,
         };
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "draft".to_string());
+        let mut entity_states = crate::operation::single_instance(
+            [("order".to_string(), "draft".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
         assert_eq!(result.outcome, "submitted_valid");
         assert_eq!(result.steps_executed.len(), 2);
-        assert_eq!(entity_states.get("order").unwrap(), "submitted");
+        assert_eq!(
+            crate::operation::get_instance_state(
+                &entity_states,
+                "order",
+                crate::operation::DEFAULT_INSTANCE_ID
+            )
+            .unwrap(),
+            "submitted"
+        );
     }
 
     // ──────────────────────────────────────
@@ -1566,8 +1605,11 @@ mod tests {
             verdicts: VerdictSet::new(),
         };
 
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("Order".to_string(), "initial".to_string());
+        let mut entity_states = crate::operation::single_instance(
+            [("Order".to_string(), "initial".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None);
 
@@ -1595,7 +1637,12 @@ mod tests {
         //
         // branch_a sets Order -> state_a
         // branch_b sets Order -> state_b (overwrites state_a)
-        let final_state = entity_states.get("Order").unwrap();
+        let final_state = crate::operation::get_instance_state(
+            &entity_states,
+            "Order",
+            crate::operation::DEFAULT_INSTANCE_ID,
+        )
+        .unwrap();
         assert_eq!(
             final_state, "state_b",
             "Last-writer-wins: branch_b (declared second) overwrites branch_a's state. \

@@ -347,8 +347,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "draft".to_string());
+        let mut entity_states = single_instance(
+            [("order".to_string(), "draft".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_operation(&op, "buyer", &facts, &verdicts, &mut entity_states);
         assert!(result.is_ok());
@@ -396,8 +399,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "submitted".to_string());
+        let entity_states = single_instance(
+            [("order".to_string(), "submitted".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         // Both buyer and admin should succeed
         let mut states_clone = entity_states.clone();
@@ -436,12 +442,18 @@ mod tests {
         );
 
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("account".to_string(), "pending".to_string());
+        let mut entity_states = single_instance(
+            [("account".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
         assert!(result.is_ok());
-        assert_eq!(entity_states.get("account").unwrap(), "active");
+        assert_eq!(
+            get_instance_state(&entity_states, "account", DEFAULT_INSTANCE_ID).unwrap(),
+            "active"
+        );
     }
 
     #[test]
@@ -498,8 +510,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "pending".to_string());
+        let mut entity_states = single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
         assert!(result.is_ok());
@@ -512,7 +527,10 @@ mod tests {
                 to_state: "approved".to_string(),
             }
         );
-        assert_eq!(entity_states.get("order").unwrap(), "approved");
+        assert_eq!(
+            get_instance_state(&entity_states, "order", DEFAULT_INSTANCE_ID).unwrap(),
+            "approved"
+        );
     }
 
     #[test]
@@ -531,8 +549,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "draft".to_string()); // Wrong state
+        let mut entity_states = single_instance(
+            [("order".to_string(), "draft".to_string())]
+                .into_iter()
+                .collect(),
+        ); // Wrong state
 
         let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
         assert!(result.is_err());
@@ -602,16 +623,27 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "approved".to_string());
-        entity_states.insert("payment".to_string(), "authorized".to_string());
+        let mut entity_states = single_instance(
+            [
+                ("order".to_string(), "approved".to_string()),
+                ("payment".to_string(), "authorized".to_string()),
+            ]
+            .into_iter()
+            .collect(),
+        );
 
         let result = execute_operation(&op, "system", &facts, &verdicts, &mut entity_states);
         assert!(result.is_ok());
         let res = result.unwrap();
         assert_eq!(res.effects_applied.len(), 2);
-        assert_eq!(entity_states.get("order").unwrap(), "fulfilled");
-        assert_eq!(entity_states.get("payment").unwrap(), "captured");
+        assert_eq!(
+            get_instance_state(&entity_states, "order", DEFAULT_INSTANCE_ID).unwrap(),
+            "fulfilled"
+        );
+        assert_eq!(
+            get_instance_state(&entity_states, "payment", DEFAULT_INSTANCE_ID).unwrap(),
+            "captured"
+        );
     }
 
     // ──────────────────────────────────────
@@ -639,8 +671,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("payment".to_string(), "pending".to_string());
+        let mut entity_states = single_instance(
+            [("payment".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_operation(&op, "system", &facts, &verdicts, &mut entity_states);
         assert!(result.is_ok());
@@ -668,8 +703,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "pending".to_string());
+        let mut entity_states = single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result =
             execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states).unwrap();
@@ -715,8 +753,14 @@ mod tests {
         );
 
         let states = init_entity_states(&contract);
-        assert_eq!(states.get("order").unwrap(), "draft");
-        assert_eq!(states.get("payment").unwrap(), "pending");
+        assert_eq!(
+            get_instance_state(&states, "order", DEFAULT_INSTANCE_ID).unwrap(),
+            "draft"
+        );
+        assert_eq!(
+            get_instance_state(&states, "payment", DEFAULT_INSTANCE_ID).unwrap(),
+            "pending"
+        );
     }
 
     // ──────────────────────────────────────
@@ -751,16 +795,22 @@ mod tests {
                 verdicts_used: vec![],
             },
         });
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "pending".to_string());
+        let mut entity_states = single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
         assert!(result.is_ok());
 
         // Without verdict -- should fail precondition
         let empty_verdicts = VerdictSet::new();
-        let mut entity_states2 = EntityStateMap::new();
-        entity_states2.insert("order".to_string(), "pending".to_string());
+        let mut entity_states2 = single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
         let result2 = execute_operation(&op, "admin", &facts, &empty_verdicts, &mut entity_states2);
         assert!(result2.is_err());
         match result2.unwrap_err() {
@@ -791,8 +841,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("payment".to_string(), "pending".to_string());
+        let mut entity_states = single_instance(
+            [("payment".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_operation(&op, "system", &facts, &verdicts, &mut entity_states);
         assert!(result.is_err());
@@ -830,8 +883,11 @@ mod tests {
 
         let facts = FactSet::new();
         let verdicts = VerdictSet::new();
-        let mut entity_states = EntityStateMap::new();
-        entity_states.insert("order".to_string(), "draft".to_string());
+        let mut entity_states = single_instance(
+            [("order".to_string(), "draft".to_string())]
+                .into_iter()
+                .collect(),
+        );
 
         let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
         assert!(result.is_ok());
