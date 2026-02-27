@@ -1030,4 +1030,132 @@ mod tests {
         let full_json = serde_json::to_value(&full).unwrap();
         assert!(full_json.get("attestation").is_some());
     }
+
+    // ── Backward compatibility tests ─────────────────────────────────
+
+    /// Critical backward compat test: all conformance positive fixtures must
+    /// deserialize without error and with trust: None.
+    #[test]
+    fn test_existing_bundles_work_without_trust() {
+        // Walk conformance/positive/ relative to the workspace root
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        // crates/interchange -> workspace root
+        let workspace = manifest_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("workspace root");
+        let positive_dir = workspace.join("conformance").join("positive");
+
+        let entries =
+            std::fs::read_dir(&positive_dir).expect("conformance/positive/ not found");
+
+        let mut checked = 0usize;
+        for entry in entries {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            // Only load expected.json files (the output of elaboration)
+            if !path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .ends_with(".expected.json")
+            {
+                continue;
+            }
+
+            let json_str = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("failed to read {}: {}", path.display(), e));
+            let json_val: serde_json::Value = serde_json::from_str(&json_str)
+                .unwrap_or_else(|e| panic!("invalid JSON in {}: {}", path.display(), e));
+
+            let result = from_interchange(&json_val)
+                .unwrap_or_else(|e| panic!("deserialization failed for {}: {}", path.display(), e));
+
+            assert!(
+                result.trust.is_none(),
+                "conformance fixture {} should have trust: None, got: {:?}",
+                path.display(),
+                result.trust
+            );
+            checked += 1;
+        }
+
+        assert!(checked > 0, "no conformance fixtures found in {:?}", positive_dir);
+    }
+
+    #[test]
+    fn test_provenance_trust_fields_with_data() {
+        let fields = ProvenanceTrustFields {
+            trust_domain: Some("myorg.prod".to_string()),
+            attestation: Some("sig-value-here".to_string()),
+        };
+        let json = serde_json::to_value(&fields).unwrap();
+        assert_eq!(json["trust_domain"], "myorg.prod");
+        assert_eq!(json["attestation"], "sig-value-here");
+
+        // Roundtrip
+        let back: ProvenanceTrustFields = serde_json::from_value(json).unwrap();
+        assert_eq!(back.trust_domain, Some("myorg.prod".to_string()));
+        assert_eq!(back.attestation, Some("sig-value-here".to_string()));
+    }
+
+    #[test]
+    fn test_provenance_trust_fields_empty() {
+        let fields = ProvenanceTrustFields {
+            trust_domain: None,
+            attestation: None,
+        };
+        let json = serde_json::to_value(&fields).unwrap();
+        // Both None fields should be omitted (skip_serializing_if)
+        assert!(
+            json.get("trust_domain").is_none(),
+            "trust_domain should be omitted when None"
+        );
+        assert!(
+            json.get("attestation").is_none(),
+            "attestation should be omitted when None"
+        );
+
+        // Roundtrip from empty object
+        let back: ProvenanceTrustFields = serde_json::from_value(json).unwrap();
+        assert!(back.trust_domain.is_none());
+        assert!(back.attestation.is_none());
+    }
+
+    #[test]
+    fn test_trust_metadata_full_roundtrip() {
+        let trust = TrustMetadata {
+            bundle_attestation: Some("sig-bytes-base64".to_string()),
+            trust_domain: Some("acme.corp.us-east-1".to_string()),
+            attestation_format: Some("ed25519-detached".to_string()),
+            signer_public_key: Some("pubkey-bytes-base64".to_string()),
+        };
+
+        let json = serde_json::to_string(&trust).unwrap();
+        let back: TrustMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.bundle_attestation, trust.bundle_attestation);
+        assert_eq!(back.trust_domain, trust.trust_domain);
+        assert_eq!(back.attestation_format, trust.attestation_format);
+        assert_eq!(back.signer_public_key, trust.signer_public_key);
+    }
+
+    #[test]
+    fn test_trust_metadata_partial_roundtrip() {
+        let trust = TrustMetadata {
+            bundle_attestation: None,
+            trust_domain: Some("staging.internal".to_string()),
+            attestation_format: None,
+            signer_public_key: None,
+        };
+
+        let json = serde_json::to_string(&trust).unwrap();
+        let back: TrustMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.trust_domain, Some("staging.internal".to_string()));
+        assert!(back.bundle_attestation.is_none());
+        assert!(back.attestation_format.is_none());
+        assert!(back.signer_public_key.is_none());
+    }
 }
