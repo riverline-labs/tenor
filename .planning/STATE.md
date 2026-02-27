@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 9 of 11 — Builder SPA
-**Plan**: 2 of 7 completed in current phase
+**Plan**: 3 of 7 completed in current phase
 **Status**: Phase 9 in progress
-**Last activity**: 2026-02-27 — Phase 9 Plan 2 complete (Entity editor with SVG state machine + Fact editor with full type system + Persona editor + Source editor + all wired into app routing)
+**Last activity**: 2026-02-27 — Phase 9 Plan 3 complete (Rule editor + Operation editor + PredicateBuilder + StratumView + AuthorityMatrix)
 
 Progress: ██████████████████░░ 72% (Phases 1-8 complete, Phase 9 started)
 
@@ -107,6 +107,10 @@ Progress: ██████████████████░░ 72% (Phas
 - [Phase 09-02] Rename pattern: removeConstruct(oldId) + addConstruct({...updated}) since updateConstruct matches (id, kind)
 - [Phase 09-02] Source description field reused for base_url/connection string (no dedicated field in SourceConstruct)
 - [Phase 09-02] StateMachine nodePosOverrides reset via useEffect on states/transitions change to avoid stale drag positions
+- [Phase 09]: PredicateBuilder uses ExprTypeSelector inline (not a separate dialog) to minimize friction for expression type changes
+- [Phase 09]: StratumView compact mode auto-triggers when > 8 rules to avoid horizontal overflow
+- [Phase 09]: Rule conditions filter availableVerdicts to strata < current rule stratum; operation mode passes all verdicts
+- [Phase 09]: AuthorityMatrix toggles dispatch directly to updateConstruct on OperationConstruct (operation owns allowed_personas)
 
 ## Blockers/Concerns
 
@@ -128,6 +132,7 @@ Progress: ██████████████████░░ 72% (Phas
 | 05 | 04 | 385 | 7 | 24 |
 | 05 | 05 | 847 | 7 | 7 |
 | 05 | 06 | ~10800 | 9 | 15 |
+| Phase 09 P03 | 408 | 6 tasks | 6 files |
 
 ## Performance Metrics (continued)
 
@@ -145,9 +150,10 @@ Progress: ██████████████████░░ 72% (Phas
 | 08 | 04 | 216 | 6 | 1 |
 | 09 | 01 | 746 | 10 | 21 |
 | 09 | 02 | 403 | 6 | 6 |
+| 09 | 03 | 408 | 6 | 6 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 09-02-PLAN.md (Entity editor with SVG state machine + Fact editor + Persona editor + Source editor)
-Next action: Phase 9 Plan 3 — Operation and Rule editors
+Stopped at: Completed 09-03-PLAN.md (Rule editor + Operation editor + PredicateBuilder + StratumView + AuthorityMatrix)
+Next action: Phase 9 Plan 4 — Flow editor
