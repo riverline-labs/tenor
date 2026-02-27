@@ -2,7 +2,7 @@
   "flow_outcome": "approved_by_manager",
   "steps_executed": [
     {
-      "result": "error: entity 'Document' in state 'draft', expected 'review'",
+      "result": "error: entity 'Document' instance '_default' in state 'draft', expected 'review'",
       "step_id": "try_approve",
       "step_type": "operation"
     },

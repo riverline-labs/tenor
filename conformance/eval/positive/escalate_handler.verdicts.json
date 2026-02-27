@@ -21,7 +21,7 @@
     {
       "step_id": "step_review",
       "step_type": "operation",
-      "result": "error: entity 'Ticket' in state 'open', expected 'reviewing'"
+      "result": "error: entity 'Ticket' instance '_default' in state 'open', expected 'reviewing'"
     },
     {
       "step_id": "step_review",

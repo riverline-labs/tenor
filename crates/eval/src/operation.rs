@@ -28,6 +28,13 @@ pub const DEFAULT_INSTANCE_ID: &str = "_default";
 /// Single-instance contracts use `_default` as the instance_id.
 pub type EntityStateMap = BTreeMap<(String, String), String>;
 
+/// Maps entity_id → instance_id for instance targeting in operations and flows.
+///
+/// Per §9.2 and §11.1: the executor provides which specific instance to target
+/// for each entity effect. An empty map falls back to DEFAULT_INSTANCE_ID
+/// for backward compatibility with single-instance contracts.
+pub type InstanceBindingMap = BTreeMap<String, String>;
+
 /// Create a single-instance state map from entity_id -> state (backward compat).
 /// Each entity gets the `_default` instance ID per §6.5 degenerate case.
 pub fn single_instance(states: BTreeMap<String, String>) -> EntityStateMap {
@@ -46,10 +53,24 @@ pub fn get_instance_state<'a>(
     states.get(&(entity_id.to_string(), instance_id.to_string()))
 }
 
+/// Resolve the target instance_id for a given entity from the binding map.
+///
+/// Per §11.4: if an entity is not in the bindings, fall back to DEFAULT_INSTANCE_ID
+/// for backward compatibility with single-instance contracts.
+pub fn resolve_instance_id<'a>(bindings: &'a InstanceBindingMap, entity_id: &str) -> &'a str {
+    bindings
+        .get(entity_id)
+        .map(|s| s.as_str())
+        .unwrap_or(DEFAULT_INSTANCE_ID)
+}
+
 /// Record of a single entity state transition applied by an operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectRecord {
     pub entity_id: String,
+    /// The specific instance that was targeted by this effect.
+    /// Per §9.5: provenance records instance_binding.
+    pub instance_id: String,
     pub from_state: String,
     pub to_state: String,
 }
@@ -86,11 +107,15 @@ pub enum OperationError {
     /// Entity is not in the expected state for the effect.
     InvalidEntityState {
         entity_id: String,
+        instance_id: String,
         expected: String,
         actual: String,
     },
     /// Entity referenced by effect not found in entity state map.
-    EntityNotFound { entity_id: String },
+    EntityNotFound {
+        entity_id: String,
+        instance_id: String,
+    },
     /// Evaluation error during precondition check.
     EvalError(EvalError),
 }
@@ -120,17 +145,25 @@ impl std::fmt::Display for OperationError {
             }
             OperationError::InvalidEntityState {
                 entity_id,
+                instance_id,
                 expected,
                 actual,
             } => {
                 write!(
                     f,
-                    "entity '{}' in state '{}', expected '{}'",
-                    entity_id, actual, expected
+                    "entity '{}' instance '{}' in state '{}', expected '{}'",
+                    entity_id, instance_id, actual, expected
                 )
             }
-            OperationError::EntityNotFound { entity_id } => {
-                write!(f, "entity '{}' not found in state map", entity_id)
+            OperationError::EntityNotFound {
+                entity_id,
+                instance_id,
+            } => {
+                write!(
+                    f,
+                    "entity '{}' instance '{}' not found in state map",
+                    entity_id, instance_id
+                )
             }
             OperationError::EvalError(e) => write!(f, "evaluation error: {}", e),
         }
@@ -167,12 +200,18 @@ pub fn init_entity_states(contract: &crate::types::Contract) -> EntityStateMap {
 /// 2. Precondition evaluation
 /// 3. Effect execution (entity state transitions)
 /// 4. Outcome determination
+///
+/// The `instance_bindings` parameter maps entity_id → instance_id to identify
+/// which specific instance each entity effect targets. An empty map falls back
+/// to DEFAULT_INSTANCE_ID for each entity (backward compat with single-instance
+/// contracts per §6.5 degenerate case).
 pub fn execute_operation(
     op: &Operation,
     persona: &str,
     facts: &FactSet,
     verdicts: &VerdictSet,
     entity_states: &mut EntityStateMap,
+    instance_bindings: &InstanceBindingMap,
 ) -> Result<OperationResult, OperationError> {
     // Step 1: Persona check
     if !op.allowed_personas.contains(&persona.to_string()) {
@@ -199,28 +238,32 @@ pub fn execute_operation(
     let mut outcome_from_effects: Option<String> = None;
 
     for effect in &op.effects {
-        // Use DEFAULT_INSTANCE_ID for single-instance lookups.
-        // Multi-instance support (Plan 04-02) will thread instance_id through Operation effects.
-        let key = (effect.entity_id.clone(), DEFAULT_INSTANCE_ID.to_string());
+        // Resolve the target instance for this entity from the binding map.
+        // Falls back to DEFAULT_INSTANCE_ID if no binding provided (§6.5 degenerate case).
+        let instance_id = resolve_instance_id(instance_bindings, &effect.entity_id).to_string();
+        let key = (effect.entity_id.clone(), instance_id.clone());
         let current_state = entity_states
             .get(&key)
             .ok_or_else(|| OperationError::EntityNotFound {
                 entity_id: effect.entity_id.clone(),
+                instance_id: instance_id.clone(),
             })?
             .clone();
 
         if current_state != effect.from {
             return Err(OperationError::InvalidEntityState {
                 entity_id: effect.entity_id.clone(),
+                instance_id: instance_id.clone(),
                 expected: effect.from.clone(),
                 actual: current_state,
             });
         }
 
-        // Apply state transition
+        // Apply state transition to the targeted (entity_id, instance_id) pair
         entity_states.insert(key, effect.to.clone());
         effects_applied.push(EffectRecord {
             entity_id: effect.entity_id.clone(),
+            instance_id,
             from_state: effect.from.clone(),
             to_state: effect.to.clone(),
         });
@@ -353,7 +396,14 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_operation(&op, "buyer", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "buyer",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
         let res = result.unwrap();
         assert_eq!(res.outcome, "submitted");
@@ -369,7 +419,14 @@ mod tests {
         let verdicts = VerdictSet::new();
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_operation(&op, "seller", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "seller",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_err());
         match result.unwrap_err() {
             OperationError::PersonaRejected {
@@ -407,7 +464,14 @@ mod tests {
 
         // Both buyer and admin should succeed
         let mut states_clone = entity_states.clone();
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut states_clone);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut states_clone,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
     }
 
@@ -448,7 +512,14 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
         assert_eq!(
             get_instance_state(&entity_states, "account", DEFAULT_INSTANCE_ID).unwrap(),
@@ -480,7 +551,14 @@ mod tests {
         let verdicts = VerdictSet::new();
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_err());
         match result.unwrap_err() {
             OperationError::PreconditionFailed { operation_id, .. } => {
@@ -516,13 +594,21 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
         let res = result.unwrap();
         assert_eq!(
             res.effects_applied[0],
             EffectRecord {
                 entity_id: "order".to_string(),
+                instance_id: DEFAULT_INSTANCE_ID.to_string(),
                 from_state: "pending".to_string(),
                 to_state: "approved".to_string(),
             }
@@ -555,15 +641,24 @@ mod tests {
                 .collect(),
         ); // Wrong state
 
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_err());
         match result.unwrap_err() {
             OperationError::InvalidEntityState {
                 entity_id,
+                instance_id,
                 expected,
                 actual,
             } => {
                 assert_eq!(entity_id, "order");
+                assert_eq!(instance_id, DEFAULT_INSTANCE_ID);
                 assert_eq!(expected, "pending");
                 assert_eq!(actual, "draft");
             }
@@ -589,11 +684,22 @@ mod tests {
         let verdicts = VerdictSet::new();
         let mut entity_states = EntityStateMap::new(); // Empty -- no entities
 
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_err());
         match result.unwrap_err() {
-            OperationError::EntityNotFound { entity_id } => {
+            OperationError::EntityNotFound {
+                entity_id,
+                instance_id,
+            } => {
                 assert_eq!(entity_id, "order");
+                assert_eq!(instance_id, DEFAULT_INSTANCE_ID);
             }
             other => panic!("expected EntityNotFound, got {:?}", other),
         }
@@ -632,7 +738,14 @@ mod tests {
             .collect(),
         );
 
-        let result = execute_operation(&op, "system", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "system",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
         let res = result.unwrap();
         assert_eq!(res.effects_applied.len(), 2);
@@ -677,7 +790,14 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_operation(&op, "system", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "system",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
         let res = result.unwrap();
         assert_eq!(res.outcome, "payment_success");
@@ -709,8 +829,15 @@ mod tests {
                 .collect(),
         );
 
-        let result =
-            execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states).unwrap();
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        )
+        .unwrap();
         assert_eq!(result.provenance.operation_id, "approve");
         assert_eq!(result.provenance.persona, "admin");
         assert_eq!(result.provenance.effects.len(), 1);
@@ -718,6 +845,7 @@ mod tests {
             result.provenance.effects[0],
             EffectRecord {
                 entity_id: "order".to_string(),
+                instance_id: DEFAULT_INSTANCE_ID.to_string(),
                 from_state: "pending".to_string(),
                 to_state: "approved".to_string(),
             }
@@ -801,7 +929,14 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
 
         // Without verdict -- should fail precondition
@@ -811,7 +946,14 @@ mod tests {
                 .into_iter()
                 .collect(),
         );
-        let result2 = execute_operation(&op, "admin", &facts, &empty_verdicts, &mut entity_states2);
+        let result2 = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &empty_verdicts,
+            &mut entity_states2,
+            &InstanceBindingMap::new(),
+        );
         assert!(result2.is_err());
         match result2.unwrap_err() {
             OperationError::PreconditionFailed { .. } => {}
@@ -847,7 +989,14 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_operation(&op, "system", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "system",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_err());
         match result.unwrap_err() {
             OperationError::PreconditionFailed {
@@ -889,8 +1038,259 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_operation(&op, "admin", &facts, &verdicts, &mut entity_states);
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
         assert!(result.is_ok());
         assert_eq!(result.unwrap().outcome, "submitted");
+    }
+
+    // ──────────────────────────────────────
+    // Instance-targeted operation tests
+    // ──────────────────────────────────────
+
+    #[test]
+    fn instance_targeted_operation_targets_specific_instance() {
+        // Two order instances: "order-1" in draft, "order-2" in submitted.
+        // Binding selects order-1 for the effect.
+        let op = make_operation(
+            "submit_order",
+            vec!["buyer"],
+            vec![Effect {
+                entity_id: "order".to_string(),
+                from: "draft".to_string(),
+                to: "submitted".to_string(),
+                outcome: None,
+            }],
+            vec!["submitted"],
+        );
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+
+        // Two instances of the same entity type
+        let mut entity_states: EntityStateMap = BTreeMap::new();
+        entity_states.insert(
+            ("order".to_string(), "order-1".to_string()),
+            "draft".to_string(),
+        );
+        entity_states.insert(
+            ("order".to_string(), "order-2".to_string()),
+            "submitted".to_string(),
+        );
+
+        let mut bindings = InstanceBindingMap::new();
+        bindings.insert("order".to_string(), "order-1".to_string());
+
+        let result = execute_operation(
+            &op,
+            "buyer",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &bindings,
+        );
+        assert!(result.is_ok());
+        let res = result.unwrap();
+        assert_eq!(res.outcome, "submitted");
+        assert_eq!(res.effects_applied.len(), 1);
+        assert_eq!(res.effects_applied[0].instance_id, "order-1");
+
+        // order-1 should be in "submitted" now
+        assert_eq!(
+            get_instance_state(&entity_states, "order", "order-1").unwrap(),
+            "submitted"
+        );
+        // order-2 should be UNCHANGED in "submitted"
+        assert_eq!(
+            get_instance_state(&entity_states, "order", "order-2").unwrap(),
+            "submitted"
+        );
+    }
+
+    #[test]
+    fn instance_targeted_wrong_state_fails_for_targeted_instance() {
+        // Effect targets order-2 (in "submitted"), but effect expects "draft".
+        let op = make_operation(
+            "submit_order",
+            vec!["buyer"],
+            vec![Effect {
+                entity_id: "order".to_string(),
+                from: "draft".to_string(),
+                to: "submitted".to_string(),
+                outcome: None,
+            }],
+            vec!["submitted"],
+        );
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+
+        let mut entity_states: EntityStateMap = BTreeMap::new();
+        entity_states.insert(
+            ("order".to_string(), "order-1".to_string()),
+            "draft".to_string(),
+        );
+        entity_states.insert(
+            ("order".to_string(), "order-2".to_string()),
+            "submitted".to_string(),
+        );
+
+        // Target order-2 which is in "submitted", not "draft" -> InvalidEntityState
+        let mut bindings = InstanceBindingMap::new();
+        bindings.insert("order".to_string(), "order-2".to_string());
+
+        let result = execute_operation(
+            &op,
+            "buyer",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &bindings,
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            OperationError::InvalidEntityState {
+                entity_id,
+                instance_id,
+                expected,
+                actual,
+            } => {
+                assert_eq!(entity_id, "order");
+                assert_eq!(instance_id, "order-2");
+                assert_eq!(expected, "draft");
+                assert_eq!(actual, "submitted");
+            }
+            other => panic!("expected InvalidEntityState, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn empty_bindings_fall_back_to_default_instance() {
+        // Empty bindings should use DEFAULT_INSTANCE_ID (backward compat)
+        let op = make_operation(
+            "approve",
+            vec!["admin"],
+            vec![Effect {
+                entity_id: "order".to_string(),
+                from: "pending".to_string(),
+                to: "approved".to_string(),
+                outcome: None,
+            }],
+            vec!["approved"],
+        );
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+        let mut entity_states = single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
+
+        // Empty bindings -> falls back to DEFAULT_INSTANCE_ID
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        );
+        assert!(result.is_ok());
+        assert_eq!(
+            get_instance_state(&entity_states, "order", DEFAULT_INSTANCE_ID).unwrap(),
+            "approved"
+        );
+    }
+
+    #[test]
+    fn instance_not_in_state_map_returns_entity_not_found_with_instance_id() {
+        // Binding references an instance that doesn't exist in entity_states
+        let op = make_operation(
+            "approve",
+            vec!["admin"],
+            vec![Effect {
+                entity_id: "order".to_string(),
+                from: "pending".to_string(),
+                to: "approved".to_string(),
+                outcome: None,
+            }],
+            vec!["approved"],
+        );
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+        let mut entity_states: EntityStateMap = BTreeMap::new();
+        // No entry for "order/nonexistent"
+
+        let mut bindings = InstanceBindingMap::new();
+        bindings.insert("order".to_string(), "nonexistent".to_string());
+
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &bindings,
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            OperationError::EntityNotFound {
+                entity_id,
+                instance_id,
+            } => {
+                assert_eq!(entity_id, "order");
+                assert_eq!(instance_id, "nonexistent");
+            }
+            other => panic!("expected EntityNotFound, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn effect_record_carries_instance_id() {
+        // Verify EffectRecord.instance_id is populated from the binding
+        let op = make_operation(
+            "process",
+            vec!["system"],
+            vec![Effect {
+                entity_id: "payment".to_string(),
+                from: "pending".to_string(),
+                to: "captured".to_string(),
+                outcome: None,
+            }],
+            vec!["done"],
+        );
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+        let mut entity_states: EntityStateMap = BTreeMap::new();
+        entity_states.insert(
+            ("payment".to_string(), "pay-42".to_string()),
+            "pending".to_string(),
+        );
+
+        let mut bindings = InstanceBindingMap::new();
+        bindings.insert("payment".to_string(), "pay-42".to_string());
+
+        let result = execute_operation(
+            &op,
+            "system",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &bindings,
+        )
+        .unwrap();
+        assert_eq!(result.effects_applied[0].entity_id, "payment");
+        assert_eq!(result.effects_applied[0].instance_id, "pay-42");
+        assert_eq!(result.effects_applied[0].from_state, "pending");
+        assert_eq!(result.effects_applied[0].to_state, "captured");
     }
 }
