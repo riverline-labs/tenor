@@ -15,7 +15,9 @@ cargo build \
   --target wasm32-unknown-unknown \
   --release
 
-WASM_FILE="$REPO_ROOT/target/wasm32-unknown-unknown/release/tenor_wasm_bridge.wasm"
+# The bridge crate has its own workspace ([workspace] in Cargo.toml),
+# so its output goes to the bridge directory's own target/, not the root target/.
+WASM_FILE="$BRIDGE_DIR/target/wasm32-unknown-unknown/release/tenor_wasm_bridge.wasm"
 
 if [ ! -f "$WASM_FILE" ]; then
   echo "ERROR: Expected WASM file not found at $WASM_FILE" >&2
