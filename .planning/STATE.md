@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 8 of 11 — Automatic UI
-**Plan**: 1 of ? completed in current phase
+**Plan**: 2 of ? completed in current phase
 **Status**: Phase 8 in progress
-**Last activity**: 2026-02-27 — Phase 8 Plan 1 complete (tenor ui CLI command and React project scaffold)
+**Last activity**: 2026-02-27 — Phase 8 Plan 2 complete (component implementations: types_gen, hooks, 11 React components)
 
 Progress: ████████████████░░░░ 64% (Phases 1-7 complete, Phase 8 started)
 
@@ -86,6 +86,10 @@ Progress: ████████████████░░░░ 64% (Phas
 - [Phase 08-01] types.ts uses plain string for Decimal/Money/Date/DateTime (not branded types) for simpler UI usage
 - [Phase 08-01] theme.ts uses djb2 hash of contract_id for hue derivation — deterministic HSL color palette
 - [Phase 08-01] generate_ui_project uses vec![] macro to build file list (clippy::vec_init_then_push)
+- [Phase 08-02] emit_action_space and emit_fact_input use r##"..."## raw strings (no format!()) — clippy::useless_format fires when format! used with {{}} escaping but no Rust variable substitution
+- [Phase 08-02] FactInput dispatches on FACTS metadata from types.ts at runtime (no static codegen of type info in component)
+- [Phase 08-02] ProvenanceDrill uses r## delimiter since color="#7c3aed" contains "# which terminates r# raw strings
+- [Phase 08-02] Entity transitions field absent in CodegenEntity — ENTITIES const emits transitions: [] as placeholder
 
 ## Blockers/Concerns
 
@@ -119,9 +123,10 @@ Progress: ████████████████░░░░ 64% (Phas
 | 07 | 03 | 1695 | 8 | 11 |
 | 07 | 04 | 686 | 6 | 23 |
 | 08 | 01 | 438 | 6 | 5 |
+| 08 | 02 | 882 | 7 | 6 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 08-01-PLAN.md (tenor ui CLI command and React project scaffold)
-Next action: Execute Phase 8 Plan 2 (component implementations)
+Stopped at: Completed 08-02-PLAN.md (component implementations: types_gen, hooks, 11 React components)
+Next action: Execute Phase 8 Plan 3 (if exists) or Phase 8 completion
