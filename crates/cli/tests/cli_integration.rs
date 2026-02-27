@@ -8,7 +8,10 @@
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::Command;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use ed25519_dalek::SigningKey;
 use predicates::prelude::*;
+use rand::rngs::OsRng;
 use serde_json;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -934,4 +937,181 @@ fn e12_etag_change_detection() {
         etag1, etag2,
         "different contracts must produce different etags"
     );
+}
+
+// ──────────────────────────────────────────────
+// WASM binary signing and verification
+// ──────────────────────────────────────────────
+
+/// Helper: generate an Ed25519 keypair and write the .secret and .pub files.
+///
+/// Returns (secret_key_path, pub_key_path).
+fn write_test_keypair(dir: &tempfile::TempDir) -> (PathBuf, PathBuf) {
+    let signing_key = SigningKey::generate(&mut OsRng);
+    let verifying_key = signing_key.verifying_key();
+
+    // .secret file: base64-encoded 32-byte seed
+    let seed_b64 = BASE64.encode(signing_key.to_bytes());
+    let secret_path = dir.path().join("test-key.secret");
+    fs::write(&secret_path, &seed_b64).expect("write secret key");
+
+    // .pub file: base64-encoded 32-byte public key
+    let pub_b64 = BASE64.encode(verifying_key.to_bytes());
+    let pub_path = dir.path().join("test-key.pub");
+    fs::write(&pub_path, &pub_b64).expect("write public key");
+
+    (secret_path, pub_path)
+}
+
+/// sign-wasm produces a valid .sig file containing all expected fields.
+#[test]
+fn sign_wasm_produces_sig_file() {
+    let dir = TempDir::new().unwrap();
+    let (secret_path, _pub_path) = write_test_keypair(&dir);
+
+    // Write a fake WASM binary.
+    let wasm_path = dir.path().join("evaluator.wasm");
+    fs::write(&wasm_path, b"fake wasm binary content for testing").unwrap();
+
+    let bundle_etag = "abc123etag";
+
+    tenor()
+        .args([
+            "sign-wasm",
+            wasm_path.to_str().unwrap(),
+            "--key",
+            secret_path.to_str().unwrap(),
+            "--bundle-etag",
+            bundle_etag,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Signed WASM binary:"))
+        .stdout(predicate::str::contains("WASM hash:"))
+        .stdout(predicate::str::contains("Bundle etag: abc123etag"));
+
+    // Verify the .sig file was created and has expected fields.
+    let sig_path = dir.path().join("evaluator.wasm.sig");
+    assert!(sig_path.exists(), ".sig file must exist");
+
+    let sig_str = fs::read_to_string(&sig_path).unwrap();
+    let sig_json: serde_json::Value = serde_json::from_str(&sig_str).unwrap();
+    assert_eq!(sig_json["attestation_format"], "ed25519-detached");
+    assert_eq!(sig_json["bundle_etag"], bundle_etag);
+    assert!(
+        sig_json["wasm_hash"].is_string(),
+        "wasm_hash must be present"
+    );
+    assert!(
+        sig_json["signature"].is_string(),
+        "signature must be present"
+    );
+    assert!(
+        sig_json["signer_public_key"].is_string(),
+        "signer_public_key must be present"
+    );
+}
+
+/// verify-wasm succeeds for a valid signed binary.
+#[test]
+fn verify_wasm_succeeds_for_valid_binary() {
+    let dir = TempDir::new().unwrap();
+    let (secret_path, pub_path) = write_test_keypair(&dir);
+
+    let wasm_path = dir.path().join("evaluator.wasm");
+    fs::write(&wasm_path, b"fake wasm binary content for testing").unwrap();
+
+    // Sign first.
+    tenor()
+        .args([
+            "sign-wasm",
+            wasm_path.to_str().unwrap(),
+            "--key",
+            secret_path.to_str().unwrap(),
+            "--bundle-etag",
+            "etag-v1",
+        ])
+        .assert()
+        .success();
+
+    let sig_path = dir.path().join("evaluator.wasm.sig");
+
+    // Verify.
+    tenor()
+        .args([
+            "verify-wasm",
+            wasm_path.to_str().unwrap(),
+            "--sig",
+            sig_path.to_str().unwrap(),
+            "--pubkey",
+            pub_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("WASM binary verified:"))
+        .stdout(predicate::str::contains("Signature: valid"));
+}
+
+/// verify-wasm fails when the WASM binary has been tampered with.
+#[test]
+fn verify_wasm_fails_for_tampered_binary() {
+    let dir = TempDir::new().unwrap();
+    let (secret_path, pub_path) = write_test_keypair(&dir);
+
+    let wasm_path = dir.path().join("evaluator.wasm");
+    fs::write(&wasm_path, b"original wasm binary content").unwrap();
+
+    // Sign the original.
+    tenor()
+        .args([
+            "sign-wasm",
+            wasm_path.to_str().unwrap(),
+            "--key",
+            secret_path.to_str().unwrap(),
+            "--bundle-etag",
+            "etag-v1",
+        ])
+        .assert()
+        .success();
+
+    let sig_path = dir.path().join("evaluator.wasm.sig");
+
+    // Tamper with the binary.
+    fs::write(&wasm_path, b"tampered wasm binary content!!").unwrap();
+
+    // Verify should fail.
+    tenor()
+        .args([
+            "verify-wasm",
+            wasm_path.to_str().unwrap(),
+            "--sig",
+            sig_path.to_str().unwrap(),
+            "--pubkey",
+            pub_path.to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("hash mismatch"));
+}
+
+/// sign-wasm help shows expected options.
+#[test]
+fn sign_wasm_help_shows_options() {
+    tenor()
+        .args(["sign-wasm", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--key"))
+        .stdout(predicate::str::contains("--bundle-etag"));
+}
+
+/// verify-wasm help shows expected options.
+#[test]
+fn verify_wasm_help_shows_options() {
+    tenor()
+        .args(["verify-wasm", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--sig"))
+        .stdout(predicate::str::contains("--pubkey"));
 }

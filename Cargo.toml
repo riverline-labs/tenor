@@ -34,6 +34,6 @@ tower-http = { version = "0.6", features = ["cors"] }
 ureq = { version = "3", features = ["json"] }
 lsp-server = "0.7"
 lsp-types = "0.97"
-ed25519-dalek = { version = "2", features = ["rand_core"] }
+ed25519-dalek = { version = "2.2", features = ["rand_core"] }
 base64 = "0.22"
 rand = "0.8"

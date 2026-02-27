@@ -94,3 +94,13 @@ pub fn read_public_key(path: &Path) -> Result<VerifyingKey, String> {
     VerifyingKey::from_bytes(&key_bytes)
         .map_err(|e| format!("invalid public key material in '{}': {}", path.display(), e))
 }
+
+/// Compute a short hex fingerprint of a verifying key (first 8 bytes of the key bytes).
+pub fn key_fingerprint(key: &VerifyingKey) -> String {
+    let bytes = key.to_bytes();
+    bytes[..8]
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<_>>()
+        .join("")
+}
