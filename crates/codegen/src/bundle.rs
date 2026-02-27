@@ -90,6 +90,7 @@ pub struct CodegenFact {
 pub struct CodegenEntity {
     pub id: String,
     pub states: Vec<String>,
+    pub transitions: Vec<(String, String)>,
 }
 
 /// An Operation construct extracted from interchange JSON.
@@ -159,6 +160,11 @@ impl CodegenBundle {
                     entities.push(CodegenEntity {
                         id: e.id.clone(),
                         states: e.states.clone(),
+                        transitions: e
+                            .transitions
+                            .iter()
+                            .map(|t| (t.from.clone(), t.to.clone()))
+                            .collect(),
                     });
                 }
                 InterchangeConstruct::Operation(op) => {
@@ -411,6 +417,10 @@ mod tests {
         assert_eq!(
             result.entities[0].states,
             vec!["draft", "submitted", "approved"]
+        );
+        assert_eq!(
+            result.entities[0].transitions,
+            vec![("draft".to_string(), "submitted".to_string())]
         );
     }
 

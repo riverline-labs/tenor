@@ -337,6 +337,12 @@ fn test_generate_minimal_ui() {
         "Facts must contain is_active"
     );
 
+    // Transitions must be populated (not empty)
+    assert!(
+        types_ts.contains(r#"["draft", "submitted"]"#),
+        "ENTITIES.Order transitions must include draft->submitted"
+    );
+
     // 4. No obvious duplication: OrderState should appear as a type but not repeated
     let order_state_count = types_ts.matches("OrderState").count();
     // It will appear in the type declaration and in EntityStates interface = 2 occurrences minimum
@@ -507,6 +513,22 @@ fn test_entity_states_match() {
     assert!(
         types_ts.contains("DeliveryRecord"),
         "ENTITIES must reference DeliveryRecord"
+    );
+
+    // ENTITIES must contain transitions (not empty arrays)
+    // EscrowAccount has transitions like held->released, held->refunded, etc.
+    assert!(
+        types_ts.contains(r#"["held", "released"]"#),
+        "ENTITIES.EscrowAccount transitions must include held->released"
+    );
+    assert!(
+        types_ts.contains(r#"["held", "refunded"]"#),
+        "ENTITIES.EscrowAccount transitions must include held->refunded"
+    );
+    // DeliveryRecord has transitions like pending->confirmed
+    assert!(
+        types_ts.contains(r#"["pending", "confirmed"]"#),
+        "ENTITIES.DeliveryRecord transitions must include pending->confirmed"
     );
 }
 

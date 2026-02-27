@@ -59,13 +59,19 @@ pub(super) fn emit_ui_types(bundle: &CodegenBundle) -> String {
                 states_arr.join(", ")
             ));
             out.push_str(&format!("    initial: \"{}\",\n", initial));
-            // Transitions: we store empty array (transitions aren't in CodegenEntity;
-            // the interchange JSON has them but CodegenBundle doesn't parse them currently).
-            // Plan explicitly says: "If CodegenEntity does not have transitions, extract
-            // them from the interchange bundle directly in generate.rs and pass them through."
-            // Since generate.rs passes bundle as CodegenBundle (no transitions field),
-            // we emit an empty array here as a placeholder consistent with the data available.
-            out.push_str("    transitions: [] as [string, string][],\n");
+            if entity.transitions.is_empty() {
+                out.push_str("    transitions: [] as [string, string][],\n");
+            } else {
+                let pairs: Vec<String> = entity
+                    .transitions
+                    .iter()
+                    .map(|(from, to)| format!("[\"{}\", \"{}\"]", from, to))
+                    .collect();
+                out.push_str(&format!(
+                    "    transitions: [{}] as [string, string][],\n",
+                    pairs.join(", ")
+                ));
+            }
             out.push_str("  },\n");
         }
         out.push_str("} as const;\n\n");

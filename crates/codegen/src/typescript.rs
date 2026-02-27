@@ -275,6 +275,11 @@ mod tests {
                     "approved".to_string(),
                     "rejected".to_string(),
                 ],
+                transitions: vec![
+                    ("draft".to_string(), "submitted".to_string()),
+                    ("submitted".to_string(), "approved".to_string()),
+                    ("submitted".to_string(), "rejected".to_string()),
+                ],
             }],
             operations: vec![CodegenOperation {
                 id: "approve_order".to_string(),
