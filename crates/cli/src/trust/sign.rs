@@ -11,7 +11,11 @@ use crate::trust::keygen;
 /// Core signing logic — operates on in-memory values.
 ///
 /// Returns the signed bundle JSON value (with `bundle`, `etag`, `tenor`, `trust` fields).
-pub fn sign_bundle(bundle_content: serde_json::Value, signing_key: &SigningKey, format: &str) -> serde_json::Value {
+pub fn sign_bundle(
+    bundle_content: serde_json::Value,
+    signing_key: &SigningKey,
+    format: &str,
+) -> serde_json::Value {
     let etag = compute_etag(&bundle_content);
     let verifying_key = signing_key.verifying_key();
     let signature = signing_key.sign(etag.as_bytes());
@@ -39,10 +43,8 @@ pub fn sign_bundle(bundle_content: serde_json::Value, signing_key: &SigningKey, 
 pub fn extract_bundle_content(bundle_json: serde_json::Value) -> Option<serde_json::Value> {
     if bundle_json.get("constructs").is_some() {
         Some(bundle_json)
-    } else if let Some(inner) = bundle_json.get("bundle").cloned() {
-        Some(inner)
     } else {
-        None
+        bundle_json.get("bundle").cloned()
     }
 }
 
@@ -196,7 +198,10 @@ mod tests {
 
         let stored_etag = signed["etag"].as_str().expect("etag missing");
         let expected_etag = compute_etag(&bundle);
-        assert_eq!(stored_etag, expected_etag, "etag does not match bundle content");
+        assert_eq!(
+            stored_etag, expected_etag,
+            "etag does not match bundle content"
+        );
     }
 
     #[test]
@@ -221,7 +226,10 @@ mod tests {
 
         let sig1 = signed1["trust"]["bundle_attestation"].as_str().unwrap();
         let sig2 = signed2["trust"]["bundle_attestation"].as_str().unwrap();
-        assert_ne!(sig1, sig2, "different bundles must produce different signatures");
+        assert_ne!(
+            sig1, sig2,
+            "different bundles must produce different signatures"
+        );
     }
 
     #[test]
@@ -233,11 +241,17 @@ mod tests {
 
         let sig1 = signed1["trust"]["bundle_attestation"].as_str().unwrap();
         let sig2 = signed2["trust"]["bundle_attestation"].as_str().unwrap();
-        assert_eq!(sig1, sig2, "same bundle signed twice must produce identical signatures");
+        assert_eq!(
+            sig1, sig2,
+            "same bundle signed twice must produce identical signatures"
+        );
 
         let etag1 = signed1["etag"].as_str().unwrap();
         let etag2 = signed2["etag"].as_str().unwrap();
-        assert_eq!(etag1, etag2, "same bundle signed twice must produce identical etags");
+        assert_eq!(
+            etag1, etag2,
+            "same bundle signed twice must produce identical etags"
+        );
     }
 
     #[test]

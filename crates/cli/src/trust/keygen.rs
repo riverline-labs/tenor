@@ -183,10 +183,7 @@ mod tests {
         std::fs::write(&bad_path, "not-valid-base64!!!").unwrap();
 
         let result = read_secret_key(&bad_path);
-        assert!(
-            result.is_err(),
-            "expected error for invalid base64 content"
-        );
+        assert!(result.is_err(), "expected error for invalid base64 content");
     }
 
     #[test]

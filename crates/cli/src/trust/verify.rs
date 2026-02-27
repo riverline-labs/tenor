@@ -19,7 +19,10 @@ pub enum VerifyResult {
 /// Verify a signed bundle JSON value in memory.
 ///
 /// Returns `VerifyResult::Ok` if the bundle is valid, or `VerifyResult::Fail(reason)` otherwise.
-pub fn verify_bundle(signed_json: &serde_json::Value, verifying_key_override: Option<&VerifyingKey>) -> VerifyResult {
+pub fn verify_bundle(
+    signed_json: &serde_json::Value,
+    verifying_key_override: Option<&VerifyingKey>,
+) -> VerifyResult {
     // Extract the trust section
     let trust = match signed_json.get("trust") {
         Some(t) if !t.is_null() => t,
@@ -29,7 +32,9 @@ pub fn verify_bundle(signed_json: &serde_json::Value, verifying_key_override: Op
     // Check attestation format
     let attestation_format = match trust.get("attestation_format").and_then(|v| v.as_str()) {
         Some(f) => f,
-        None => return VerifyResult::Fail("attestation_format missing from trust section".to_string()),
+        None => {
+            return VerifyResult::Fail("attestation_format missing from trust section".to_string())
+        }
     };
 
     if attestation_format != "ed25519-detached" {
@@ -45,11 +50,17 @@ pub fn verify_bundle(signed_json: &serde_json::Value, verifying_key_override: Op
     } else if let Some(embedded_key) = trust.get("signer_public_key").and_then(|v| v.as_str()) {
         let key_bytes = match BASE64.decode(embedded_key) {
             Ok(b) => b,
-            Err(e) => return VerifyResult::Fail(format!("error decoding signer_public_key: {}", e)),
+            Err(e) => {
+                return VerifyResult::Fail(format!("error decoding signer_public_key: {}", e))
+            }
         };
         let key_arr: [u8; 32] = match key_bytes.try_into() {
             Ok(arr) => arr,
-            Err(_) => return VerifyResult::Fail("signer_public_key has invalid length (expected 32 bytes)".to_string()),
+            Err(_) => {
+                return VerifyResult::Fail(
+                    "signer_public_key has invalid length (expected 32 bytes)".to_string(),
+                )
+            }
         };
         match VerifyingKey::from_bytes(&key_arr) {
             Ok(k) => k,
@@ -62,7 +73,9 @@ pub fn verify_bundle(signed_json: &serde_json::Value, verifying_key_override: Op
     // Extract the signature
     let sig_b64 = match trust.get("bundle_attestation").and_then(|v| v.as_str()) {
         Some(s) => s,
-        None => return VerifyResult::Fail("bundle_attestation missing from trust section".to_string()),
+        None => {
+            return VerifyResult::Fail("bundle_attestation missing from trust section".to_string())
+        }
     };
 
     let sig_bytes = match BASE64.decode(sig_b64) {
@@ -72,7 +85,11 @@ pub fn verify_bundle(signed_json: &serde_json::Value, verifying_key_override: Op
 
     let sig_arr: [u8; 64] = match sig_bytes.try_into() {
         Ok(arr) => arr,
-        Err(_) => return VerifyResult::Fail("bundle_attestation has invalid length (expected 64 bytes)".to_string()),
+        Err(_) => {
+            return VerifyResult::Fail(
+                "bundle_attestation has invalid length (expected 64 bytes)".to_string(),
+            )
+        }
     };
 
     let signature = Signature::from_bytes(&sig_arr);

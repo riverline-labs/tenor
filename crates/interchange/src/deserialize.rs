@@ -1046,8 +1046,7 @@ mod tests {
             .expect("workspace root");
         let positive_dir = workspace.join("conformance").join("positive");
 
-        let entries =
-            std::fs::read_dir(&positive_dir).expect("conformance/positive/ not found");
+        let entries = std::fs::read_dir(&positive_dir).expect("conformance/positive/ not found");
 
         let mut checked = 0usize;
         for entry in entries {
@@ -1083,7 +1082,11 @@ mod tests {
             checked += 1;
         }
 
-        assert!(checked > 0, "no conformance fixtures found in {:?}", positive_dir);
+        assert!(
+            checked > 0,
+            "no conformance fixtures found in {:?}",
+            positive_dir
+        );
     }
 
     #[test]

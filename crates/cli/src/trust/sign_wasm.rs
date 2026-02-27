@@ -147,18 +147,12 @@ mod tests {
 
         let attestation = sign_wasm_bytes(fake_wasm, &sk, bundle_etag);
 
-        assert!(
-            attestation.get("wasm_hash").is_some(),
-            "wasm_hash missing"
-        );
+        assert!(attestation.get("wasm_hash").is_some(), "wasm_hash missing");
         assert!(
             attestation.get("bundle_etag").is_some(),
             "bundle_etag missing"
         );
-        assert!(
-            attestation.get("signature").is_some(),
-            "signature missing"
-        );
+        assert!(attestation.get("signature").is_some(), "signature missing");
         assert!(
             attestation.get("signer_public_key").is_some(),
             "signer_public_key missing"

@@ -86,8 +86,16 @@ fn test_cli_keygen() {
         .decode(pub_contents.trim())
         .expect(".pub file is not valid base64");
 
-    assert_eq!(secret_bytes.len(), 32, ".secret must be 32 bytes (Ed25519 seed)");
-    assert_eq!(pub_bytes.len(), 32, ".pub must be 32 bytes (Ed25519 verifying key)");
+    assert_eq!(
+        secret_bytes.len(),
+        32,
+        ".secret must be 32 bytes (Ed25519 seed)"
+    );
+    assert_eq!(
+        pub_bytes.len(),
+        32,
+        ".pub must be 32 bytes (Ed25519 verifying key)"
+    );
 }
 
 // ── Test 2: sign and verify ─────────────────────────────────────────
@@ -116,10 +124,7 @@ fn test_cli_sign_and_verify() {
 
     // Verify the signed bundle (using embedded public key)
     tenor()
-        .args([
-            "verify",
-            signed_path.to_str().unwrap(),
-        ])
+        .args(["verify", signed_path.to_str().unwrap()])
         .assert()
         .success();
 }
@@ -268,7 +273,11 @@ fn test_cli_verify_wasm_fails_tampered() {
     let sig_path = PathBuf::from(&sig_path_str);
 
     // Tamper: overwrite the WASM file with different content
-    fs::write(&wasm_path, b"\x00asm\x01\x00\x00\x00tampered wasm content!!").unwrap();
+    fs::write(
+        &wasm_path,
+        b"\x00asm\x01\x00\x00\x00tampered wasm content!!",
+    )
+    .unwrap();
 
     // Verify must fail
     tenor()

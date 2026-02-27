@@ -237,7 +237,11 @@ mod tests {
 
         let attestation = sign_wasm_bytes(wasm_bytes, &sk, bundle_etag);
         let result = verify_wasm_bytes(wasm_bytes, &attestation, &vk);
-        assert_eq!(result, VerifyWasmResult::Ok, "roundtrip verification failed");
+        assert_eq!(
+            result,
+            VerifyWasmResult::Ok,
+            "roundtrip verification failed"
+        );
     }
 
     #[test]
