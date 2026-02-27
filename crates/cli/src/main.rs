@@ -170,7 +170,7 @@ enum Commands {
     Connect {
         /// Path to the .tenor source file or interchange JSON
         contract: PathBuf,
-        /// Path to external schema document (OpenAPI, etc.)
+        /// Path to external schema document (OpenAPI, GraphQL SDL, SQL DDL — auto-detected)
         #[arg(long)]
         environment: Option<PathBuf>,
         /// Output directory for generated adapter scaffolding
@@ -179,6 +179,21 @@ enum Commands {
         /// Show proposed mappings without generating files
         #[arg(long)]
         dry_run: bool,
+        /// Output review file instead of interactive prompts
+        #[arg(long)]
+        batch: bool,
+        /// Generate adapters from a reviewed mapping file
+        #[arg(long)]
+        apply: Option<PathBuf>,
+        /// LLM model to use (default: claude-sonnet-4-20250514)
+        #[arg(long)]
+        model: Option<String>,
+        /// Force heuristic matching (skip LLM even if API key is set)
+        #[arg(long)]
+        heuristic: bool,
+        /// Show detailed matching reasoning
+        #[arg(long)]
+        verbose: bool,
     },
 
     /// Start the Language Server Protocol server over stdio
@@ -279,15 +294,25 @@ fn main() {
             environment,
             out,
             dry_run,
+            batch,
+            apply,
+            model,
+            heuristic,
+            verbose,
         } => {
-            connect::cmd_connect(
-                &contract,
-                environment.as_deref(),
-                &out,
+            connect::cmd_connect(connect::ConnectOptions {
+                contract: &contract,
+                environment: environment.as_deref(),
+                output_dir: &out,
                 dry_run,
-                cli.output,
-                cli.quiet,
-            );
+                batch,
+                apply: apply.as_deref(),
+                model: model.as_deref(),
+                heuristic,
+                verbose,
+                output: cli.output,
+                quiet: cli.quiet,
+            });
         }
         Commands::Lsp => {
             if let Err(e) = tenor_lsp::run() {
