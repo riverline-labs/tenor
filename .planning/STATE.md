@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 8 of 11 — Automatic UI
-**Plan**: 4 of 4 completed in current phase
-**Status**: Phase 8 complete
-**Last activity**: 2026-02-27 — Phase 8 Plan 4 complete (UI generation test suite: 12 integration tests)
+**Phase**: 9 of 11 — Builder SPA
+**Plan**: 1 of 7 completed in current phase
+**Status**: Phase 9 in progress
+**Last activity**: 2026-02-27 — Phase 9 Plan 1 complete (Builder SPA scaffold: Vite + React + TypeScript + WASM evaluator + Zustand stores + DSL generator + layout utilities + application shell)
 
-Progress: ████████████████░░░░ 64% (Phases 1-7 complete, Phase 8 started)
+Progress: ██████████████████░░ 72% (Phases 1-8 complete, Phase 9 started)
 
 ## Decisions
 
@@ -99,6 +99,11 @@ Progress: ████████████████░░░░ 64% (Phas
 - [Phase 08]: [08-04] TypeScript compilation tests marked #[ignore] — avoid CI dependency on Node.js
 - [Phase 08]: [08-04] Fact ID assertions use OR patterns (isActive || is_active) to tolerate camelCase conversion
 
+- [Phase 09-01] Internal model is always interchange JSON; DSL generated only at export time
+- [Phase 09-01] WASM pkg committed via git force-add (wasm-pack generates .gitignore with * that blocks tracking)
+- [Phase 09-01] zundo used for undo/redo (zustand temporal middleware, 50-state history)
+- [Phase 09-01] Simulation store reads contractHandle from elaboration store (no duplicate WASM state)
+
 ## Blockers/Concerns
 
 - Part B (private repo) depends on Part A being pushed to main first
@@ -134,9 +139,10 @@ Progress: ████████████████░░░░ 64% (Phas
 | 08 | 02 | 882 | 7 | 6 |
 | 08 | 03 | 291 | 5 | 5 |
 | 08 | 04 | 216 | 6 | 1 |
+| 09 | 01 | 746 | 10 | 21 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 08-04-PLAN.md (UI generation test suite: 12 integration tests)
-Next action: Phase 8 complete — proceed to Phase 9
+Stopped at: Completed 09-01-PLAN.md (Builder SPA scaffold: Vite + React + TypeScript + WASM + Zustand stores + DSL generator)
+Next action: Phase 9 Plan 2 — Fact editor and entity state machine editor
