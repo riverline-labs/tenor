@@ -206,8 +206,8 @@ enum Commands {
         #[arg(long, default_value = "ed25519")]
         algorithm: String,
         /// Output file prefix (default: tenor-key)
-        #[arg(long, default_value = "tenor-key")]
-        output: String,
+        #[arg(long = "prefix", default_value = "tenor-key")]
+        prefix: String,
     },
 
     /// Sign an interchange bundle with a detached attestation
@@ -218,8 +218,8 @@ enum Commands {
         #[arg(long)]
         key: PathBuf,
         /// Output file path (default: <bundle>.signed.json)
-        #[arg(long)]
-        output: Option<PathBuf>,
+        #[arg(long = "out", name = "out")]
+        out: Option<PathBuf>,
         /// Attestation format identifier
         #[arg(long, default_value = "ed25519-detached")]
         format: String,
@@ -355,16 +355,16 @@ fn main() {
                 process::exit(1);
             }
         }
-        Commands::Keygen { algorithm, output } => {
-            trust::keygen::cmd_keygen(&algorithm, &output);
+        Commands::Keygen { algorithm, prefix } => {
+            trust::keygen::cmd_keygen(&algorithm, &prefix);
         }
         Commands::Sign {
             bundle,
             key,
-            output,
+            out,
             format,
         } => {
-            trust::sign::cmd_sign(&bundle, &key, output.as_deref(), &format);
+            trust::sign::cmd_sign(&bundle, &key, out.as_deref(), &format);
         }
         Commands::Verify { bundle, pubkey } => {
             trust::verify::cmd_verify(&bundle, pubkey.as_deref());

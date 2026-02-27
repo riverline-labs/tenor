@@ -38,7 +38,10 @@ pub fn cmd_keygen(algorithm: &str, output_prefix: &str) {
         use std::os::unix::fs::PermissionsExt;
         let perms = std::fs::Permissions::from_mode(0o600);
         if let Err(e) = std::fs::set_permissions(&secret_path, perms) {
-            eprintln!("warning: failed to set permissions on '{}': {}", secret_path, e);
+            eprintln!(
+                "warning: failed to set permissions on '{}': {}",
+                secret_path, e
+            );
         }
     }
 
@@ -64,9 +67,12 @@ pub fn read_secret_key(path: &Path) -> Result<SigningKey, String> {
     let bytes = BASE64
         .decode(contents.trim())
         .map_err(|e| format!("error decoding secret key '{}': {}", path.display(), e))?;
-    let key_bytes: [u8; 32] = bytes
-        .try_into()
-        .map_err(|_| format!("invalid secret key length in '{}': expected 32 bytes", path.display()))?;
+    let key_bytes: [u8; 32] = bytes.try_into().map_err(|_| {
+        format!(
+            "invalid secret key length in '{}': expected 32 bytes",
+            path.display()
+        )
+    })?;
     Ok(SigningKey::from_bytes(&key_bytes))
 }
 
@@ -79,9 +85,12 @@ pub fn read_public_key(path: &Path) -> Result<VerifyingKey, String> {
     let bytes = BASE64
         .decode(contents.trim())
         .map_err(|e| format!("error decoding public key '{}': {}", path.display(), e))?;
-    let key_bytes: [u8; 32] = bytes
-        .try_into()
-        .map_err(|_| format!("invalid public key length in '{}': expected 32 bytes", path.display()))?;
+    let key_bytes: [u8; 32] = bytes.try_into().map_err(|_| {
+        format!(
+            "invalid public key length in '{}': expected 32 bytes",
+            path.display()
+        )
+    })?;
     VerifyingKey::from_bytes(&key_bytes)
         .map_err(|e| format!("invalid public key material in '{}': {}", path.display(), e))
 }
