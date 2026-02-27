@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 8 of 11 — Automatic UI
-**Plan**: 3 of ? completed in current phase
-**Status**: Phase 8 in progress
-**Last activity**: 2026-02-27 — Phase 8 Plan 3 complete (professional theming: theme.rs module, global CSS, textPrimary/textSecondary rename)
+**Plan**: 4 of 4 completed in current phase
+**Status**: Phase 8 complete
+**Last activity**: 2026-02-27 — Phase 8 Plan 4 complete (UI generation test suite: 12 integration tests)
 
 Progress: ████████████████░░░░ 64% (Phases 1-7 complete, Phase 8 started)
 
@@ -95,6 +95,9 @@ Progress: ████████████████░░░░ 64% (Phas
 - [Phase 08-03] textPrimary/textSecondary rename: matches new theme.ts output keys; old text/textMuted removed from all generated TypeScript
 - [Phase 08-03] sidebar color removed from theme: Layout now uses theme.colors.surface for sidebar background
 - [Phase 08-03] styles.css emitted as standalone global reset: imported in main.tsx, complements per-component inline styles
+- [Phase 08]: [08-04] Minimal contract written inline as const (not a fixture file) for self-contained tests
+- [Phase 08]: [08-04] TypeScript compilation tests marked #[ignore] — avoid CI dependency on Node.js
+- [Phase 08]: [08-04] Fact ID assertions use OR patterns (isActive || is_active) to tolerate camelCase conversion
 
 ## Blockers/Concerns
 
@@ -130,9 +133,10 @@ Progress: ████████████████░░░░ 64% (Phas
 | 08 | 01 | 438 | 6 | 5 |
 | 08 | 02 | 882 | 7 | 6 |
 | 08 | 03 | 291 | 5 | 5 |
+| 08 | 04 | 216 | 6 | 1 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 08-03-PLAN.md (professional theming: theme.rs module, global CSS, textPrimary/textSecondary rename)
-Next action: Execute Phase 8 Plan 4 (if exists) or Phase 8 completion
+Stopped at: Completed 08-04-PLAN.md (UI generation test suite: 12 integration tests)
+Next action: Phase 8 complete — proceed to Phase 9
