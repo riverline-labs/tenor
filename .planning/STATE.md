@@ -3,11 +3,11 @@
 ## Current Position
 
 **Phase**: 4 of 11 — Multi-Instance Entities
-**Plan**: 2 of 5 completed in current phase
+**Plan**: 3 of 5 completed in current phase
 **Status**: In progress
-**Last activity**: 2026-02-27 — Completed plan 04-02 (instance-targeted operation and flow execution)
+**Last activity**: 2026-02-27 — Completed plan 04-03 (per-instance action space and instance-scoped provenance)
 
-Progress: ████████░░░░░░░░░░░░ 31% (Phases 1-3 complete, plans 04-01 and 04-02 done, 35 plans remaining)
+Progress: ████████░░░░░░░░░░░░ 33% (Phases 1-3 complete, plans 04-01 through 04-03 done, 34 plans remaining)
 
 ## Decisions
 
@@ -25,6 +25,10 @@ Progress: ████████░░░░░░░░░░░░ 31% (Phas
 - Empty InstanceBindingMap falls back to DEFAULT_INSTANCE_ID for full backward compat
 - EffectRecord gains instance_id field per §9.5 provenance requirements
 - evaluate_flow() public API gains instance_bindings parameter (empty map = backward compat)
+- Action.instance_bindings is BTreeMap<String, BTreeSet<String>> (entity_id to set of valid instance_ids) per §15.6
+- OperationProvenance.state_before/state_after use BTreeMap<(String,String),String> tuple keys (internal type, not serialized)
+- Two-pass effect loop: validate+capture state_before first, then apply, then capture state_after
+- StepRecord.instance_bindings empty for non-operation steps (branch, handoff, escalation)
 
 ## Blockers/Concerns
 
@@ -37,9 +41,10 @@ Progress: ████████░░░░░░░░░░░░ 31% (Phas
 |-------|------|-------------|-------|-------|
 | 04 | 01 | 740 | 2 | 7 |
 | 04 | 02 | 633 | 2 | 11 |
+| 04 | 03 | 536 | 2 | 4 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed plan 04-02 (instance-targeted operation and flow execution)
-Next action: Execute plan 04-03
+Stopped at: Completed plan 04-03 (per-instance action space and instance-scoped provenance)
+Next action: Execute plan 04-04

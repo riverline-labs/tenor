@@ -173,7 +173,7 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 | 1. Migration | Complete | — | 2026-02-26 |
 | 2. Source Declarations | Complete | — | 2026-02-27 |
 | 3. Automated Fact Wiring | Complete | — | 2026-02-27 |
-| 4. Multi-Instance Entities | 2/5 | In Progress|  |
+| 4. Multi-Instance Entities | 3/5 | In Progress|  |
 | 5. Trust & Security | Planned | 0/6 | — |
 | 6. Advanced Policies | Planned | 0/4 | — |
 | 7. SDKs | Planned | 0/4 | — |

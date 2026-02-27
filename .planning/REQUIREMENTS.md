@@ -30,14 +30,14 @@
 - [x] **FLX-05**: Missing binding for entity referenced in effects = execution error
 
 ### Action Space
-- [ ] **ACT-01**: compute_action_space() returns per-instance results
-- [ ] **ACT-02**: Action struct includes instance_bindings (entity_id → set of valid instance_ids)
-- [ ] **ACT-03**: BlockedAction includes per-instance blocking info
+- [x] **ACT-01**: compute_action_space() returns per-instance results
+- [x] **ACT-02**: Action struct includes instance_bindings (entity_id → set of valid instance_ids)
+- [x] **ACT-03**: BlockedAction includes per-instance blocking info
 
 ### Provenance
-- [ ] **PRV-01**: OperationProvenance records instance_binding map
-- [ ] **PRV-02**: OperationProvenance has per-instance state_before/state_after
-- [ ] **PRV-03**: FlowProvenance carries instance bindings through step records
+- [x] **PRV-01**: OperationProvenance records instance_binding map
+- [x] **PRV-02**: OperationProvenance has per-instance state_before/state_after
+- [x] **PRV-03**: FlowProvenance carries instance bindings through step records
 
 ### Testing
 - [x] **TST-01**: All existing tests updated to use single_instance() helper
@@ -135,12 +135,12 @@
 | FLX-03 | 04-02 | Complete |
 | FLX-04 | 04-02 | Complete |
 | FLX-05 | 04-02 | Complete |
-| ACT-01 | 04-03 | Pending |
-| ACT-02 | 04-03 | Pending |
-| ACT-03 | 04-03 | Pending |
-| PRV-01 | 04-03 | Pending |
-| PRV-02 | 04-03 | Pending |
-| PRV-03 | 04-03 | Pending |
+| ACT-01 | 04-03 | Complete |
+| ACT-02 | 04-03 | Complete |
+| ACT-03 | 04-03 | Complete |
+| PRV-01 | 04-03 | Complete |
+| PRV-02 | 04-03 | Complete |
+| PRV-03 | 04-03 | Complete |
 | TST-01 | 04-01 | Complete |
 | TST-02 | 04-04 | Pending |
 | TST-03 | 04-04 | Pending |
