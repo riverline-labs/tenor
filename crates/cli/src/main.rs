@@ -9,6 +9,7 @@ mod runner;
 mod serve;
 mod tap;
 mod trust;
+mod ui;
 
 use std::path::{Path, PathBuf};
 use std::process;
@@ -197,6 +198,27 @@ enum Commands {
         verbose: bool,
     },
 
+    /// Generate a React application from a contract
+    Ui {
+        /// Path to .tenor source file or interchange JSON bundle
+        contract: PathBuf,
+        /// Output directory (default: ./tenor-ui/)
+        #[arg(long = "out", default_value = "./tenor-ui")]
+        out_dir: PathBuf,
+        /// Executor API base URL
+        #[arg(long, default_value = "http://localhost:3000")]
+        api_url: String,
+        /// Contract ID for multi-contract executors
+        #[arg(long)]
+        contract_id: Option<String>,
+        /// Custom theme file (JSON)
+        #[arg(long)]
+        theme: Option<PathBuf>,
+        /// Application title (default: contract id)
+        #[arg(long)]
+        title: Option<String>,
+    },
+
     /// Start the Language Server Protocol server over stdio
     Lsp,
 
@@ -369,6 +391,25 @@ fn main() {
                 model: model.as_deref(),
                 heuristic,
                 verbose,
+                output: cli.output,
+                quiet: cli.quiet,
+            });
+        }
+        Commands::Ui {
+            contract,
+            out_dir,
+            api_url,
+            contract_id,
+            theme,
+            title,
+        } => {
+            ui::cmd_ui(ui::UiOptions {
+                contract: &contract,
+                output_dir: &out_dir,
+                api_url: &api_url,
+                contract_id: contract_id.as_deref(),
+                theme: theme.as_deref(),
+                title: title.as_deref(),
                 output: cli.output,
                 quiet: cli.quiet,
             });
