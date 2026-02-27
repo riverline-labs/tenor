@@ -8,6 +8,7 @@ mod migrate;
 mod runner;
 mod serve;
 mod tap;
+mod trust;
 
 use std::path::{Path, PathBuf};
 use std::process;
@@ -198,6 +199,30 @@ enum Commands {
 
     /// Start the Language Server Protocol server over stdio
     Lsp,
+
+    /// Sign a WASM evaluator binary with bundle binding
+    SignWasm {
+        /// Path to the WASM binary file
+        wasm: PathBuf,
+        /// Path to the Ed25519 secret key file
+        #[arg(long)]
+        key: PathBuf,
+        /// Bundle etag to bind the WASM binary to
+        #[arg(long)]
+        bundle_etag: String,
+    },
+
+    /// Verify a signed WASM evaluator binary
+    VerifyWasm {
+        /// Path to the WASM binary file
+        wasm: PathBuf,
+        /// Path to the detached signature file
+        #[arg(long)]
+        sig: PathBuf,
+        /// Path to the public key file
+        #[arg(long)]
+        pubkey: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -319,6 +344,16 @@ fn main() {
                 eprintln!("LSP server error: {}", e);
                 process::exit(1);
             }
+        }
+        Commands::SignWasm {
+            wasm,
+            key,
+            bundle_etag,
+        } => {
+            trust::sign_wasm::cmd_sign_wasm(&wasm, &key, &bundle_etag);
+        }
+        Commands::VerifyWasm { wasm, sig, pubkey } => {
+            trust::verify_wasm::cmd_verify_wasm(&wasm, &sig, &pubkey);
         }
     }
 }
