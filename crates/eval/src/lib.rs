@@ -42,8 +42,9 @@ pub use operation::{
 #[cfg(feature = "anthropic")]
 pub use policy::AnthropicClient;
 pub use policy::{
-    AgentPolicy, AgentSnapshot, ApprovalChannel, ApprovalResult, CallbackApprovalChannel,
-    FirstAvailablePolicy, HumanInTheLoopPolicy, LlmClient, LlmError, LlmPolicy, Message,
+    AgentPolicy, AgentSnapshot, AlwaysApprove, ApprovalChannel, ApprovalPredicate, ApprovalResult,
+    CallbackApprovalChannel, CompositePolicy, EntityStatePredicate, FirstAvailablePolicy,
+    FlowIdPredicate, HumanInTheLoopPolicy, LlmClient, LlmError, LlmPolicy, Message, NeverApprove,
     PriorityPolicy, RandomPolicy, StdinApprovalChannel, TimeoutBehavior,
 };
 pub use types::{Contract, EvalError, FactSet, Value, VerdictInstance, VerdictSet};
