@@ -42,7 +42,8 @@
         { "$ref": "#/$defs/Persona" },
         { "$ref": "#/$defs/Operation" },
         { "$ref": "#/$defs/Flow" },
-        { "$ref": "#/$defs/System" }
+        { "$ref": "#/$defs/System" },
+        { "$ref": "#/$defs/SourceConstruct" }
       ]
     },
 
@@ -264,14 +265,53 @@
       ]
     },
 
-    "Source": {
+    "FreetextSource": {
       "type": "object",
       "required": ["field", "system"],
       "additionalProperties": false,
-      "description": "External data source binding for a Fact.",
+      "description": "Legacy freetext source binding for a Fact. The freetext string 'system.field' is split into system and field components.",
       "properties": {
         "field": { "type": "string" },
         "system": { "type": "string" }
+      }
+    },
+
+    "StructuredSource": {
+      "type": "object",
+      "required": ["path", "source_id"],
+      "additionalProperties": false,
+      "description": "Structured source binding referencing a declared Source construct.",
+      "properties": {
+        "path": { "type": "string", "description": "Dot-separated path within the source." },
+        "source_id": { "type": "string", "description": "Reference to a declared Source construct id." }
+      }
+    },
+
+    "FactSource": {
+      "description": "Source binding for a Fact. Either a legacy freetext binding or a structured reference to a declared Source construct.",
+      "oneOf": [
+        { "$ref": "#/$defs/FreetextSource" },
+        { "$ref": "#/$defs/StructuredSource" }
+      ]
+    },
+
+    "SourceConstruct": {
+      "type": "object",
+      "required": ["fields", "id", "kind", "protocol", "provenance", "tenor"],
+      "additionalProperties": false,
+      "description": "A declared external data source. Section 18.2.8 of the Tenor spec.",
+      "properties": {
+        "description": { "type": "string", "description": "Human-readable description of the source." },
+        "fields": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Protocol-specific key-value fields (e.g., base_url, dialect, endpoint, auth)."
+        },
+        "id": { "type": "string" },
+        "kind": { "const": "Source" },
+        "protocol": { "type": "string", "description": "Protocol tag: http, database, graphql, grpc, static, manual, or x_* extension." },
+        "provenance": { "$ref": "#/$defs/Provenance" },
+        "tenor": { "type": "string" }
       }
     },
 
@@ -288,7 +328,7 @@
         "id": { "type": "string" },
         "kind": { "const": "Fact" },
         "provenance": { "$ref": "#/$defs/Provenance" },
-        "source": { "$ref": "#/$defs/Source" },
+        "source": { "$ref": "#/$defs/FactSource" },
         "tenor": { "type": "string" },
         "type": { "$ref": "#/$defs/BaseType" }
       }

@@ -15,6 +15,7 @@ pub struct Index {
     pub type_decls: HashMap<String, Provenance>,
     pub personas: HashMap<String, Provenance>,
     pub systems: HashMap<String, Provenance>,
+    pub sources: HashMap<String, Provenance>,
     /// Map from rule_id -> verdict_type name produced by that rule
     pub rule_verdicts: HashMap<String, String>,
     /// Map from verdict_type -> (rule_id, stratum) of the producing rule
@@ -31,6 +32,7 @@ pub fn build_index(constructs: &[RawConstruct]) -> Result<Index, ElabError> {
         type_decls: HashMap::new(),
         personas: HashMap::new(),
         systems: HashMap::new(),
+        sources: HashMap::new(),
         rule_verdicts: HashMap::new(),
         verdict_strata: HashMap::new(),
     };
@@ -181,6 +183,23 @@ pub fn build_index(constructs: &[RawConstruct]) -> Result<Index, ElabError> {
                     ));
                 }
                 idx.systems.insert(id.clone(), prov.clone());
+            }
+            RawConstruct::Source { id, prov, .. } => {
+                if let Some(first) = idx.sources.get(id) {
+                    return Err(ElabError::new(
+                        2,
+                        Some("Source"),
+                        Some(id),
+                        Some("id"),
+                        &prov.file,
+                        prov.line,
+                        format!(
+                            "duplicate Source id '{}': first declared at line {}",
+                            id, first.line
+                        ),
+                    ));
+                }
+                idx.sources.insert(id.clone(), prov.clone());
             }
             RawConstruct::Import { .. } => {}
         }

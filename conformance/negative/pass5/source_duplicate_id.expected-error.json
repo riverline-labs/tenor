@@ -1,0 +1,9 @@
+{
+  "construct_id": "dup_source",
+  "construct_kind": "Source",
+  "field": "id",
+  "file": "source_duplicate_id.tenor",
+  "line": 6,
+  "message": "duplicate Source id 'dup_source': first declared at line 1",
+  "pass": 2
+}

@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 // Re-export AST types so existing callers that use `parser::Foo` still work.
 pub use crate::ast::{
     Provenance, RawBranch, RawCompStep, RawConstruct, RawExpr, RawFailureHandler, RawJoinPolicy,
-    RawLiteral, RawStep, RawStepTarget, RawTerm, RawTrigger, RawType,
+    RawLiteral, RawSourceDecl, RawStep, RawStepTarget, RawTerm, RawTrigger, RawType,
 };
 
 // ──────────────────────────────────────────────
@@ -615,6 +615,7 @@ impl<'a> Parser<'a> {
                 "flow" => self.parse_flow(line),
                 "persona" => self.parse_persona(line),
                 "system" => self.parse_system(line),
+                "source" => self.parse_source(line),
                 _ => Err(self.err(format!("unexpected token '{}'", w))),
             },
             other => Err(self.err(format!("expected construct keyword, got {:?}", other))),
@@ -678,7 +679,7 @@ impl<'a> Parser<'a> {
                     type_ = Some(self.parse_type()?);
                 }
                 "source" => {
-                    source = Some(self.take_str()?);
+                    source = Some(self.parse_fact_source()?);
                 }
                 "default" => {
                     default = Some(self.parse_literal()?);
@@ -697,6 +698,76 @@ impl<'a> Parser<'a> {
                 line,
             },
         })
+    }
+
+    fn parse_fact_source(&mut self) -> Result<RawSourceDecl, ElabError> {
+        // Freetext: source: "some.string"
+        // Structured: source: source_id { path: "..." }
+        if let Token::Str(_) = self.peek() {
+            let s = self.take_str()?;
+            return Ok(RawSourceDecl::Freetext(s));
+        }
+        // Structured form: bare identifier then { path: "..." }
+        let source_id = self.take_word()?;
+        self.expect_lbrace()?;
+        self.expect_word("path")?;
+        self.expect_colon()?;
+        let path = self.take_str()?;
+        self.expect_rbrace()?;
+        Ok(RawSourceDecl::Structured { source_id, path })
+    }
+
+    fn parse_source(&mut self, line: u32) -> Result<RawConstruct, ElabError> {
+        self.advance(); // consume 'source'
+        let id = self.take_word()?;
+        self.expect_lbrace()?;
+        let mut protocol = None;
+        let mut description = None;
+        let mut fields = BTreeMap::new();
+        while self.peek() != &Token::RBrace {
+            let key = self.take_word()?;
+            self.expect_colon()?;
+            match key.as_str() {
+                "protocol" => {
+                    protocol = Some(self.parse_protocol_tag()?);
+                }
+                "description" => {
+                    description = Some(self.take_str()?);
+                }
+                _ => {
+                    // All other fields: accept string or bare word as string value
+                    let val = if let Token::Str(_) = self.peek() {
+                        self.take_str()?
+                    } else {
+                        self.take_word()?
+                    };
+                    fields.insert(key, val);
+                }
+            }
+        }
+        self.expect_rbrace()?;
+        Ok(RawConstruct::Source {
+            id,
+            protocol: protocol.ok_or_else(|| self.err("Source missing 'protocol'"))?,
+            fields,
+            description,
+            prov: Provenance {
+                file: self.filename.clone(),
+                line,
+            },
+        })
+    }
+
+    fn parse_protocol_tag(&mut self) -> Result<String, ElabError> {
+        let mut tag = self.take_word()?;
+        // Handle dotted extension tags like x_internal.event_bus
+        while self.peek() == &Token::Dot {
+            self.advance();
+            let segment = self.take_word()?;
+            tag.push('.');
+            tag.push_str(&segment);
+        }
+        Ok(tag)
     }
 
     fn parse_entity(&mut self, line: u32) -> Result<RawConstruct, ElabError> {
@@ -1626,7 +1697,7 @@ impl<'a> Parser<'a> {
             Token::Word(w) if matches!(
                 w.as_str(),
                 "fact" | "entity" | "rule" | "operation" | "flow"
-                    | "type" | "persona" | "system" | "import"
+                    | "type" | "persona" | "system" | "import" | "source"
             )
         )
     }

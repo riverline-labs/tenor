@@ -545,6 +545,22 @@ fn index_construct(
                 children: None,
             });
         }
+        RawConstruct::Source { id, prov, .. } => {
+            let loc = make_location(uri, content, prov.line);
+            index
+                .declarations
+                .insert(("Source".to_string(), id.clone()), loc);
+            symbols.push(DocumentSymbol {
+                name: id.clone(),
+                detail: Some("Source".to_string()),
+                kind: SymbolKind::NAMESPACE,
+                tags: None,
+                deprecated: None,
+                range: make_range(content, prov.line),
+                selection_range: make_range(content, prov.line),
+                children: None,
+            });
+        }
         RawConstruct::Import { .. } => {}
     }
 }

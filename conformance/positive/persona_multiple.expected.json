@@ -1,6 +1,24 @@
 {
   "constructs": [
     {
+      "id": "approver",
+      "kind": "Persona",
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 7
+      },
+      "tenor": "1.0"
+    },
+    {
+      "id": "reviewer",
+      "kind": "Persona",
+      "provenance": {
+        "file": "persona_multiple.tenor",
+        "line": 6
+      },
+      "tenor": "1.0"
+    },
+    {
       "id": "amount",
       "kind": "Fact",
       "provenance": {
@@ -41,24 +59,6 @@
           "to": "approved"
         }
       ]
-    },
-    {
-      "id": "approver",
-      "kind": "Persona",
-      "provenance": {
-        "file": "persona_multiple.tenor",
-        "line": 7
-      },
-      "tenor": "1.0"
-    },
-    {
-      "id": "reviewer",
-      "kind": "Persona",
-      "provenance": {
-        "file": "persona_multiple.tenor",
-        "line": 6
-      },
-      "tenor": "1.0"
     },
     {
       "allowed_personas": [

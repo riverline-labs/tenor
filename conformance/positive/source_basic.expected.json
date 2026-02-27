@@ -1,0 +1,112 @@
+{
+  "constructs": [
+    {
+      "description": "Human-provided input from buyer self-service portal",
+      "fields": {},
+      "id": "buyer_portal",
+      "kind": "Source",
+      "protocol": "manual",
+      "provenance": {
+        "file": "source_basic.tenor",
+        "line": 20
+      },
+      "tenor": "1.0"
+    },
+    {
+      "description": "Compliance reporting database",
+      "fields": {
+        "dialect": "postgres"
+      },
+      "id": "compliance_db",
+      "kind": "Source",
+      "protocol": "database",
+      "provenance": {
+        "file": "source_basic.tenor",
+        "line": 9
+      },
+      "tenor": "1.0"
+    },
+    {
+      "description": "Static configuration values",
+      "fields": {},
+      "id": "config_store",
+      "kind": "Source",
+      "protocol": "static",
+      "provenance": {
+        "file": "source_basic.tenor",
+        "line": 15
+      },
+      "tenor": "1.0"
+    },
+    {
+      "description": "Order management REST API",
+      "fields": {
+        "auth": "bearer_token",
+        "base_url": "https://api.orders.com/v2",
+        "schema_ref": "https://api.orders.com/v2/openapi.json"
+      },
+      "id": "order_service",
+      "kind": "Source",
+      "protocol": "http",
+      "provenance": {
+        "file": "source_basic.tenor",
+        "line": 1
+      },
+      "tenor": "1.0"
+    },
+    {
+      "id": "compliance_flag",
+      "kind": "Fact",
+      "provenance": {
+        "file": "source_basic.tenor",
+        "line": 30
+      },
+      "source": {
+        "path": "compliance.flag",
+        "source_id": "compliance_db"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "id": "escrow_amount",
+      "kind": "Fact",
+      "provenance": {
+        "file": "source_basic.tenor",
+        "line": 25
+      },
+      "source": {
+        "path": "orders.balance",
+        "source_id": "order_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Int",
+        "max": 1000000,
+        "min": 0
+      }
+    },
+    {
+      "id": "manual_input",
+      "kind": "Fact",
+      "provenance": {
+        "file": "source_basic.tenor",
+        "line": 35
+      },
+      "source": {
+        "field": "refund_requested",
+        "system": "buyer_portal"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    }
+  ],
+  "id": "source_basic",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

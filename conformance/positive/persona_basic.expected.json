@@ -1,6 +1,15 @@
 {
   "constructs": [
     {
+      "id": "admin",
+      "kind": "Persona",
+      "provenance": {
+        "file": "persona_basic.tenor",
+        "line": 6
+      },
+      "tenor": "1.0"
+    },
+    {
       "id": "status",
       "kind": "Fact",
       "provenance": {
@@ -39,15 +48,6 @@
           "to": "closed"
         }
       ]
-    },
-    {
-      "id": "admin",
-      "kind": "Persona",
-      "provenance": {
-        "file": "persona_basic.tenor",
-        "line": 6
-      },
-      "tenor": "1.0"
     },
     {
       "allowed_personas": [

@@ -1,0 +1,9 @@
+source risk_engine {
+  protocol: x_internal.event_bus
+  description: "Internal Kafka-backed risk engine"
+}
+
+fact risk_score {
+  type: Int(min: 0, max: 100)
+  source: risk_engine { path: "scores.current" }
+}

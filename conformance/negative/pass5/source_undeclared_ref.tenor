@@ -1,0 +1,4 @@
+fact bad_fact {
+  type: Bool
+  source: nonexistent { path: "foo.bar" }
+}

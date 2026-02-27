@@ -74,6 +74,17 @@ pub enum RawLiteral {
 }
 
 // ──────────────────────────────────────────────
+// Source declarations on Facts
+// ──────────────────────────────────────────────
+
+/// Source declaration on a Fact: freetext string or structured reference.
+#[derive(Debug, Clone)]
+pub enum RawSourceDecl {
+    Freetext(String),
+    Structured { source_id: String, path: String },
+}
+
+// ──────────────────────────────────────────────
 // Raw expressions
 // ──────────────────────────────────────────────
 
@@ -145,7 +156,7 @@ pub enum RawConstruct {
     Fact {
         id: String,
         type_: RawType,
-        source: String,
+        source: RawSourceDecl,
         default: Option<RawLiteral>,
         prov: Provenance,
     },
@@ -191,6 +202,13 @@ pub enum RawConstruct {
     },
     Persona {
         id: String,
+        prov: Provenance,
+    },
+    Source {
+        id: String,
+        protocol: String,
+        fields: BTreeMap<String, String>,
+        description: Option<String>,
         prov: Provenance,
     },
     Flow {

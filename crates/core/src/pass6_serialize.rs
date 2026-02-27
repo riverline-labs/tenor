@@ -36,6 +36,7 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
     let mut flows: Vec<&RawConstruct> = Vec::new();
     let mut personas: Vec<&RawConstruct> = Vec::new();
     let mut systems: Vec<&RawConstruct> = Vec::new();
+    let mut sources: Vec<&RawConstruct> = Vec::new();
 
     for c in constructs {
         match c {
@@ -48,6 +49,7 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
             RawConstruct::Flow { .. } => flows.push(c),
             RawConstruct::Persona { .. } => personas.push(c),
             RawConstruct::System { .. } => systems.push(c),
+            RawConstruct::Source { .. } => sources.push(c),
             _ => {}
         }
     }
@@ -61,15 +63,19 @@ pub fn serialize(constructs: &[RawConstruct], bundle_id: &str) -> Value {
     flows.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
     personas.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
     systems.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
+    sources.sort_by(|a, b| construct_id(a).cmp(construct_id(b)));
 
     let mut result: Vec<Value> = Vec::new();
+    for c in &personas {
+        result.push(serialize_construct(c, &fact_types));
+    }
+    for c in &sources {
+        result.push(serialize_construct(c, &fact_types));
+    }
     for c in &facts {
         result.push(serialize_construct(c, &fact_types));
     }
     for c in &entities {
-        result.push(serialize_construct(c, &fact_types));
-    }
-    for c in &personas {
         result.push(serialize_construct(c, &fact_types));
     }
     for rules in rules_by_stratum.values() {
@@ -114,6 +120,7 @@ fn construct_id(c: &RawConstruct) -> &str {
         RawConstruct::TypeDecl { id, .. } => id,
         RawConstruct::Persona { id, .. } => id,
         RawConstruct::System { id, .. } => id,
+        RawConstruct::Source { id, .. } => id,
         RawConstruct::Import { .. } => "",
     }
 }
@@ -277,6 +284,29 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
             Value::Object(m)
         }
+        RawConstruct::Source {
+            id,
+            protocol,
+            fields,
+            description,
+            prov,
+        } => {
+            let mut m = Map::new();
+            if let Some(desc) = description {
+                ins(&mut m, "description", json!(desc));
+            }
+            let mut fm = Map::new();
+            for (k, v) in fields {
+                fm.insert(k.clone(), json!(v));
+            }
+            ins(&mut m, "fields", Value::Object(fm));
+            ins(&mut m, K_ID, json!(id));
+            ins(&mut m, K_KIND, json!("Source"));
+            ins(&mut m, "protocol", json!(protocol));
+            ins(&mut m, K_PROVENANCE, serialize_prov(prov));
+            ins(&mut m, K_TENOR, json!(crate::TENOR_VERSION));
+            Value::Object(m)
+        }
         RawConstruct::System {
             id,
             members,
@@ -303,16 +333,27 @@ fn serialize_prov(prov: &Provenance) -> Value {
     Value::Object(m)
 }
 
-fn serialize_source(source: &str) -> Value {
-    if let Some(dot) = source.find('.') {
-        let system = &source[..dot];
-        let field = &source[dot + 1..];
-        let mut m = Map::new();
-        ins(&mut m, "field", json!(field));
-        ins(&mut m, "system", json!(system));
-        Value::Object(m)
-    } else {
-        json!(source)
+fn serialize_source(source: &RawSourceDecl) -> Value {
+    match source {
+        RawSourceDecl::Freetext(s) => {
+            // Legacy freetext: split on first dot for backward compat
+            if let Some(dot) = s.find('.') {
+                let system = &s[..dot];
+                let field = &s[dot + 1..];
+                let mut m = Map::new();
+                ins(&mut m, "field", json!(field));
+                ins(&mut m, "system", json!(system));
+                Value::Object(m)
+            } else {
+                json!(s)
+            }
+        }
+        RawSourceDecl::Structured { source_id, path } => {
+            let mut m = Map::new();
+            ins(&mut m, "path", json!(path));
+            ins(&mut m, "source_id", json!(source_id));
+            Value::Object(m)
+        }
     }
 }
 

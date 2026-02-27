@@ -1,6 +1,15 @@
 {
   "constructs": [
     {
+      "id": "inspector",
+      "kind": "Persona",
+      "provenance": {
+        "file": "exists_quantifier.tenor",
+        "line": 5
+      },
+      "tenor": "1.0"
+    },
+    {
       "id": "inspection_items",
       "kind": "Fact",
       "provenance": {
@@ -28,15 +37,6 @@
         },
         "max": 100
       }
-    },
-    {
-      "id": "inspector",
-      "kind": "Persona",
-      "provenance": {
-        "file": "exists_quantifier.tenor",
-        "line": 5
-      },
-      "tenor": "1.0"
     },
     {
       "body": {
