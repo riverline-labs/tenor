@@ -33,7 +33,11 @@ pub fn cmd_verify(signed_bundle_path: &Path, pubkey_path: Option<&Path>) {
     let signed_json: serde_json::Value = match serde_json::from_str(&bundle_str) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("error parsing JSON in '{}': {}", signed_bundle_path.display(), e);
+            eprintln!(
+                "error parsing JSON in '{}': {}",
+                signed_bundle_path.display(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -77,14 +81,19 @@ pub fn cmd_verify(signed_bundle_path: &Path, pubkey_path: Option<&Path>) {
         let key_bytes = match BASE64.decode(embedded_key) {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("Verification failed: error decoding signer_public_key: {}", e);
+                eprintln!(
+                    "Verification failed: error decoding signer_public_key: {}",
+                    e
+                );
                 std::process::exit(1);
             }
         };
         let key_arr: [u8; 32] = match key_bytes.try_into() {
             Ok(arr) => arr,
             Err(_) => {
-                eprintln!("Verification failed: signer_public_key has invalid length (expected 32 bytes)");
+                eprintln!(
+                    "Verification failed: signer_public_key has invalid length (expected 32 bytes)"
+                );
                 std::process::exit(1);
             }
         };
@@ -112,7 +121,10 @@ pub fn cmd_verify(signed_bundle_path: &Path, pubkey_path: Option<&Path>) {
     let sig_bytes = match BASE64.decode(sig_b64) {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("Verification failed: error decoding bundle_attestation: {}", e);
+            eprintln!(
+                "Verification failed: error decoding bundle_attestation: {}",
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -120,7 +132,9 @@ pub fn cmd_verify(signed_bundle_path: &Path, pubkey_path: Option<&Path>) {
     let sig_arr: [u8; 64] = match sig_bytes.try_into() {
         Ok(arr) => arr,
         Err(_) => {
-            eprintln!("Verification failed: bundle_attestation has invalid length (expected 64 bytes)");
+            eprintln!(
+                "Verification failed: bundle_attestation has invalid length (expected 64 bytes)"
+            );
             std::process::exit(1);
         }
     };

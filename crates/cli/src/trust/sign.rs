@@ -79,7 +79,10 @@ pub fn cmd_sign(bundle_path: &Path, key_path: &Path, output_path: Option<&Path>,
     let mut trust_map = Map::new();
     trust_map.insert("attestation_format".to_string(), serde_json::json!(format));
     trust_map.insert("bundle_attestation".to_string(), serde_json::json!(sig_b64));
-    trust_map.insert("signer_public_key".to_string(), serde_json::json!(pubkey_b64));
+    trust_map.insert(
+        "signer_public_key".to_string(),
+        serde_json::json!(pubkey_b64),
+    );
 
     let mut signed_map = Map::new();
     signed_map.insert("bundle".to_string(), bundle_content);
@@ -103,7 +106,11 @@ pub fn cmd_sign(bundle_path: &Path, key_path: &Path, output_path: Option<&Path>,
     let pretty = serde_json::to_string_pretty(&signed_bundle)
         .unwrap_or_else(|e| panic!("serialization error: {}", e));
     if let Err(e) = std::fs::write(out_path, &pretty) {
-        eprintln!("error writing signed bundle to '{}': {}", out_path.display(), e);
+        eprintln!(
+            "error writing signed bundle to '{}': {}",
+            out_path.display(),
+            e
+        );
         std::process::exit(1);
     }
 
