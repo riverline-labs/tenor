@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 6 of 11 — Advanced Policies
-**Plan**: 4 of 4 completed in current phase
-**Status**: Phase 6 complete
-**Last activity**: 2026-02-27 — Completed plan 06-04 (Advanced Policies documentation)
+**Phase**: 7 of 11 — SDKs
+**Plan**: 1 of 4 completed in current phase
+**Status**: Executing
+**Last activity**: 2026-02-27 — Phase 7 Plan 1 complete (TypeScript SDK)
 
-Progress: ████████████░░░░░░░░ 55% (Phases 1-6 complete)
+Progress: █████████████░░░░░░░ 57% (Phases 1-6 complete, Phase 7 in progress)
 
 ## Decisions
 
@@ -70,6 +70,9 @@ Progress: ████████████░░░░░░░░ 55% (Phas
 - [Phase 06-03]: CompositePolicy filtered ActionSpace has empty blocked_actions (approver only needs the proposed action)
 - [Phase 06-03]: Short-circuit on proposer None via ? operator — no predicate/approver consulted
 - [Phase 06-04]: HumanInTheLoopPolicy.timeout field stores intended duration but delegates enforcement to the ApprovalChannel implementation — choose() does not enforce via tokio::time::timeout
+- [Phase 07-01]: TenorEvaluator.fromJson/fromBundle are synchronous (not async) — wasm-pack --target nodejs produces synchronous CommonJS module
+- [Phase 07-01]: FactValue uses interface-based recursion (FactRecord, FactList) to avoid TypeScript circular type alias error
+- [Phase 07-01]: executeFlowWithBindings() added to expose simulate_flow_with_bindings WASM export for multi-instance use
 
 ## Blockers/Concerns
 
@@ -98,9 +101,10 @@ Progress: ████████████░░░░░░░░ 55% (Phas
 | 06 | 02 | 311 | 8 | 3 |
 | 06 | 03 | 257 | 7 | 2 |
 | 06 | 04 | 171 | 6 | 1 |
+| 07 | 01 | 1393 | 8 | 12 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed plan 06-04 (Advanced Policies documentation — Phase 6 complete)
-Next action: Begin Phase 7 when scheduled
+Stopped at: Completed 07-sdks/07-01-PLAN.md (TypeScript SDK)
+Next action: Execute Phase 7 Plan 2

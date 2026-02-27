@@ -77,10 +77,10 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 5. Edge cases handled: empty action space, timeout, invalid LLM response
    **Plans**: 4 (06-01 through 06-04)
 
-- [ ] 06-01: HumanInTheLoopPolicy
-- [ ] 06-02: LlmPolicy
-- [ ] 06-03: CompositePolicy
-- [ ] 06-04: Documentation and examples
+- [x] 06-01: HumanInTheLoopPolicy
+- [x] 06-02: LlmPolicy
+- [x] 06-03: CompositePolicy
+- [x] 06-04: Documentation and examples
 
 ### Phase 7: SDKs
 
@@ -97,7 +97,7 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 5. Each SDK: test suite proving identical results to Rust evaluator
    **Plans**: 4 (07-01 through 07-04)
 
-- [ ] 07-01: TypeScript SDK (WASM wrapper)
+- [x] 07-01: TypeScript SDK (WASM wrapper)
 - [ ] 07-02: Python SDK (PyO3)
 - [ ] 07-03: Go SDK (wazero + WASI bridge)
 - [ ] 07-04: Cross-SDK conformance tests
@@ -198,9 +198,9 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 | 2. Source Declarations     | Complete | —        | 2026-02-27 |
 | 3. Automated Fact Wiring   | Complete | —        | 2026-02-27 |
 | 4. Multi-Instance Entities | 5/5      | Complete | 2026-02-27 |
-| 5. Trust & Security        | 5/6      | Complete | 2026-02-27 |
-| 6. Advanced Policies       | 4/4 | Complete   | 2026-02-27 |
-| 7. SDKs                    | Planned  | 0/4      | —          |
+| 5. Trust & Security        | 6/6      | Complete | 2026-02-27 |
+| 6. Advanced Policies       | 4/4      | Complete | 2026-02-27 |
+| 7. SDKs                    | Active   | 1/4      | —          |
 | 8. Automatic UI            | Planned  | 0/4      | —          |
 | 9. Builder                 | Planned  | 0/7      | —          |
 | 10. Hosted Platform        | Planned  | 0/7      | —          |
