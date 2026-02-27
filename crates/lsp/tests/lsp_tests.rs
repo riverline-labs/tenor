@@ -127,9 +127,7 @@ fn goto_definition_unknown_word_returns_none() {
     );
 
     // stratum is not a declared construct, should return None
-    // (unless it happens to match a construct name)
-    // We just verify the function doesn't panic
-    let _ = result;
+    assert!(result.is_none());
 }
 
 // ──────────────────────────────────────────────

@@ -662,14 +662,12 @@
       "description": "A terminal step target (end of flow path).",
       "properties": {
         "kind": {
-          "type": "string",
-          "enum": ["Terminal", "Terminate"],
-          "description": "'Terminal' for flow outcomes, 'Terminate' for failure handlers."
+          "const": "Terminal",
+          "description": "Terminal step target (end of flow path)."
         },
         "outcome": {
           "type": "string",
-          "enum": ["success", "failure", "escalation"],
-          "description": "Flow outcome."
+          "description": "Flow outcome label (user-defined)."
         }
       }
     },
