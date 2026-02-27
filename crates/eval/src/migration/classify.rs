@@ -480,6 +480,25 @@ fn classify_field_change(
         ("System", "shared_entities") => classify_set_change(before, after, "shared_entity"),
         ("System", "triggers") => classify_set_change(before, after, "trigger"),
 
+        // Source fields (§18.2.8)
+        ("Source", "protocol") => ChangeClassification {
+            severity: ChangeSeverity::Infrastructure,
+            reason: "Adapter wiring changes".to_string(),
+            migration_action: Some("Update adapter configuration for new protocol".to_string()),
+        },
+        ("Source", "description") => ChangeClassification {
+            severity: ChangeSeverity::NonBreaking,
+            reason: "Documentation metadata".to_string(),
+            migration_action: None,
+        },
+        // All other Source fields (base_url, dialect, endpoint, etc.) are connection
+        // configuration — Infrastructure per §18.2.8.
+        ("Source", _) => ChangeClassification {
+            severity: ChangeSeverity::Infrastructure,
+            reason: "Connection configuration change".to_string(),
+            migration_action: Some("Update adapter connection settings".to_string()),
+        },
+
         // Trust metadata (§18.2.9)
         // Trust metadata (attestations, provenance signatures, policy bindings) lives on
         // manifests and provenance records, not on interchange bundle constructs.
