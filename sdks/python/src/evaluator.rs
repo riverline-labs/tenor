@@ -10,7 +10,6 @@ use crate::types::{json_to_py, py_to_json};
 #[pyclass]
 pub struct TenorEvaluator {
     contract: tenor_eval::Contract,
-    bundle: serde_json::Value,
 }
 
 #[pymethods]
@@ -26,7 +25,7 @@ impl TenorEvaluator {
                 pyo3::exceptions::PyValueError::new_err(format!("Invalid contract: {}", e))
             })?;
 
-        Ok(TenorEvaluator { contract, bundle })
+        Ok(TenorEvaluator { contract })
     }
 
     /// Load a contract from a Python dict (interchange bundle).
@@ -37,10 +36,7 @@ impl TenorEvaluator {
             .map_err(|e| {
                 pyo3::exceptions::PyValueError::new_err(format!("Invalid contract: {}", e))
             })?;
-        Ok(TenorEvaluator {
-            contract,
-            bundle: bundle_json,
-        })
+        Ok(TenorEvaluator { contract })
     }
 
     /// Evaluate rules against the provided facts.
@@ -106,7 +102,9 @@ impl TenorEvaluator {
     /// `flow_id`: ID of the flow to execute
     /// `facts`: dict of {fact_id: value}
     /// `entity_states`: dict of {entity_id: state_string} (flat) or
-    ///   {entity_id: {instance_id: state}} (multi-instance)
+    ///   {entity_id: {instance_id: state}} (multi-instance).
+    ///   Provided states are overlaid on contract defaults — an empty dict
+    ///   uses contract initial states for all entities.
     /// `persona`: persona ID for provenance recording
     ///
     /// Returns a dict with "flow_id", "persona", "outcome", "path", "would_transition", "verdicts".
@@ -121,28 +119,63 @@ impl TenorEvaluator {
         let facts_json = py_to_json(facts)?;
         let states_json = py_to_json(entity_states)?;
 
-        // Parse entity states (supports both flat and nested formats)
-        let entity_map = parse_entity_states(&states_json).map_err(|e| {
+        // Parse the provided entity states (supports both flat and nested formats)
+        let provided_states = parse_entity_states(&states_json).map_err(|e| {
             pyo3::exceptions::PyValueError::new_err(format!("Invalid entity states: {}", e))
         })?;
+
+        // Assemble facts and evaluate rules to get verdicts
+        let fact_set = tenor_eval::assemble::assemble_facts(&self.contract, &facts_json)
+            .map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Fact assembly error: {}", e))
+            })?;
+
+        let verdict_set = tenor_eval::rules::eval_strata(&self.contract, &fact_set)
+            .map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Evaluation error: {}", e))
+            })?;
+
+        // Create frozen snapshot
+        let snapshot = tenor_eval::Snapshot {
+            facts: fact_set,
+            verdicts: verdict_set.clone(),
+        };
+
+        // Merge contract defaults with provided states (provided states override defaults)
+        let mut merged_states = tenor_eval::operation::init_entity_states(&self.contract);
+        for (key, state) in provided_states {
+            merged_states.insert(key, state);
+        }
+
+        // Find the target flow
+        let target_flow = self
+            .contract
+            .get_flow(flow_id)
+            .ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Flow execution error: flow '{}' not found in contract",
+                    flow_id
+                ))
+            })?;
 
         // Use empty instance_bindings — falls back to DEFAULT_INSTANCE_ID (backward compat)
         let instance_bindings = BTreeMap::new();
 
-        let flow_eval_result = tenor_eval::evaluate_flow(
-            &self.bundle,
-            &facts_json,
-            flow_id,
-            persona,
-            Some(&entity_map),
+        // Execute the flow
+        let mut flow_result = tenor_eval::flow::execute_flow(
+            target_flow,
+            &self.contract,
+            &snapshot,
+            &mut merged_states,
             &instance_bindings,
+            None,
         )
         .map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Flow execution error: {}", e))
         })?;
 
-        let flow_result = &flow_eval_result.flow_result;
-        let verdict_set = &flow_eval_result.verdicts;
+        // Record persona for provenance
+        flow_result.initiating_persona = Some(persona.to_string());
 
         let path: Vec<serde_json::Value> = flow_result
             .steps_executed
