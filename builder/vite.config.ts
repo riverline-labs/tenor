@@ -18,4 +18,11 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["tenor-eval-wasm"],
   },
+  define: {
+    // Expose TENOR_BUILDER_CONTRACT env var to client code via import.meta.env
+    // Set by `tenor builder --contract <path>` via VITE_TENOR_CONTRACT_PATH env var
+    "import.meta.env.VITE_TENOR_CONTRACT_PATH": JSON.stringify(
+      process.env.VITE_TENOR_CONTRACT_PATH ?? ""
+    ),
+  },
 });
