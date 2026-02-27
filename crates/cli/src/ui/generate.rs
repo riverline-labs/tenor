@@ -53,6 +53,7 @@ pub(super) fn generate_ui_project(
             templates::index_html(&config.title),
         ),
         // src/
+        (src_dir.join("styles.css"), templates::global_css()),
         (src_dir.join("main.tsx"), templates::main_tsx()),
         (
             src_dir.join("App.tsx"),

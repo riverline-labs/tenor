@@ -93,6 +93,7 @@ pub(super) fn index_html(title: &str) -> String {
 pub(super) fn main_tsx() -> String {
     r#"import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './styles.css';
 import App from './App.tsx';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -100,6 +101,66 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>
 );
+"#
+    .to_string()
+}
+
+/// Generate src/styles.css with global reset and responsive layout styles.
+pub(super) fn global_css() -> String {
+    r#"/* Global reset and base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+/* Responsive container */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  padding: 24px 16px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 24px 32px;
+  max-width: 1200px;
+}
+
+/* Card component */
+.card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-container { flex-direction: column; }
+  .sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; }
+  .main-content { padding: 16px; }
+}
 "#
     .to_string()
 }
