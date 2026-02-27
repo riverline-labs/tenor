@@ -5,7 +5,10 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyList, PyString};
 pub fn json_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
     match value {
         serde_json::Value::Null => Ok(py.None()),
-        serde_json::Value::Bool(b) => Ok(b.into_pyobject(py)?.into_any().unbind()),
+        serde_json::Value::Bool(b) => {
+            let py_bool = pyo3::types::PyBool::new(py, *b).to_owned();
+            Ok(py_bool.into_any().unbind())
+        }
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 Ok(i.into_pyobject(py)?.into_any().unbind())
@@ -15,7 +18,7 @@ pub fn json_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObjec
                 Ok(py.None())
             }
         }
-        serde_json::Value::String(s) => Ok(s.into_pyobject(py)?.into_any().unbind()),
+        serde_json::Value::String(s) => Ok(s.as_str().into_pyobject(py)?.into_any().unbind()),
         serde_json::Value::Array(arr) => {
             let list = PyList::empty(py);
             for item in arr {
