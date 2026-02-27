@@ -1,0 +1,42 @@
+{
+  "flow_id": "approval_flow",
+  "instance_bindings": {},
+  "outcome": "order_approved",
+  "path": [
+    {
+      "instance_bindings": {
+        "Order": "_default"
+      },
+      "result": "success",
+      "step_id": "step_approve",
+      "step_type": "operation"
+    }
+  ],
+  "persona": "admin",
+  "simulation": true,
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_active"
+        ],
+        "rule": "check_active",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "account_active"
+    }
+  ],
+  "would_transition": [
+    {
+      "entity_id": "Order",
+      "from_state": "pending",
+      "instance_id": "_default",
+      "to_state": "approved"
+    }
+  ]
+}

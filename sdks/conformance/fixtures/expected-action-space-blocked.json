@@ -1,0 +1,17 @@
+{
+  "actions": [],
+  "blocked_actions": [
+    {
+      "flow_id": "approval_flow",
+      "instance_bindings": {},
+      "reason": {
+        "missing_verdicts": [
+          "account_active"
+        ],
+        "type": "PreconditionNotMet"
+      }
+    }
+  ],
+  "current_verdicts": [],
+  "persona_id": "admin"
+}

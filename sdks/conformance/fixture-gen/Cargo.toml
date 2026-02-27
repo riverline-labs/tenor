@@ -1,0 +1,14 @@
+[workspace]
+
+[package]
+name = "tenor-conformance-gen"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "generate"
+path = "src/main.rs"
+
+[dependencies]
+tenor-eval = { path = "../../../crates/eval", default-features = false }
+serde_json = "1"
