@@ -76,11 +76,25 @@ pub struct EffectRecord {
 }
 
 /// Provenance record for an operation execution.
+///
+/// Per §9.5: operation provenance records the instance_binding map used,
+/// and per-instance state snapshots before and after effect application.
+/// This enables complete auditability — every state change is traced to a
+/// specific (entity_id, instance_id) pair.
 #[derive(Debug, Clone)]
 pub struct OperationProvenance {
     pub operation_id: String,
     pub persona: String,
     pub effects: Vec<EffectRecord>,
+    /// Maps entity_id → instance_id for the instances targeted by this operation.
+    /// Per §9.5: records which specific instance was acted on for each entity effect.
+    pub instance_binding: BTreeMap<String, String>,
+    /// Per-instance entity state BEFORE effects were applied.
+    /// Key: (entity_id, instance_id). Only includes instances targeted by effects.
+    pub state_before: BTreeMap<(String, String), String>,
+    /// Per-instance entity state AFTER effects were applied.
+    /// Key: (entity_id, instance_id). Only includes instances targeted by effects.
+    pub state_after: BTreeMap<(String, String), String>,
 }
 
 /// Result of a successful operation execution.
@@ -237,10 +251,18 @@ pub fn execute_operation(
     let mut effects_applied = Vec::new();
     let mut outcome_from_effects: Option<String> = None;
 
+    // Per §9.5: snapshot state_before for all targeted instances before applying any effects.
+    let mut instance_binding_map: BTreeMap<String, String> = BTreeMap::new();
+    let mut state_before: BTreeMap<(String, String), String> = BTreeMap::new();
+
+    // First pass: resolve all target instances and capture pre-effect states.
+    // This must be done before any effects are applied.
     for effect in &op.effects {
-        // Resolve the target instance for this entity from the binding map.
-        // Falls back to DEFAULT_INSTANCE_ID if no binding provided (§6.5 degenerate case).
         let instance_id = resolve_instance_id(instance_bindings, &effect.entity_id).to_string();
+        instance_binding_map
+            .entry(effect.entity_id.clone())
+            .or_insert_with(|| instance_id.clone());
+
         let key = (effect.entity_id.clone(), instance_id.clone());
         let current_state = entity_states
             .get(&key)
@@ -259,6 +281,15 @@ pub fn execute_operation(
             });
         }
 
+        // Capture state_before for this (entity_id, instance_id) pair.
+        state_before.entry(key).or_insert_with(|| current_state);
+    }
+
+    // Second pass: apply effects and collect EffectRecords.
+    for effect in &op.effects {
+        let instance_id = resolve_instance_id(instance_bindings, &effect.entity_id).to_string();
+        let key = (effect.entity_id.clone(), instance_id.clone());
+
         // Apply state transition to the targeted (entity_id, instance_id) pair
         entity_states.insert(key, effect.to.clone());
         effects_applied.push(EffectRecord {
@@ -271,6 +302,15 @@ pub fn execute_operation(
         // Track outcome from effect (for multi-outcome routing)
         if let Some(ref effect_outcome) = effect.outcome {
             outcome_from_effects = Some(effect_outcome.clone());
+        }
+    }
+
+    // Capture state_after for all targeted instances after effects applied.
+    let mut state_after: BTreeMap<(String, String), String> = BTreeMap::new();
+    for record in &effects_applied {
+        let key = (record.entity_id.clone(), record.instance_id.clone());
+        if let Some(s) = entity_states.get(&key) {
+            state_after.insert(key, s.clone());
         }
     }
 
@@ -297,6 +337,9 @@ pub fn execute_operation(
         operation_id: op.id.clone(),
         persona: persona.to_string(),
         effects: effects_applied.clone(),
+        instance_binding: instance_binding_map,
+        state_before,
+        state_after,
     };
 
     Ok(OperationResult {
@@ -849,6 +892,213 @@ mod tests {
                 from_state: "pending".to_string(),
                 to_state: "approved".to_string(),
             }
+        );
+
+        // New §9.5 fields: instance_binding, state_before, state_after
+        assert_eq!(
+            result
+                .provenance
+                .instance_binding
+                .get("order")
+                .map(|s| s.as_str()),
+            Some(DEFAULT_INSTANCE_ID),
+            "instance_binding should map 'order' -> '_default'"
+        );
+        let before_key = ("order".to_string(), DEFAULT_INSTANCE_ID.to_string());
+        assert_eq!(
+            result
+                .provenance
+                .state_before
+                .get(&before_key)
+                .map(|s| s.as_str()),
+            Some("pending"),
+            "state_before should be 'pending'"
+        );
+        let after_key = ("order".to_string(), DEFAULT_INSTANCE_ID.to_string());
+        assert_eq!(
+            result
+                .provenance
+                .state_after
+                .get(&after_key)
+                .map(|s| s.as_str()),
+            Some("approved"),
+            "state_after should be 'approved'"
+        );
+    }
+
+    #[test]
+    fn provenance_instance_binding_reflects_targeted_instance() {
+        // Verify that when we use explicit instance bindings, provenance captures them.
+        let op = make_operation(
+            "approve",
+            vec!["admin"],
+            vec![Effect {
+                entity_id: "order".to_string(),
+                from: "pending".to_string(),
+                to: "approved".to_string(),
+                outcome: None,
+            }],
+            vec!["approved"],
+        );
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+        let mut entity_states: EntityStateMap = BTreeMap::new();
+        entity_states.insert(
+            ("order".to_string(), "order-99".to_string()),
+            "pending".to_string(),
+        );
+
+        let mut bindings = InstanceBindingMap::new();
+        bindings.insert("order".to_string(), "order-99".to_string());
+
+        let result = execute_operation(
+            &op,
+            "admin",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &bindings,
+        )
+        .unwrap();
+
+        // instance_binding should record the targeted instance
+        assert_eq!(
+            result
+                .provenance
+                .instance_binding
+                .get("order")
+                .map(|s| s.as_str()),
+            Some("order-99"),
+            "instance_binding should record 'order' -> 'order-99'"
+        );
+
+        // state_before: order/order-99 was "pending"
+        let before_key = ("order".to_string(), "order-99".to_string());
+        assert_eq!(
+            result
+                .provenance
+                .state_before
+                .get(&before_key)
+                .map(|s| s.as_str()),
+            Some("pending"),
+            "state_before should capture pre-effect state"
+        );
+
+        // state_after: order/order-99 is now "approved"
+        let after_key = ("order".to_string(), "order-99".to_string());
+        assert_eq!(
+            result
+                .provenance
+                .state_after
+                .get(&after_key)
+                .map(|s| s.as_str()),
+            Some("approved"),
+            "state_after should capture post-effect state"
+        );
+    }
+
+    #[test]
+    fn provenance_multi_effect_captures_all_instances() {
+        // Operation with 2 effects on different entities; verify both are in provenance.
+        let op = make_operation(
+            "complete_order",
+            vec!["system"],
+            vec![
+                Effect {
+                    entity_id: "order".to_string(),
+                    from: "approved".to_string(),
+                    to: "fulfilled".to_string(),
+                    outcome: None,
+                },
+                Effect {
+                    entity_id: "payment".to_string(),
+                    from: "authorized".to_string(),
+                    to: "captured".to_string(),
+                    outcome: None,
+                },
+            ],
+            vec!["completed"],
+        );
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+        let mut entity_states: EntityStateMap = BTreeMap::new();
+        entity_states.insert(
+            ("order".to_string(), "ord-1".to_string()),
+            "approved".to_string(),
+        );
+        entity_states.insert(
+            ("payment".to_string(), "pay-1".to_string()),
+            "authorized".to_string(),
+        );
+
+        let mut bindings = InstanceBindingMap::new();
+        bindings.insert("order".to_string(), "ord-1".to_string());
+        bindings.insert("payment".to_string(), "pay-1".to_string());
+
+        let result = execute_operation(
+            &op,
+            "system",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &bindings,
+        )
+        .unwrap();
+
+        // instance_binding has both entities
+        assert_eq!(
+            result
+                .provenance
+                .instance_binding
+                .get("order")
+                .map(|s| s.as_str()),
+            Some("ord-1")
+        );
+        assert_eq!(
+            result
+                .provenance
+                .instance_binding
+                .get("payment")
+                .map(|s| s.as_str()),
+            Some("pay-1")
+        );
+
+        // state_before: both were in their source states
+        assert_eq!(
+            result
+                .provenance
+                .state_before
+                .get(&("order".to_string(), "ord-1".to_string()))
+                .map(|s| s.as_str()),
+            Some("approved")
+        );
+        assert_eq!(
+            result
+                .provenance
+                .state_before
+                .get(&("payment".to_string(), "pay-1".to_string()))
+                .map(|s| s.as_str()),
+            Some("authorized")
+        );
+
+        // state_after: both transitioned
+        assert_eq!(
+            result
+                .provenance
+                .state_after
+                .get(&("order".to_string(), "ord-1".to_string()))
+                .map(|s| s.as_str()),
+            Some("fulfilled")
+        );
+        assert_eq!(
+            result
+                .provenance
+                .state_after
+                .get(&("payment".to_string(), "pay-1".to_string()))
+                .map(|s| s.as_str()),
+            Some("captured")
         );
     }
 

@@ -39,11 +39,17 @@ pub struct Snapshot {
 // ──────────────────────────────────────────────
 
 /// Record of a single step executed during a flow.
+///
+/// Per §9.5 and §11.4: step records carry instance bindings to trace
+/// which specific entity instances were targeted at each step.
 #[derive(Debug, Clone)]
 pub struct StepRecord {
     pub step_id: String,
     pub step_type: String,
     pub result: String,
+    /// Maps entity_id → instance_id for the instances targeted at this step.
+    /// Empty for non-operation steps (branch, handoff, parallel).
+    pub instance_bindings: std::collections::BTreeMap<String, String>,
 }
 
 /// Result of a successful flow execution.
@@ -157,6 +163,7 @@ fn handle_failure(
                             step_id: format!("comp:{}", comp_step.op),
                             step_type: "compensation".to_string(),
                             result: comp_result.outcome.clone(),
+                            instance_bindings: comp_result.provenance.instance_binding.clone(),
                         });
                     }
                     Err(comp_err) => {
@@ -165,6 +172,7 @@ fn handle_failure(
                             step_id: format!("comp:{}", comp_step.op),
                             step_type: "compensation".to_string(),
                             result: format!("error: {}", comp_err),
+                            instance_bindings: std::collections::BTreeMap::new(),
                         });
                         match &comp_step.on_failure {
                             StepTarget::Terminal { outcome } => {
@@ -220,6 +228,7 @@ fn handle_failure(
                 step_id: step_id.to_string(),
                 step_type: "escalation".to_string(),
                 result: format!("escalated to {}", to_persona),
+                instance_bindings: std::collections::BTreeMap::new(),
             });
             // Caller will set current_step_id = next
             Ok(None)
@@ -324,6 +333,7 @@ pub fn execute_flow(
                             step_id: id.clone(),
                             step_type: "operation".to_string(),
                             result: op_result.outcome.clone(),
+                            instance_bindings: op_result.provenance.instance_binding.clone(),
                         });
 
                         // Route based on outcome
@@ -356,6 +366,7 @@ pub fn execute_flow(
                             step_id: id.clone(),
                             step_type: "operation".to_string(),
                             result: format!("error: {}", op_err),
+                            instance_bindings: op_bindings.clone(),
                         });
 
                         match handle_failure(
@@ -413,6 +424,7 @@ pub fn execute_flow(
                     step_id: id.clone(),
                     step_type: "branch".to_string(),
                     result: branch_label.to_string(),
+                    instance_bindings: std::collections::BTreeMap::new(),
                 });
 
                 let target = if branch_taken { if_true } else { if_false };
@@ -462,6 +474,9 @@ pub fn execute_flow(
                             step_id: id.clone(),
                             step_type: "sub_flow".to_string(),
                             result: sub_result.outcome.clone(),
+                            // Sub-flows inherit the parent instance_bindings per §11.4/§11.5.
+                            // We record the parent's bindings for this sub-flow step.
+                            instance_bindings: instance_bindings.clone(),
                         });
 
                         match on_success {
@@ -483,6 +498,7 @@ pub fn execute_flow(
                             step_id: id.clone(),
                             step_type: "sub_flow".to_string(),
                             result: "error".to_string(),
+                            instance_bindings: instance_bindings.clone(),
                         });
 
                         match handle_failure(
@@ -527,6 +543,7 @@ pub fn execute_flow(
                     step_id: id.clone(),
                     step_type: "handoff".to_string(),
                     result: "handoff".to_string(),
+                    instance_bindings: std::collections::BTreeMap::new(),
                 });
                 current_step_id = next.clone();
             }
@@ -593,6 +610,8 @@ pub fn execute_flow(
                     step_id: id.clone(),
                     step_type: "parallel".to_string(),
                     result: branch_summaries.join(", "),
+                    // Parallel steps use the parent's instance_bindings
+                    instance_bindings: instance_bindings.clone(),
                 });
 
                 // Collect branch step records
