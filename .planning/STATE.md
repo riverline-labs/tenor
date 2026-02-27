@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 9 of 11 — Builder SPA
-**Plan**: 1 of 7 completed in current phase
+**Plan**: 2 of 7 completed in current phase
 **Status**: Phase 9 in progress
-**Last activity**: 2026-02-27 — Phase 9 Plan 1 complete (Builder SPA scaffold: Vite + React + TypeScript + WASM evaluator + Zustand stores + DSL generator + layout utilities + application shell)
+**Last activity**: 2026-02-27 — Phase 9 Plan 2 complete (Entity editor with SVG state machine + Fact editor with full type system + Persona editor + Source editor + all wired into app routing)
 
 Progress: ██████████████████░░ 72% (Phases 1-8 complete, Phase 9 started)
 
@@ -103,6 +103,10 @@ Progress: ██████████████████░░ 72% (Phas
 - [Phase 09-01] WASM pkg committed via git force-add (wasm-pack generates .gitignore with * that blocks tracking)
 - [Phase 09-01] zundo used for undo/redo (zustand temporal middleware, 50-state history)
 - [Phase 09-01] Simulation store reads contractHandle from elaboration store (no duplicate WASM state)
+- [Phase 09-02] FactDefault plain strings for Text/Date/DateTime/Enum (no text_literal/enum_literal in interchange type)
+- [Phase 09-02] Rename pattern: removeConstruct(oldId) + addConstruct({...updated}) since updateConstruct matches (id, kind)
+- [Phase 09-02] Source description field reused for base_url/connection string (no dedicated field in SourceConstruct)
+- [Phase 09-02] StateMachine nodePosOverrides reset via useEffect on states/transitions change to avoid stale drag positions
 
 ## Blockers/Concerns
 
@@ -140,9 +144,10 @@ Progress: ██████████████████░░ 72% (Phas
 | 08 | 03 | 291 | 5 | 5 |
 | 08 | 04 | 216 | 6 | 1 |
 | 09 | 01 | 746 | 10 | 21 |
+| 09 | 02 | 403 | 6 | 6 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 09-01-PLAN.md (Builder SPA scaffold: Vite + React + TypeScript + WASM + Zustand stores + DSL generator)
-Next action: Phase 9 Plan 2 — Fact editor and entity state machine editor
+Stopped at: Completed 09-02-PLAN.md (Entity editor with SVG state machine + Fact editor + Persona editor + Source editor)
+Next action: Phase 9 Plan 3 — Operation and Rule editors
