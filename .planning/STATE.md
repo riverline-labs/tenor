@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 8 of 11 — Automatic UI
-**Plan**: 2 of ? completed in current phase
+**Plan**: 3 of ? completed in current phase
 **Status**: Phase 8 in progress
-**Last activity**: 2026-02-27 — Phase 8 Plan 2 complete (component implementations: types_gen, hooks, 11 React components)
+**Last activity**: 2026-02-27 — Phase 8 Plan 3 complete (professional theming: theme.rs module, global CSS, textPrimary/textSecondary rename)
 
 Progress: ████████████████░░░░ 64% (Phases 1-7 complete, Phase 8 started)
 
@@ -90,6 +90,11 @@ Progress: ████████████████░░░░ 64% (Phas
 - [Phase 08-02] FactInput dispatches on FACTS metadata from types.ts at runtime (no static codegen of type info in component)
 - [Phase 08-02] ProvenanceDrill uses r## delimiter since color="#7c3aed" contains "# which terminates r# raw strings
 - [Phase 08-02] Entity transitions field absent in CodegenEntity — ENTITIES const emits transitions: [] as placeholder
+- [Phase 08-03] theme.rs extracted from generate.rs as dedicated module with 6 unit tests
+- [Phase 08-03] Custom theme uses per-color merge (not full replacement): {"colors": {"primary": "#ff0000"}} overrides just primary
+- [Phase 08-03] textPrimary/textSecondary rename: matches new theme.ts output keys; old text/textMuted removed from all generated TypeScript
+- [Phase 08-03] sidebar color removed from theme: Layout now uses theme.colors.surface for sidebar background
+- [Phase 08-03] styles.css emitted as standalone global reset: imported in main.tsx, complements per-component inline styles
 
 ## Blockers/Concerns
 
@@ -124,9 +129,10 @@ Progress: ████████████████░░░░ 64% (Phas
 | 07 | 04 | 686 | 6 | 23 |
 | 08 | 01 | 438 | 6 | 5 |
 | 08 | 02 | 882 | 7 | 6 |
+| 08 | 03 | 291 | 5 | 5 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 08-02-PLAN.md (component implementations: types_gen, hooks, 11 React components)
-Next action: Execute Phase 8 Plan 3 (if exists) or Phase 8 completion
+Stopped at: Completed 08-03-PLAN.md (professional theming: theme.rs module, global CSS, textPrimary/textSecondary rename)
+Next action: Execute Phase 8 Plan 4 (if exists) or Phase 8 completion
