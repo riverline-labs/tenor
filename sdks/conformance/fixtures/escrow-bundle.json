@@ -1,0 +1,73 @@
+{
+  "constructs": [
+    {
+      "id": "is_active",
+      "kind": "Fact",
+      "provenance": { "file": "test.tenor", "line": 11 },
+      "source": { "field": "active", "system": "account" },
+      "tenor": "1.0",
+      "type": { "base": "Bool" }
+    },
+    {
+      "id": "Order",
+      "initial": "pending",
+      "kind": "Entity",
+      "provenance": { "file": "test.tenor", "line": 3 },
+      "states": ["pending", "approved"],
+      "tenor": "1.0",
+      "transitions": [{ "from": "pending", "to": "approved" }]
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": { "type": { "base": "Bool" }, "value": true },
+          "verdict_type": "account_active"
+        },
+        "when": {
+          "left": { "fact_ref": "is_active" },
+          "op": "=",
+          "right": { "literal": true, "type": { "base": "Bool" } }
+        }
+      },
+      "id": "check_active",
+      "kind": "Rule",
+      "provenance": { "file": "test.tenor", "line": 16 },
+      "stratum": 0,
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": ["admin"],
+      "effects": [{ "entity_id": "Order", "from": "pending", "to": "approved" }],
+      "error_contract": ["precondition_failed"],
+      "id": "approve_order",
+      "kind": "Operation",
+      "precondition": { "verdict_present": "account_active" },
+      "provenance": { "file": "test.tenor", "line": 22 },
+      "tenor": "1.0"
+    },
+    {
+      "entry": "step_approve",
+      "id": "approval_flow",
+      "kind": "Flow",
+      "provenance": { "file": "test.tenor", "line": 29 },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_approve",
+          "kind": "OperationStep",
+          "on_failure": { "kind": "Terminate", "outcome": "approval_failed" },
+          "op": "approve_order",
+          "outcomes": {
+            "success": { "kind": "Terminal", "outcome": "order_approved" }
+          },
+          "persona": "admin"
+        }
+      ],
+      "tenor": "1.0"
+    }
+  ],
+  "id": "entity_operation_basic",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}
