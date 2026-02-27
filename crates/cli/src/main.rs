@@ -1,5 +1,6 @@
 mod agent;
 mod ambiguity;
+mod builder;
 mod connect;
 mod diff;
 mod explain;
@@ -219,6 +220,22 @@ enum Commands {
         title: Option<String>,
     },
 
+    /// Start or build the Tenor Builder SPA
+    Builder {
+        /// Builder subcommand (omit to start dev server)
+        #[command(subcommand)]
+        command: Option<BuilderCommands>,
+        /// Port for the dev server
+        #[arg(long, default_value = "5173")]
+        port: u16,
+        /// Open browser after starting
+        #[arg(long)]
+        open: bool,
+        /// Pre-load a .tenor or .json contract file
+        #[arg(long)]
+        contract: Option<PathBuf>,
+    },
+
     /// Start the Language Server Protocol server over stdio
     Lsp,
 
@@ -293,6 +310,16 @@ enum GenerateCommands {
         /// SDK import path (default: @tenor/sdk)
         #[arg(long, default_value = "@tenor/sdk")]
         sdk_import: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum BuilderCommands {
+    /// Build the Tenor Builder SPA for production
+    Build {
+        /// Output directory for the production build
+        #[arg(long = "out", default_value = "./builder-dist")]
+        output: PathBuf,
     },
 }
 
@@ -414,6 +441,27 @@ fn main() {
                 quiet: cli.quiet,
             });
         }
+        Commands::Builder {
+            command,
+            port,
+            open,
+            contract,
+        } => match command {
+            Some(BuilderCommands::Build { output }) => {
+                builder::cmd_builder_build(builder::BuilderBuildOptions {
+                    output_dir: &output,
+                    quiet: cli.quiet,
+                });
+            }
+            None => {
+                builder::cmd_builder(builder::BuilderOptions {
+                    port,
+                    open,
+                    contract: contract.as_deref(),
+                    quiet: cli.quiet,
+                });
+            }
+        },
         Commands::Lsp => {
             if let Err(e) = tenor_lsp::run() {
                 eprintln!("LSP server error: {}", e);
