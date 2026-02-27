@@ -5,9 +5,13 @@ import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ContractOverview } from "./components/ContractOverview";
+import { EntityEditor } from "./components/editors/EntityEditor";
+import { FactEditor } from "./components/editors/FactEditor";
+import { PersonaEditor } from "./components/editors/PersonaEditor";
+import { SourceEditor } from "./components/editors/SourceEditor";
 import { useElaborationStore } from "./store/elaboration";
 
-// Lazy placeholder pages — full editors implemented in later plans
+// Placeholder for editors not yet implemented
 function PlaceholderPage({ title }: { title: string }) {
   return (
     <div className="p-6">
@@ -32,19 +36,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<ContractOverview />} />
-          <Route
-            path="personas"
-            element={<PlaceholderPage title="Personas" />}
-          />
-          <Route
-            path="sources"
-            element={<PlaceholderPage title="Sources" />}
-          />
-          <Route path="facts" element={<PlaceholderPage title="Facts" />} />
-          <Route
-            path="entities"
-            element={<PlaceholderPage title="Entities" />}
-          />
+          <Route path="personas" element={<PersonaEditor />} />
+          <Route path="sources" element={<SourceEditor />} />
+          <Route path="facts" element={<FactEditor />} />
+          <Route path="entities" element={<EntityEditor />} />
           <Route path="rules" element={<PlaceholderPage title="Rules" />} />
           <Route
             path="operations"
