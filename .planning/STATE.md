@@ -3,11 +3,11 @@
 ## Current Position
 
 **Phase**: 7 of 11 — SDKs
-**Plan**: 3 of 4 completed in current phase
-**Status**: Executing
-**Last activity**: 2026-02-27 — Phase 7 Plan 3 complete (Go SDK)
+**Plan**: 4 of 4 completed in current phase
+**Status**: Phase 7 complete
+**Last activity**: 2026-02-27 — Phase 7 Plan 4 complete (Cross-SDK Conformance Suite)
 
-Progress: ██████████████░░░░░░ 60% (Phases 1-6 complete, Phase 7 in progress)
+Progress: ████████████████░░░░ 63% (Phases 1-7 complete)
 
 ## Decisions
 
@@ -78,6 +78,10 @@ Progress: ██████████████░░░░░░ 60% (Phas
 - [Phase 07]: pyo3 0.23 with abi3-py39: stable ABI for Python 3.9+ compatibility, required when Python 3.14 on dev machine exceeds pyo3 max version
 - [Phase 07]: [07-02] execute_flow uses init_entity_states() + overlay pattern (not evaluate_flow() top-level); mirrors WASM for empty entity state handling
 - [Phase 07]: [07-02] PyO3 cdylib needs [workspace] table in Cargo.toml to exclude from root workspace
+- [Phase 07-04] WASM simulate_flow_with_bindings output is canonical format; Python SDK execute_flow must include simulation:true and instance_bindings:{} to match
+- [Phase 07-04] Go SDK omitempty removed from VerdictProvenance.VerdictsUsed, BlockedAction.InstanceBindings, FlowResult.InstanceBindings — Rust always emits these even when empty
+- [Phase 07-04] Conformance fixture-gen Cargo.toml uses [workspace] stub to avoid workspace conflict (same as Python SDK)
+- [Phase 07-04] Python runner uses .venv (maturin develop) if available, falls back to PYTHONPATH for pre-built .so
 
 ## Blockers/Concerns
 
@@ -109,9 +113,10 @@ Progress: ██████████████░░░░░░ 60% (Phas
 | 07 | 01 | 1393 | 8 | 12 |
 | 07 | 02 | 1997 | 8 | 12 |
 | 07 | 03 | 1695 | 8 | 11 |
+| 07 | 04 | 686 | 6 | 23 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 07-02-PLAN.md (Python SDK) — note: 07-03 was already complete when 07-02 executed
-Next action: Execute Phase 7 Plan 4
+Stopped at: Completed 07-04-PLAN.md (Cross-SDK Conformance Suite) — Phase 7 complete
+Next action: Execute Phase 8

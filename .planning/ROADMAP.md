@@ -98,9 +98,9 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
    **Plans**: 4 (07-01 through 07-04)
 
 - [x] 07-01: TypeScript SDK (WASM wrapper)
-- [ ] 07-02: Python SDK (PyO3)
-- [ ] 07-03: Go SDK (wazero + WASI bridge)
-- [ ] 07-04: Cross-SDK conformance tests
+- [x] 07-02: Python SDK (PyO3)
+- [x] 07-03: Go SDK (wazero + WASI bridge)
+- [x] 07-04: Cross-SDK conformance tests
 
 ### Phase 8: Automatic UI
 
@@ -200,7 +200,7 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 | 4. Multi-Instance Entities | 5/5      | Complete | 2026-02-27 |
 | 5. Trust & Security        | 6/6      | Complete | 2026-02-27 |
 | 6. Advanced Policies       | 4/4      | Complete | 2026-02-27 |
-| 7. SDKs                    | 3/4 | In Progress|  |
+| 7. SDKs                    | 4/4      | Complete | 2026-02-27 |
 | 8. Automatic UI            | Planned  | 0/4      | —          |
 | 9. Builder                 | Planned  | 0/7      | —          |
 | 10. Hosted Platform        | Planned  | 0/7      | —          |
