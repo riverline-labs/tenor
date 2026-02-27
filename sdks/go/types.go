@@ -20,7 +20,7 @@ type VerdictProvenance struct {
 	Rule         string   `json:"rule"`
 	Stratum      int      `json:"stratum"`
 	FactsUsed    []string `json:"facts_used"`
-	VerdictsUsed []string `json:"verdicts_used,omitempty"`
+	VerdictsUsed []string `json:"verdicts_used"`
 }
 
 // Verdict represents a single evaluated verdict.
@@ -76,9 +76,9 @@ type BlockedReason struct {
 
 // BlockedAction represents an action that exists but cannot currently be executed.
 type BlockedAction struct {
-	FlowID           string                       `json:"flow_id"`
-	Reason           BlockedReason                `json:"reason"`
-	InstanceBindings map[string][]string          `json:"instance_bindings,omitempty"`
+	FlowID           string              `json:"flow_id"`
+	Reason           BlockedReason       `json:"reason"`
+	InstanceBindings map[string][]string `json:"instance_bindings"`
 }
 
 // ActionSpace is the complete set of available and blocked actions for a persona.
@@ -107,12 +107,12 @@ type EntityStateChange struct {
 
 // FlowResult contains the results of a flow simulation.
 type FlowResult struct {
-	Simulation      bool                `json:"simulation"`
-	FlowID          string              `json:"flow_id"`
-	Persona         string              `json:"persona"`
-	Outcome         string              `json:"outcome"`
-	Path            []StepResult        `json:"path"`
-	WouldTransition []EntityStateChange `json:"would_transition"`
-	Verdicts        []Verdict           `json:"verdicts"`
-	InstanceBindings InstanceBindings   `json:"instance_bindings,omitempty"`
+	Simulation       bool                `json:"simulation"`
+	FlowID           string              `json:"flow_id"`
+	Persona          string              `json:"persona"`
+	Outcome          string              `json:"outcome"`
+	Path             []StepResult        `json:"path"`
+	WouldTransition  []EntityStateChange `json:"would_transition"`
+	Verdicts         []Verdict           `json:"verdicts"`
+	InstanceBindings InstanceBindings    `json:"instance_bindings"`
 }

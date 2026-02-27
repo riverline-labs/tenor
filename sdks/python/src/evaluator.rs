@@ -181,11 +181,18 @@ impl TenorEvaluator {
             .steps_executed
             .iter()
             .map(|s| {
-                serde_json::json!({
+                // Match WASM simulate_flow_with_bindings output: include instance_bindings
+                // on each step when non-empty, same as the WASM module does.
+                let mut step_json = serde_json::json!({
                     "step_id": s.step_id,
                     "step_type": s.step_type,
                     "result": s.result,
-                })
+                });
+                if !s.instance_bindings.is_empty() {
+                    step_json["instance_bindings"] = serde_json::to_value(&s.instance_bindings)
+                        .unwrap_or(serde_json::Value::Null);
+                }
+                step_json
             })
             .collect();
 
@@ -202,13 +209,17 @@ impl TenorEvaluator {
             })
             .collect();
 
+        // Match WASM simulate_flow_with_bindings output format:
+        // includes "simulation": true and "instance_bindings": {} for cross-SDK compatibility.
         let result = serde_json::json!({
+            "simulation": true,
             "flow_id": flow_id,
             "persona": persona,
             "outcome": flow_result.outcome,
             "path": path,
             "would_transition": would_transition,
             "verdicts": verdict_set.to_json()["verdicts"],
+            "instance_bindings": instance_bindings,
         });
 
         json_to_py(py, &result)
