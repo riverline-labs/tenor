@@ -3,11 +3,11 @@
 ## Current Position
 
 **Phase**: 4 of 11 — Multi-Instance Entities
-**Plan**: 3 of 5 completed in current phase
+**Plan**: 5 of 5 completed in current phase
 **Status**: In progress
-**Last activity**: 2026-02-27 — Completed plan 04-03 (per-instance action space and instance-scoped provenance)
+**Last activity**: 2026-02-27 — Completed plan 04-04 (multi-instance entity integration test suite)
 
-Progress: ████████░░░░░░░░░░░░ 33% (Phases 1-3 complete, plans 04-01 through 04-03 done, 34 plans remaining)
+Progress: ████████░░░░░░░░░░░░ 36% (Phases 1-3 complete, plans 04-01 through 04-05 done, 32 plans remaining)
 
 ## Decisions
 
@@ -29,6 +29,9 @@ Progress: ████████░░░░░░░░░░░░ 33% (Phas
 - OperationProvenance.state_before/state_after use BTreeMap<(String,String),String> tuple keys (internal type, not serialized)
 - Two-pass effect loop: validate+capture state_before first, then apply, then capture state_after
 - StepRecord.instance_bindings empty for non-operation steps (branch, handoff, escalation)
+- parse_entity_states() WASM helper: string value = old flat (-> _default), object value = new nested (-> direct parse)
+- simulate_flow_with_bindings() is new 6-arg WASM export; simulate_flow() kept as 5-arg backward-compat wrapper
+- missing_instance_binding at flow level: on_failure terminates with failure outcome (Ok result), not Rust Err; direct execute_operation returns OperationError::EntityNotFound
 
 ## Blockers/Concerns
 
@@ -42,9 +45,11 @@ Progress: ████████░░░░░░░░░░░░ 33% (Phas
 | 04 | 01 | 740 | 2 | 7 |
 | 04 | 02 | 633 | 2 | 11 |
 | 04 | 03 | 536 | 2 | 4 |
+| 04 | 04 | 280 | 2 | 1 |
+| 04 | 05 | 248 | 2 | 2 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed plan 04-03 (per-instance action space and instance-scoped provenance)
-Next action: Execute plan 04-04
+Stopped at: Completed plan 04-04 (multi-instance entity integration test suite)
+Next action: Push phase 4 to main; then execute Part B in private repo (plan 04-05 already complete)

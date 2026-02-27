@@ -41,18 +41,18 @@
 
 ### Testing
 - [x] **TST-01**: All existing tests updated to use single_instance() helper
-- [ ] **TST-02**: Multi-instance action space test
-- [ ] **TST-03**: Instance-targeted execution test
-- [ ] **TST-04**: Flow with instance bindings test
-- [ ] **TST-05**: Missing instance binding error test
-- [ ] **TST-06**: Single-instance degenerate case backward compat test
-- [ ] **TST-07**: Instance absence test
+- [x] **TST-02**: Multi-instance action space test
+- [x] **TST-03**: Instance-targeted execution test
+- [x] **TST-04**: Flow with instance bindings test
+- [x] **TST-05**: Missing instance binding error test
+- [x] **TST-06**: Single-instance degenerate case backward compat test
+- [x] **TST-07**: Instance absence test
 
 ### WASM
-- [ ] **WSM-01**: WASM API accepts new nested entity_states format
-- [ ] **WSM-02**: WASM API accepts old flat format with `_default` fallback
-- [ ] **WSM-03**: WASM action space output includes instance bindings
-- [ ] **WSM-04**: WASM flow execution accepts instance bindings
+- [x] **WSM-01**: WASM API accepts new nested entity_states format
+- [x] **WSM-02**: WASM API accepts old flat format with `_default` fallback
+- [x] **WSM-03**: WASM action space output includes instance bindings
+- [x] **WSM-04**: WASM flow execution accepts instance bindings
 
 ## Phase 5: Trust & Security
 
@@ -142,16 +142,16 @@
 | PRV-02 | 04-03 | Complete |
 | PRV-03 | 04-03 | Complete |
 | TST-01 | 04-01 | Complete |
-| TST-02 | 04-04 | Pending |
-| TST-03 | 04-04 | Pending |
-| TST-04 | 04-04 | Pending |
-| TST-05 | 04-04 | Pending |
-| TST-06 | 04-04 | Pending |
-| TST-07 | 04-04 | Pending |
-| WSM-01 | 04-05 | Pending |
-| WSM-02 | 04-05 | Pending |
-| WSM-03 | 04-05 | Pending |
-| WSM-04 | 04-05 | Pending |
+| TST-02 | 04-04 | Complete |
+| TST-03 | 04-04 | Complete |
+| TST-04 | 04-04 | Complete |
+| TST-05 | 04-04 | Complete |
+| TST-06 | 04-04 | Complete |
+| TST-07 | 04-04 | Complete |
+| WSM-01 | 04-05 | Complete |
+| WSM-02 | 04-05 | Complete |
+| WSM-03 | 04-05 | Complete |
+| WSM-04 | 04-05 | Complete |
 
 ---
 *Requirements defined: 2026-02-27*

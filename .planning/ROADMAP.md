@@ -29,10 +29,10 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
   8. All existing tests pass (660+), conformance (82+), clippy clean
 **Plans**: 5 (04-01 through 04-05)
   - [x] 04-01: EntityStateMap type migration and existing test updates
-  - [ ] 04-02: Instance-targeted operation and flow execution
-  - [ ] 04-03: Per-instance action space and instance-scoped provenance
+  - [x] 04-02: Instance-targeted operation and flow execution
+  - [x] 04-03: Per-instance action space and instance-scoped provenance
   - [ ] 04-04: New multi-instance tests
-  - [ ] 04-05: WASM evaluator instance support
+  - [x] 04-05: WASM evaluator instance support
 
 ### Phase 5: Trust & Security
 **Goal**: Contract signing, WASM bundle signing, provenance attestation, executor conformance suite
@@ -173,7 +173,7 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 | 1. Migration | Complete | — | 2026-02-26 |
 | 2. Source Declarations | Complete | — | 2026-02-27 |
 | 3. Automated Fact Wiring | Complete | — | 2026-02-27 |
-| 4. Multi-Instance Entities | 3/5 | In Progress|  |
+| 4. Multi-Instance Entities | 5/5 | Complete   | 2026-02-27 |
 | 5. Trust & Security | Planned | 0/6 | — |
 | 6. Advanced Policies | Planned | 0/4 | — |
 | 7. SDKs | Planned | 0/4 | — |
