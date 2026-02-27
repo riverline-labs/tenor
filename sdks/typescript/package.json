@@ -15,9 +15,9 @@
     "prepublishOnly": "npm run build:wasm && npm run build"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.4.0",
-    "vitest": "^1.0.0"
+    "@types/node": "^20.19.35",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
   },
   "engines": {
     "node": ">=18.0.0"
