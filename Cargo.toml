@@ -8,6 +8,7 @@ members = [
     "crates/interchange",
     "crates/lsp",
     "crates/storage",
+    "crates/executor-conformance",
 ]
 exclude = [
     "crates/tenor-eval-wasm",

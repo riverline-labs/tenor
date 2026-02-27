@@ -1,0 +1,12 @@
+[package]
+name = "tenor-executor-conformance"
+version.workspace = true
+edition.workspace = true
+description = "Executor conformance test suite for Tenor (E1-E20)"
+
+[dependencies]
+tenor-interchange = { path = "../interchange" }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }

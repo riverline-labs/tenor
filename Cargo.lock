@@ -2384,6 +2384,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tenor-executor-conformance"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tenor-interchange",
+ "tokio",
+]
+
+[[package]]
 name = "tenor-interchange"
 version = "0.1.0"
 dependencies = [
