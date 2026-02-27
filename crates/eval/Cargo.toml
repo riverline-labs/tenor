@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 description = "Tenor contract evaluator"
 
+[features]
+default = ["adapter"]
+adapter = ["tokio", "ureq"]
+
 [dependencies]
 async-trait = { workspace = true }
 tenor-core = { path = "../core" }
@@ -14,6 +18,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 rust_decimal = { workspace = true }
 time = { workspace = true }
+tokio = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

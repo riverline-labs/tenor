@@ -8,7 +8,7 @@ description = "Tenor contract evaluator compiled to WebAssembly"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tenor-eval = { path = "../eval" }
+tenor-eval = { path = "../eval", default-features = false }
 tenor-interchange = { path = "../interchange" }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }

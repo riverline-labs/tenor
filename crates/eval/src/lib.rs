@@ -8,6 +8,8 @@
 //! Implementation: Phase 3.
 
 pub mod action_space;
+#[cfg(feature = "adapter")]
+pub mod adapter;
 pub mod assemble;
 pub mod fact_provider;
 pub mod flow;
@@ -23,6 +25,13 @@ pub mod types;
 pub use action_space::{
     compute_action_space, Action, ActionSpace, BlockedAction, BlockedReason, EntitySummary,
     VerdictSummary,
+};
+#[cfg(feature = "adapter")]
+pub use adapter::database::DatabaseQuery;
+#[cfg(feature = "adapter")]
+pub use adapter::{
+    AdapterConfig, AdapterError, AdapterFactProvider, AdapterRegistry, EnrichedFactProvenance,
+    FactAdapter, StructuredSourceRef,
 };
 pub use fact_provider::{FactProvider, FactProviderError, StaticFactProvider};
 pub use flow::{FlowEvalResult, FlowResult, Snapshot, StepRecord};
