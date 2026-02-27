@@ -75,6 +75,9 @@ Progress: ██████████████░░░░░░ 60% (Phas
 - [Phase 07-01]: executeFlowWithBindings() added to expose simulate_flow_with_bindings WASM export for multi-instance use
 - [Phase 07]: [07-03] Use wasm32-wasip1 target (not wasm32-unknown-unknown) for Go SDK bridge — avoids wasm-bindgen imports that wazero cannot satisfy
 - [Phase 07]: [07-03] wasi_snapshot_preview1.MustInstantiate(ctx, r) must precede module load; WithStartFunctions() prevents wazero calling _start on library-style WASM
+- [Phase 07]: pyo3 0.23 with abi3-py39: stable ABI for Python 3.9+ compatibility, required when Python 3.14 on dev machine exceeds pyo3 max version
+- [Phase 07]: [07-02] execute_flow uses init_entity_states() + overlay pattern (not evaluate_flow() top-level); mirrors WASM for empty entity state handling
+- [Phase 07]: [07-02] PyO3 cdylib needs [workspace] table in Cargo.toml to exclude from root workspace
 
 ## Blockers/Concerns
 
@@ -96,6 +99,7 @@ Progress: ██████████████░░░░░░ 60% (Phas
 | 05 | 04 | 385 | 7 | 24 |
 | 05 | 05 | 847 | 7 | 7 |
 | 05 | 06 | ~10800 | 9 | 15 |
+
 ## Performance Metrics (continued)
 
 | 06 | 01 | 318 | 9 | 2 |
@@ -103,10 +107,11 @@ Progress: ██████████████░░░░░░ 60% (Phas
 | 06 | 03 | 257 | 7 | 2 |
 | 06 | 04 | 171 | 6 | 1 |
 | 07 | 01 | 1393 | 8 | 12 |
+| 07 | 02 | 1997 | 8 | 12 |
 | 07 | 03 | 1695 | 8 | 11 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 07-sdks/07-03-PLAN.md (Go SDK)
+Stopped at: Completed 07-02-PLAN.md (Python SDK) — note: 07-03 was already complete when 07-02 executed
 Next action: Execute Phase 7 Plan 4
