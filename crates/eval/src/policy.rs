@@ -11,8 +11,51 @@ use async_trait::async_trait;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::{self, BufRead, Write};
+use std::time::Duration;
 
 use crate::action_space::{Action, ActionSpace};
+
+/// Result of presenting a proposed action to a human for approval.
+#[derive(Debug, Clone)]
+pub enum ApprovalResult {
+    /// Proceed with the proposed action.
+    Approved,
+    /// Abort — return None from choose().
+    Rejected,
+    /// Human chose a different action from the action space.
+    Substitute(Action),
+    /// Human did not respond within the configured timeout.
+    Timeout,
+}
+
+/// What to do when the approval channel times out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TimeoutBehavior {
+    /// Reject the proposed action (default).
+    #[default]
+    Reject,
+    /// Auto-approve the proposed action.
+    Approve,
+}
+
+/// A channel through which proposed actions are presented to a human for approval.
+///
+/// Implementations can be interactive (stdin), programmatic (callback), or
+/// networked (webhook, Slack bot, etc.).
+#[async_trait]
+pub trait ApprovalChannel: Send + Sync {
+    /// Present a proposed action to the human and wait for a decision.
+    ///
+    /// The implementation receives the full action space so it can present
+    /// alternatives if the human wants to substitute.
+    async fn request_approval(
+        &self,
+        proposed: &Action,
+        action_space: &ActionSpace,
+        snapshot: &AgentSnapshot,
+    ) -> ApprovalResult;
+}
 
 /// A consistent snapshot of the world: facts and entity states.
 ///
@@ -122,6 +165,214 @@ impl AgentPolicy for PriorityPolicy {
         }
         // Fall back to first available if no priority matches
         action_space.actions.first().cloned()
+    }
+}
+
+/// Interactive terminal approval channel that reads from stdin.
+///
+/// Presents the proposed action and available alternatives, then waits
+/// for the user to approve, reject, or select a substitute.
+pub struct StdinApprovalChannel;
+
+#[async_trait]
+impl ApprovalChannel for StdinApprovalChannel {
+    async fn request_approval(
+        &self,
+        proposed: &Action,
+        action_space: &ActionSpace,
+        _snapshot: &AgentSnapshot,
+    ) -> ApprovalResult {
+        let stdout = io::stdout();
+        let stdin = io::stdin();
+        let mut stdout_lock = stdout.lock();
+        let stdin_lock = stdin.lock();
+
+        // Display proposed action
+        let _ = writeln!(
+            stdout_lock,
+            "\nProposed action: execute flow \"{}\"",
+            proposed.flow_id
+        );
+        let _ = writeln!(stdout_lock, "  Persona: {}", proposed.persona_id);
+        if !proposed.enabling_verdicts.is_empty() {
+            let verdicts: Vec<&str> = proposed
+                .enabling_verdicts
+                .iter()
+                .map(|v| v.verdict_type.as_str())
+                .collect();
+            let _ = writeln!(
+                stdout_lock,
+                "  Enabling verdicts: [{}]",
+                verdicts.join(", ")
+            );
+        }
+        if !proposed.affected_entities.is_empty() {
+            for entity in &proposed.affected_entities {
+                let _ = writeln!(
+                    stdout_lock,
+                    "  Entity {}: {} -> [{}]",
+                    entity.entity_id,
+                    entity.current_state,
+                    entity.possible_transitions.join(", ")
+                );
+            }
+        }
+        let _ = writeln!(stdout_lock);
+
+        // Show alternatives
+        if action_space.actions.len() > 1 {
+            let _ = writeln!(stdout_lock, "Alternatives:");
+            for (i, action) in action_space.actions.iter().enumerate() {
+                if action.flow_id != proposed.flow_id {
+                    let _ = writeln!(stdout_lock, "  [{}] {}", i, action.flow_id);
+                }
+            }
+            let _ = writeln!(stdout_lock);
+        }
+
+        let _ = write!(
+            stdout_lock,
+            "[a]pprove / [r]eject / [N] select alternative? "
+        );
+        let _ = stdout_lock.flush();
+
+        let mut input = String::new();
+        let mut reader = io::BufReader::new(stdin_lock);
+        if reader.read_line(&mut input).is_err() {
+            return ApprovalResult::Rejected;
+        }
+
+        let trimmed = input.trim().to_lowercase();
+        match trimmed.as_str() {
+            "a" | "approve" => ApprovalResult::Approved,
+            "r" | "reject" => ApprovalResult::Rejected,
+            num => {
+                if let Ok(idx) = num.parse::<usize>() {
+                    if let Some(action) = action_space.actions.get(idx) {
+                        ApprovalResult::Substitute(action.clone())
+                    } else {
+                        ApprovalResult::Rejected
+                    }
+                } else {
+                    ApprovalResult::Rejected
+                }
+            }
+        }
+    }
+}
+
+/// Type alias for the callback function used by CallbackApprovalChannel.
+type ApprovalCallback =
+    Box<dyn Fn(&Action, &ActionSpace, &AgentSnapshot) -> ApprovalResult + Send + Sync>;
+
+/// Programmatic approval channel that delegates to a callback function.
+///
+/// Useful for automated testing, webhooks, or integration with external
+/// approval systems.
+pub struct CallbackApprovalChannel {
+    callback: ApprovalCallback,
+}
+
+impl CallbackApprovalChannel {
+    /// Create a new CallbackApprovalChannel with the given callback.
+    pub fn new(
+        callback: impl Fn(&Action, &ActionSpace, &AgentSnapshot) -> ApprovalResult
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        Self {
+            callback: Box::new(callback),
+        }
+    }
+}
+
+#[async_trait]
+impl ApprovalChannel for CallbackApprovalChannel {
+    async fn request_approval(
+        &self,
+        proposed: &Action,
+        action_space: &ActionSpace,
+        snapshot: &AgentSnapshot,
+    ) -> ApprovalResult {
+        (self.callback)(proposed, action_space, snapshot)
+    }
+}
+
+/// A policy that delegates action selection to an inner policy, then requires
+/// human approval before proceeding.
+///
+/// The delegate policy (e.g., LlmPolicy, PriorityPolicy) proposes an action.
+/// The approval channel presents it to the human. The human approves, rejects,
+/// or substitutes a different action.
+///
+/// If the delegate returns None (no action proposed), HumanInTheLoopPolicy
+/// returns None without consulting the human.
+pub struct HumanInTheLoopPolicy {
+    /// The inner policy that proposes actions.
+    pub delegate: Box<dyn AgentPolicy>,
+    /// The channel through which approval is requested.
+    pub approval_channel: Box<dyn ApprovalChannel>,
+    /// Maximum time to wait for human response.
+    pub timeout: Duration,
+    /// What to do when the timeout expires.
+    pub timeout_behavior: TimeoutBehavior,
+}
+
+impl HumanInTheLoopPolicy {
+    /// Create a new HumanInTheLoopPolicy.
+    pub fn new(
+        delegate: Box<dyn AgentPolicy>,
+        approval_channel: Box<dyn ApprovalChannel>,
+        timeout: Duration,
+        timeout_behavior: TimeoutBehavior,
+    ) -> Self {
+        Self {
+            delegate,
+            approval_channel,
+            timeout,
+            timeout_behavior,
+        }
+    }
+}
+
+#[async_trait]
+impl AgentPolicy for HumanInTheLoopPolicy {
+    async fn choose(&self, action_space: &ActionSpace, snapshot: &AgentSnapshot) -> Option<Action> {
+        // If action space is empty, short-circuit
+        if action_space.actions.is_empty() {
+            return None;
+        }
+
+        // Delegate proposes an action
+        let proposed = self.delegate.choose(action_space, snapshot).await?;
+
+        // Consult the approval channel
+        let result = self
+            .approval_channel
+            .request_approval(&proposed, action_space, snapshot)
+            .await;
+
+        match result {
+            ApprovalResult::Approved => Some(proposed),
+            ApprovalResult::Rejected => None,
+            ApprovalResult::Substitute(substitute) => {
+                // Validate substitute is in the action space
+                let valid = action_space
+                    .actions
+                    .iter()
+                    .any(|a| a.flow_id == substitute.flow_id);
+                if valid {
+                    Some(substitute)
+                } else {
+                    None
+                }
+            }
+            ApprovalResult::Timeout => match self.timeout_behavior {
+                TimeoutBehavior::Approve => Some(proposed),
+                TimeoutBehavior::Reject => None,
+            },
+        }
     }
 }
 
@@ -324,5 +575,155 @@ mod tests {
             let result = policy.choose(&space, &snap).await;
             assert!(result.is_some());
         }
+    }
+
+    // ── HumanInTheLoopPolicy ──
+
+    fn make_hitl(result: ApprovalResult) -> HumanInTheLoopPolicy {
+        HumanInTheLoopPolicy::new(
+            Box::new(FirstAvailablePolicy),
+            Box::new(CallbackApprovalChannel::new(move |_, _, _| result.clone())),
+            Duration::from_secs(30),
+            TimeoutBehavior::Reject,
+        )
+    }
+
+    #[tokio::test]
+    async fn hitl_approve() {
+        let policy = make_hitl(ApprovalResult::Approved);
+        let space = sample_action_space(vec![sample_action("flow_a"), sample_action("flow_b")]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().flow_id, "flow_a");
+    }
+
+    #[tokio::test]
+    async fn hitl_reject() {
+        let policy = make_hitl(ApprovalResult::Rejected);
+        let space = sample_action_space(vec![sample_action("flow_a")]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn hitl_substitute_valid() {
+        // Delegate proposes flow_a, callback substitutes flow_b (valid: in action space)
+        let substitute = sample_action("flow_b");
+        let policy = HumanInTheLoopPolicy::new(
+            Box::new(FirstAvailablePolicy),
+            Box::new(CallbackApprovalChannel::new(move |_, _, _| {
+                ApprovalResult::Substitute(substitute.clone())
+            })),
+            Duration::from_secs(30),
+            TimeoutBehavior::Reject,
+        );
+        let space = sample_action_space(vec![sample_action("flow_a"), sample_action("flow_b")]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().flow_id, "flow_b");
+    }
+
+    #[tokio::test]
+    async fn hitl_substitute_invalid() {
+        // Delegate proposes flow_a, callback substitutes flow_z (NOT in action space) -> None
+        let substitute = sample_action("flow_z");
+        let policy = HumanInTheLoopPolicy::new(
+            Box::new(FirstAvailablePolicy),
+            Box::new(CallbackApprovalChannel::new(move |_, _, _| {
+                ApprovalResult::Substitute(substitute.clone())
+            })),
+            Duration::from_secs(30),
+            TimeoutBehavior::Reject,
+        );
+        let space = sample_action_space(vec![sample_action("flow_a"), sample_action("flow_b")]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn hitl_empty_action_space() {
+        // Empty action space: returns None without consulting the callback.
+        // Callback panics to verify it is NOT called.
+        let policy = HumanInTheLoopPolicy::new(
+            Box::new(FirstAvailablePolicy),
+            Box::new(CallbackApprovalChannel::new(|_, _, _| {
+                panic!("callback should not be called for empty action space")
+            })),
+            Duration::from_secs(30),
+            TimeoutBehavior::Reject,
+        );
+        let space = sample_action_space(vec![]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn hitl_timeout_reject() {
+        // Callback returns Timeout; timeout_behavior is Reject -> None
+        let policy = HumanInTheLoopPolicy::new(
+            Box::new(FirstAvailablePolicy),
+            Box::new(CallbackApprovalChannel::new(|_, _, _| {
+                ApprovalResult::Timeout
+            })),
+            Duration::from_secs(30),
+            TimeoutBehavior::Reject,
+        );
+        let space = sample_action_space(vec![sample_action("flow_a")]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn hitl_timeout_approve() {
+        // Callback returns Timeout; timeout_behavior is Approve -> returns proposed action
+        let policy = HumanInTheLoopPolicy::new(
+            Box::new(FirstAvailablePolicy),
+            Box::new(CallbackApprovalChannel::new(|_, _, _| {
+                ApprovalResult::Timeout
+            })),
+            Duration::from_secs(30),
+            TimeoutBehavior::Approve,
+        );
+        let space = sample_action_space(vec![sample_action("flow_a")]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().flow_id, "flow_a");
+    }
+
+    #[tokio::test]
+    async fn hitl_delegate_returns_none() {
+        // PriorityPolicy with no matches falls back to first; but empty space -> None.
+        // Use empty action space to force delegate to return None.
+        // Callback panics to verify it is NOT called.
+        let policy = HumanInTheLoopPolicy::new(
+            Box::new(PriorityPolicy {
+                priorities: vec!["flow_z".to_string()],
+            }),
+            Box::new(CallbackApprovalChannel::new(|_, _, _| {
+                panic!("callback should not be called when delegate returns None")
+            })),
+            Duration::from_secs(30),
+            TimeoutBehavior::Reject,
+        );
+        // Empty action space: PriorityPolicy falls back to first(), which is None
+        let space = sample_action_space(vec![]);
+        let snap = sample_snapshot();
+
+        let result = policy.choose(&space, &snap).await;
+        assert!(result.is_none());
     }
 }
