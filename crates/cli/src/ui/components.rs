@@ -76,11 +76,11 @@ export function Dashboard() {{
                 }}}}
               >
                 <div style={{{{ fontWeight: 600, marginBottom: theme.spacing.sm }}}}>{{entity.label}}</div>
-                <div style={{{{ color: theme.colors.textMuted, fontSize: '13px' }}}}>
+                <div style={{{{ color: theme.colors.textSecondary, fontSize: '13px' }}}}>
                   {{entitiesLoading ? 'Loading...' : `${{entityInstances.length}} instance${{entityInstances.length !== 1 ? 's' : ''}}`}}
                 </div>
                 {{Object.entries(stateCounts).map(([state, count]) => (
-                  <div key={{state}} style={{{{ fontSize: '12px', color: theme.colors.textMuted }}}}>
+                  <div key={{state}} style={{{{ fontSize: '12px', color: theme.colors.textSecondary }}}}>
                     {{state}}: {{count}}
                   </div>
                 ))}}
@@ -127,9 +127,9 @@ export function Dashboard() {{
       {{/* Recent activity */}}
       <section>
         <h2 style={{{{ fontSize: '16px', marginBottom: theme.spacing.md }}}}>Recent Activity</h2>
-        {{historyLoading && <div style={{{{ color: theme.colors.textMuted }}}}>Loading...</div>}}
+        {{historyLoading && <div style={{{{ color: theme.colors.textSecondary }}}}>Loading...</div>}}
         {{history.length === 0 && !historyLoading && (
-          <div style={{{{ color: theme.colors.textMuted }}}}>No recent executions.</div>
+          <div style={{{{ color: theme.colors.textSecondary }}}}>No recent executions.</div>
         )}}
         {{history.map((entry) => (
           <div
@@ -144,10 +144,10 @@ export function Dashboard() {{
             }}}}
           >
             <span style={{{{ fontWeight: 600 }}}}>{{entry.flow_id}}</span>
-            <span style={{{{ marginLeft: theme.spacing.sm, color: theme.colors.textMuted }}}}>
+            <span style={{{{ marginLeft: theme.spacing.sm, color: theme.colors.textSecondary }}}}>
               {{entry.persona}} — {{entry.outcome}}
             </span>
-            <span style={{{{ marginLeft: theme.spacing.sm, color: theme.colors.textMuted, fontSize: '11px' }}}}>
+            <span style={{{{ marginLeft: theme.spacing.sm, color: theme.colors.textSecondary, fontSize: '11px' }}}}>
               {{new Date(entry.timestamp).toLocaleString()}}
             </span>
           </div>
@@ -191,7 +191,7 @@ export function EntityList() {{
   return (
     <div style={{{{ padding: theme.spacing.lg }}}}>
       <h1 style={{{{ color: theme.colors.primary, marginBottom: theme.spacing.lg }}}}>Entities</h1>
-      {{loading && <div style={{{{ color: theme.colors.textMuted }}}}>Loading instances...</div>}}
+      {{loading && <div style={{{{ color: theme.colors.textSecondary }}}}>Loading instances...</div>}}
       <div style={{{{ display: 'flex', gap: theme.spacing.md, flexWrap: 'wrap' }}}}>
         {{ENTITY_DEFS.map((entity) => {{
           const entityInstances = instances[entity.id] ?? [];
@@ -210,7 +210,7 @@ export function EntityList() {{
               }}}}
             >
               <h3 style={{{{ margin: '0 0 8px', color: theme.colors.primary }}}}>{{entity.id}}</h3>
-              <div style={{{{ fontSize: '12px', color: theme.colors.textMuted, marginBottom: '8px' }}}}>
+              <div style={{{{ fontSize: '12px', color: theme.colors.textSecondary, marginBottom: '8px' }}}}>
                 States: {{entity.states.join(', ')}}
               </div>
               <div style={{{{ fontSize: '13px', fontWeight: 600 }}}}>
@@ -315,7 +315,7 @@ export function EntityDetail() {{
           Instances {{loading ? '(loading...)' : `(${{entityInstances.length}})`}}
         </h2>
         {{entityInstances.length === 0 && !loading && (
-          <div style={{{{ color: theme.colors.textMuted }}}}>No instances found.</div>
+          <div style={{{{ color: theme.colors.textSecondary }}}}>No instances found.</div>
         )}}
         {{entityInstances.map((inst) => (
           <div
@@ -424,7 +424,7 @@ export function InstanceDetail() {{
         {{entityId}} / <span style={{{{ fontFamily: theme.fonts.mono }}}}>{{instanceId}}</span>
       </h1>
 
-      {{loading && <div style={{{{ color: theme.colors.textMuted }}}}>Loading...</div>}}
+      {{loading && <div style={{{{ color: theme.colors.textSecondary }}}}>Loading...</div>}}
 
       {{/* Current state */}}
       {{state && (
@@ -454,7 +454,7 @@ export function InstanceDetail() {{
       <section>
         <h2 style={{{{ fontSize: '16px', marginBottom: theme.spacing.sm }}}}>Execution History</h2>
         {{history.length === 0 && !loading && (
-          <div style={{{{ color: theme.colors.textMuted }}}}>No executions involving this instance.</div>
+          <div style={{{{ color: theme.colors.textSecondary }}}}>No executions involving this instance.</div>
         )}}
         {{history.map((entry) => (
           <div
@@ -469,14 +469,14 @@ export function InstanceDetail() {{
             }}}}
           >
             <span style={{{{ fontWeight: 600 }}}}>{{entry.flow_id}}</span>
-            <span style={{{{ marginLeft: theme.spacing.sm, color: theme.colors.textMuted }}}}>
+            <span style={{{{ marginLeft: theme.spacing.sm, color: theme.colors.textSecondary }}}}>
               {{entry.persona}} — {{entry.outcome}}
             </span>
             <div style={{{{ marginTop: '4px' }}}}>
               {{entry.entity_state_changes
                 .filter((c) => c.entity_id === entityId)
                 .map((c, i) => (
-                  <span key={{i}} style={{{{ fontSize: '12px', color: theme.colors.textMuted }}}}>
+                  <span key={{i}} style={{{{ fontSize: '12px', color: theme.colors.textSecondary }}}}>
                     {{c.from_state}} → {{c.to_state}}
                   </span>
                 ))}}
@@ -523,13 +523,13 @@ export function BlockedActions({ blocked }: BlockedActionsProps) {
         >
           <div style={{ fontWeight: 600, fontSize: '13px' }}>{action.flow_id}</div>
           {action.reason && (
-            <div style={{ fontSize: '12px', color: theme.colors.textMuted, marginTop: '4px' }}>
+            <div style={{ fontSize: '12px', color: theme.colors.textSecondary, marginTop: '4px' }}>
               {action.reason}
             </div>
           )}
           {action.enabling_verdicts && action.enabling_verdicts.length > 0 && (
             <div style={{ fontSize: '12px', marginTop: '4px' }}>
-              <span style={{ color: theme.colors.textMuted }}>Requires: </span>
+              <span style={{ color: theme.colors.textSecondary }}>Requires: </span>
               {action.enabling_verdicts.map((v, j) => (
                 <span
                   key={j}
@@ -640,7 +640,7 @@ export function ActionSpace() {
           <h2 style={{ fontSize: '15px', marginBottom: theme.spacing.sm }}>Select Instances</h2>
           {Object.entries(instances).map(([entityId, entityInstances]) => (
             <div key={entityId} style={{ marginBottom: theme.spacing.sm }}>
-              <label style={{ display: 'block', marginBottom: theme.spacing.xs, fontSize: '13px', color: theme.colors.textMuted }}>
+              <label style={{ display: 'block', marginBottom: theme.spacing.xs, fontSize: '13px', color: theme.colors.textSecondary }}>
                 {entityId}
               </label>
               <select
@@ -666,7 +666,7 @@ export function ActionSpace() {
       )}
 
       {/* Loading / error */}
-      {asLoading && <div style={{ color: theme.colors.textMuted }}>Computing action space...</div>}
+      {asLoading && <div style={{ color: theme.colors.textSecondary }}>Computing action space...</div>}
       {asError && <div style={{ color: theme.colors.error }}>{asError}</div>}
 
       {/* Available actions */}
@@ -804,7 +804,7 @@ function FactField({ meta, value, onChange }: FactFieldProps) {
     marginBottom: '4px',
     fontSize: '13px',
     fontWeight: 600,
-    color: theme.colors.text,
+    color: theme.colors.textPrimary,
   };
 
   const inputStyle: React.CSSProperties = {
@@ -1024,7 +1024,7 @@ function FactField({ meta, value, onChange }: FactFieldProps) {
               margin: 0,
             }}
           >
-            <legend style={{ fontSize: '12px', color: theme.colors.textMuted }}>{meta.label}</legend>
+            <legend style={{ fontSize: '12px', color: theme.colors.textSecondary }}>{meta.label}</legend>
             {Object.entries(meta.fields ?? {}).map(([fieldId, fieldMeta]) => (
               <FactField
                 key={fieldId}
@@ -1073,7 +1073,7 @@ interface FlowExecutionProps {
 export function FlowExecution({ flowId, mode, result, loading, error }: FlowExecutionProps) {
   if (loading) {
     return (
-      <div style={{ color: theme.colors.textMuted, padding: theme.spacing.md }}>
+      <div style={{ color: theme.colors.textSecondary, padding: theme.spacing.md }}>
         {mode === 'simulate' ? 'Simulating' : 'Executing'} {flowId}...
       </div>
     );
@@ -1152,7 +1152,7 @@ export function FlowExecution({ flowId, mode, result, loading, error }: FlowExec
             }}
           >
             <thead>
-              <tr style={{ color: theme.colors.textMuted }}>
+              <tr style={{ color: theme.colors.textSecondary }}>
                 <th style={{ textAlign: 'left', paddingBottom: '4px' }}>Entity</th>
                 <th style={{ textAlign: 'left', paddingBottom: '4px' }}>From</th>
                 <th style={{ textAlign: 'left', paddingBottom: '4px' }}>To</th>
@@ -1180,7 +1180,7 @@ export function FlowExecution({ flowId, mode, result, loading, error }: FlowExec
               key={i}
               style={{
                 fontSize: '12px',
-                color: theme.colors.textMuted,
+                color: theme.colors.textSecondary,
                 fontFamily: theme.fonts.mono,
                 marginBottom: '2px',
               }}
@@ -1206,7 +1206,7 @@ export function FlowExecution({ flowId, mode, result, loading, error }: FlowExec
               }}
             >
               <span style={{ color: theme.colors.info }}>{v.verdict_type}</span>
-              <span style={{ fontFamily: theme.fonts.mono, color: theme.colors.textMuted }}>
+              <span style={{ fontFamily: theme.fonts.mono, color: theme.colors.textSecondary }}>
                 {JSON.stringify(v.payload)}
               </span>
             </div>
@@ -1274,7 +1274,7 @@ function TreeNode({ label, color, children, defaultExpanded = false }: TreeNodeP
 
 export function ProvenanceDrill({ verdicts }: ProvenanceDrillProps) {
   if (verdicts.length === 0) {
-    return <div style={{ color: theme.colors.textMuted }}>No provenance data available.</div>;
+    return <div style={{ color: theme.colors.textSecondary }}>No provenance data available.</div>;
   }
 
   return (
@@ -1332,7 +1332,7 @@ export function VerdictDisplay({ verdicts }: VerdictDisplayProps) {
   const [selected, setSelected] = useState<Verdict | null>(null);
 
   if (verdicts.length === 0) {
-    return <div style={{ color: theme.colors.textMuted }}>No verdicts to display.</div>;
+    return <div style={{ color: theme.colors.textSecondary }}>No verdicts to display.</div>;
   }
 
   // Group verdicts by stratum
@@ -1349,7 +1349,7 @@ export function VerdictDisplay({ verdicts }: VerdictDisplayProps) {
     <div>
       {strata.map((stratum) => (
         <div key={stratum} style={{ marginBottom: theme.spacing.md }}>
-          <h4 style={{ fontSize: '13px', color: theme.colors.textMuted, marginBottom: '6px' }}>
+          <h4 style={{ fontSize: '13px', color: theme.colors.textSecondary, marginBottom: '6px' }}>
             Stratum {stratum}
           </h4>
           {(byStratum.get(stratum) ?? []).map((verdict, i) => {
@@ -1384,12 +1384,12 @@ export function VerdictDisplay({ verdicts }: VerdictDisplayProps) {
                     style={{
                       fontFamily: theme.fonts.mono,
                       fontSize: '12px',
-                      color: theme.colors.textMuted,
+                      color: theme.colors.textSecondary,
                     }}
                   >
                     {JSON.stringify(verdict.payload)}
                   </span>
-                  <span style={{ fontSize: '11px', color: theme.colors.textMuted }}>
+                  <span style={{ fontSize: '11px', color: theme.colors.textSecondary }}>
                     via {verdict.provenance.rule_id}
                   </span>
                 </div>
@@ -1497,11 +1497,11 @@ export function FlowHistory() {
         </select>
       </div>
 
-      {loading && <div style={{ color: theme.colors.textMuted }}>Loading history...</div>}
+      {loading && <div style={{ color: theme.colors.textSecondary }}>Loading history...</div>}
       {error && <div style={{ color: theme.colors.error }}>{error}</div>}
 
       {filtered.length === 0 && !loading && (
-        <div style={{ color: theme.colors.textMuted }}>No executions match the current filters.</div>
+        <div style={{ color: theme.colors.textSecondary }}>No executions match the current filters.</div>
       )}
 
       {filtered.map((entry) => {
@@ -1532,7 +1532,7 @@ export function FlowHistory() {
               <div style={{ display: 'flex', gap: theme.spacing.md, alignItems: 'center' }}>
                 <span style={{ fontSize: '12px' }}>{isExpanded ? '▾' : '▸'}</span>
                 <span style={{ fontWeight: 600, fontSize: '13px' }}>{entry.flow_id}</span>
-                <span style={{ color: theme.colors.textMuted, fontSize: '12px' }}>
+                <span style={{ color: theme.colors.textSecondary, fontSize: '12px' }}>
                   {entry.persona}
                 </span>
               </div>
@@ -1540,7 +1540,7 @@ export function FlowHistory() {
                 <span style={{ color: outcomeColor, fontWeight: 600, fontSize: '12px' }}>
                   {entry.outcome.toUpperCase()}
                 </span>
-                <span style={{ color: theme.colors.textMuted, fontSize: '11px' }}>
+                <span style={{ color: theme.colors.textSecondary, fontSize: '11px' }}>
                   {new Date(entry.timestamp).toLocaleString()}
                 </span>
               </div>
@@ -1553,7 +1553,7 @@ export function FlowHistory() {
                   fontSize: '13px',
                 }}
               >
-                <div style={{ marginBottom: '4px', color: theme.colors.textMuted, fontSize: '11px' }}>
+                <div style={{ marginBottom: '4px', color: theme.colors.textSecondary, fontSize: '11px' }}>
                   ID: {entry.execution_id}
                 </div>
                 {entry.entity_state_changes.length > 0 && (

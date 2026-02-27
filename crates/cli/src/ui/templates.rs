@@ -216,7 +216,7 @@ const navStyle = (isActive: boolean): React.CSSProperties => ({{
   padding: '8px 16px',
   textDecoration: 'none',
   borderRadius: '6px',
-  color: isActive ? theme.colors.primary : theme.colors.text,
+  color: isActive ? theme.colors.primary : theme.colors.textPrimary,
   backgroundColor: isActive ? theme.colors.primaryLight : 'transparent',
   fontWeight: isActive ? 600 : 400,
   marginBottom: '4px',
@@ -237,7 +237,7 @@ export function Layout() {{
       {{/* Sidebar */}}
       <nav style={{{{
         width: '220px',
-        backgroundColor: theme.colors.sidebar,
+        backgroundColor: theme.colors.surface,
         borderRight: `1px solid ${{theme.colors.border}}`,
         padding: '16px',
         flexShrink: 0,
@@ -271,7 +271,7 @@ export function Layout() {{
           justifyContent: 'flex-end',
           gap: '12px',
         }}}}>
-          <label style={{{{ fontSize: '14px', color: theme.colors.textMuted }}}}>
+          <label style={{{{ fontSize: '14px', color: theme.colors.textSecondary }}}}>
             Persona:
           </label>
           <select
