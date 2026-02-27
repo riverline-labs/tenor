@@ -453,3 +453,190 @@ fn test_compute_action_space_current_verdicts() {
     assert_eq!(verdicts[0]["verdict_type"], "account_active");
     assert_eq!(verdicts[0]["producing_rule"], "check_active");
 }
+
+// ── Multi-instance format tests ──
+
+#[wasm_bindgen_test(unsupported = test)]
+fn test_compute_action_space_new_nested_format_available() {
+    // New format: {"Order": {"ord-001": "pending"}} — single instance in new format
+    let load_result = tenor_eval_wasm::load_contract(BASIC_BUNDLE);
+    let handle = serde_json::from_str::<serde_json::Value>(&load_result)
+        .unwrap()["handle"]
+        .as_u64()
+        .unwrap() as u32;
+
+    let result = tenor_eval_wasm::compute_action_space(
+        handle,
+        r#"{"is_active": true}"#,
+        r#"{"Order": {"ord-001": "pending"}}"#,
+        "admin",
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+    assert!(parsed.get("error").is_none(), "unexpected error: {}", result);
+    let actions = parsed["actions"].as_array().unwrap();
+    assert_eq!(actions.len(), 1, "action should be available");
+    assert_eq!(actions[0]["flow_id"], "approval_flow");
+
+    // instance_bindings should include ord-001
+    let bindings = &actions[0]["instance_bindings"];
+    assert!(
+        bindings["Order"].as_array().unwrap().contains(&serde_json::json!("ord-001")),
+        "ord-001 should appear in instance_bindings: {}",
+        result
+    );
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn test_compute_action_space_multi_instance_partial_valid() {
+    // New format: Order has ord-001 (pending = valid) and ord-002 (approved = blocked)
+    // Action should still be available for ord-001
+    let load_result = tenor_eval_wasm::load_contract(BASIC_BUNDLE);
+    let handle = serde_json::from_str::<serde_json::Value>(&load_result)
+        .unwrap()["handle"]
+        .as_u64()
+        .unwrap() as u32;
+
+    let result = tenor_eval_wasm::compute_action_space(
+        handle,
+        r#"{"is_active": true}"#,
+        r#"{"Order": {"ord-001": "pending", "ord-002": "approved"}}"#,
+        "admin",
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+    assert!(parsed.get("error").is_none(), "unexpected error: {}", result);
+    let actions = parsed["actions"].as_array().unwrap();
+    assert_eq!(actions.len(), 1, "action should be available for ord-001");
+
+    let bindings = &actions[0]["instance_bindings"]["Order"];
+    let binding_arr = bindings.as_array().unwrap();
+    // ord-001 is valid, ord-002 is not
+    assert!(
+        binding_arr.contains(&serde_json::json!("ord-001")),
+        "ord-001 should be valid"
+    );
+    assert!(
+        !binding_arr.contains(&serde_json::json!("ord-002")),
+        "ord-002 should not be in valid bindings"
+    );
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn test_compute_action_space_multi_instance_all_blocked() {
+    // Both instances in "approved" (not "pending") — action should be blocked
+    let load_result = tenor_eval_wasm::load_contract(BASIC_BUNDLE);
+    let handle = serde_json::from_str::<serde_json::Value>(&load_result)
+        .unwrap()["handle"]
+        .as_u64()
+        .unwrap() as u32;
+
+    let result = tenor_eval_wasm::compute_action_space(
+        handle,
+        r#"{"is_active": true}"#,
+        r#"{"Order": {"ord-001": "approved", "ord-002": "approved"}}"#,
+        "admin",
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+    assert!(parsed.get("error").is_none(), "unexpected error: {}", result);
+    assert_eq!(parsed["actions"].as_array().unwrap().len(), 0, "no valid actions");
+    let blocked = parsed["blocked_actions"].as_array().unwrap();
+    assert_eq!(blocked.len(), 1);
+    assert_eq!(blocked[0]["reason"]["type"], "EntityNotInSourceState");
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn test_action_space_includes_instance_bindings() {
+    // Old flat format should produce instance_bindings with _default
+    let load_result = tenor_eval_wasm::load_contract(BASIC_BUNDLE);
+    let handle = serde_json::from_str::<serde_json::Value>(&load_result)
+        .unwrap()["handle"]
+        .as_u64()
+        .unwrap() as u32;
+
+    let result = tenor_eval_wasm::compute_action_space(
+        handle,
+        r#"{"is_active": true}"#,
+        r#"{"Order": "pending"}"#,
+        "admin",
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+    let actions = parsed["actions"].as_array().unwrap();
+    assert_eq!(actions.len(), 1);
+    // instance_bindings should include _default for the single-instance case
+    let bindings = &actions[0]["instance_bindings"];
+    assert!(
+        bindings.get("Order").is_some(),
+        "Order should be in instance_bindings"
+    );
+    let order_bindings = bindings["Order"].as_array().unwrap();
+    assert!(
+        order_bindings.contains(&serde_json::json!("_default")),
+        "_default should appear in instance_bindings for flat format"
+    );
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn test_simulate_flow_with_bindings_success() {
+    // Test simulate_flow_with_bindings with new multi-instance format
+    let load_result = tenor_eval_wasm::load_contract(BASIC_BUNDLE);
+    let handle = serde_json::from_str::<serde_json::Value>(&load_result)
+        .unwrap()["handle"]
+        .as_u64()
+        .unwrap() as u32;
+
+    // Use new nested format for entity_states, with explicit instance_bindings
+    let result = tenor_eval_wasm::simulate_flow_with_bindings(
+        handle,
+        "approval_flow",
+        "admin",
+        r#"{"is_active": true}"#,
+        r#"{"Order": {"ord-001": "pending"}}"#,
+        r#"{"Order": "ord-001"}"#,
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+    assert!(parsed.get("error").is_none(), "unexpected error: {}", result);
+    assert_eq!(parsed["simulation"], true);
+    assert_eq!(parsed["flow_id"], "approval_flow");
+    assert_eq!(parsed["outcome"], "order_approved");
+
+    // instance_bindings should be echoed back in response
+    assert_eq!(parsed["instance_bindings"]["Order"], "ord-001");
+
+    // would_transition should include instance_id
+    let transitions = parsed["would_transition"].as_array().unwrap();
+    assert_eq!(transitions.len(), 1);
+    assert_eq!(transitions[0]["entity_id"], "Order");
+    assert_eq!(transitions[0]["instance_id"], "ord-001");
+    assert_eq!(transitions[0]["from_state"], "pending");
+    assert_eq!(transitions[0]["to_state"], "approved");
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn test_simulate_flow_with_bindings_empty_bindings_backward_compat() {
+    // Empty instance_bindings should use _default (backward compat)
+    let load_result = tenor_eval_wasm::load_contract(BASIC_BUNDLE);
+    let handle = serde_json::from_str::<serde_json::Value>(&load_result)
+        .unwrap()["handle"]
+        .as_u64()
+        .unwrap() as u32;
+
+    let result = tenor_eval_wasm::simulate_flow_with_bindings(
+        handle,
+        "approval_flow",
+        "admin",
+        r#"{"is_active": true}"#,
+        r#"{"Order": "pending"}"#,
+        r#""#,
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+    assert!(parsed.get("error").is_none(), "unexpected error: {}", result);
+    assert_eq!(parsed["outcome"], "order_approved");
+    // would_transition should have instance_id = _default
+    let transitions = parsed["would_transition"].as_array().unwrap();
+    assert_eq!(transitions[0]["instance_id"], "_default");
+}
