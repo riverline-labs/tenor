@@ -36,6 +36,7 @@ pub enum InterchangeConstruct {
     Operation(OperationConstruct),
     Flow(FlowConstruct),
     Persona(PersonaConstruct),
+    Source(SourceConstruct),
     System(SystemConstruct),
     TypeDecl(TypeDeclConstruct),
 }
@@ -169,6 +170,21 @@ pub struct FlowConstruct {
 #[derive(Debug, Clone)]
 pub struct PersonaConstruct {
     pub id: String,
+    pub provenance: Option<Provenance>,
+    pub tenor: Option<String>,
+}
+
+// ── Source ──────────────────────────────────────────────────────────
+
+/// A Source construct from interchange JSON (§5A).
+/// Source declarations are infrastructure metadata — they do not affect
+/// evaluation but describe where facts originate.
+#[derive(Debug, Clone)]
+pub struct SourceConstruct {
+    pub id: String,
+    pub protocol: String,
+    pub fields: std::collections::BTreeMap<String, String>,
+    pub description: Option<String>,
     pub provenance: Option<Provenance>,
     pub tenor: Option<String>,
 }

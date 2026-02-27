@@ -496,8 +496,10 @@ impl Contract {
                 InterchangeConstruct::Persona(p) => {
                     personas.push(p.id.clone());
                 }
-                InterchangeConstruct::System(_) | InterchangeConstruct::TypeDecl(_) => {
-                    // System and TypeDecl constructs are not used in evaluation
+                InterchangeConstruct::Source(_)
+                | InterchangeConstruct::System(_)
+                | InterchangeConstruct::TypeDecl(_) => {
+                    // Source, System, and TypeDecl constructs are not used in evaluation
                 }
             }
         }
@@ -1830,5 +1832,158 @@ mod tests {
         assert!(vs.has_verdict("test"));
         assert!(!vs.has_verdict("other"));
         assert_eq!(vs.get_verdict("test").unwrap().verdict_type, "test");
+    }
+
+    /// §5A.5: Removing all Source declarations from a contract produces
+    /// identical evaluation behavior.
+    #[test]
+    fn source_declarations_do_not_affect_evaluation() {
+        use serde_json::json;
+
+        // Bundle WITH Source constructs
+        let bundle_with_sources = json!({
+            "id": "source-eval-test",
+            "kind": "Bundle",
+            "tenor": "1.0",
+            "tenor_version": "1.0.0",
+            "constructs": [
+                {
+                    "id": "admin",
+                    "kind": "Persona",
+                    "provenance": {"file": "test.tenor", "line": 1},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "order_service",
+                    "kind": "Source",
+                    "protocol": "http",
+                    "fields": {
+                        "base_url": "https://api.orders.com/v2"
+                    },
+                    "description": "Order management REST API",
+                    "provenance": {"file": "test.tenor", "line": 3},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "compliance_db",
+                    "kind": "Source",
+                    "protocol": "database",
+                    "fields": {
+                        "dialect": "postgres"
+                    },
+                    "provenance": {"file": "test.tenor", "line": 10},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "amount",
+                    "kind": "Fact",
+                    "type": {"base": "Int"},
+                    "source": {"source_id": "order_service", "path": "orders.balance"},
+                    "provenance": {"file": "test.tenor", "line": 17},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "is_compliant",
+                    "kind": "Fact",
+                    "type": {"base": "Bool"},
+                    "source": "compliance.flag",
+                    "provenance": {"file": "test.tenor", "line": 22},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "check_amount",
+                    "kind": "Rule",
+                    "stratum": 0,
+                    "body": {
+                        "when": {
+                            "left": {"fact_ref": "amount"},
+                            "op": ">",
+                            "right": {"literal": 100, "type": {"base": "Int"}}
+                        },
+                        "produce": {
+                            "verdict_type": "high_value",
+                            "payload": {"type": {"base": "Bool"}, "value": true}
+                        }
+                    },
+                    "provenance": {"file": "test.tenor", "line": 27},
+                    "tenor": "1.0"
+                }
+            ]
+        });
+
+        // Bundle WITHOUT Source constructs (everything else identical)
+        let bundle_without_sources = json!({
+            "id": "source-eval-test",
+            "kind": "Bundle",
+            "tenor": "1.0",
+            "tenor_version": "1.0.0",
+            "constructs": [
+                {
+                    "id": "admin",
+                    "kind": "Persona",
+                    "provenance": {"file": "test.tenor", "line": 1},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "amount",
+                    "kind": "Fact",
+                    "type": {"base": "Int"},
+                    "source": {"source_id": "order_service", "path": "orders.balance"},
+                    "provenance": {"file": "test.tenor", "line": 17},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "is_compliant",
+                    "kind": "Fact",
+                    "type": {"base": "Bool"},
+                    "source": "compliance.flag",
+                    "provenance": {"file": "test.tenor", "line": 22},
+                    "tenor": "1.0"
+                },
+                {
+                    "id": "check_amount",
+                    "kind": "Rule",
+                    "stratum": 0,
+                    "body": {
+                        "when": {
+                            "left": {"fact_ref": "amount"},
+                            "op": ">",
+                            "right": {"literal": 100, "type": {"base": "Int"}}
+                        },
+                        "produce": {
+                            "verdict_type": "high_value",
+                            "payload": {"type": {"base": "Bool"}, "value": true}
+                        }
+                    },
+                    "provenance": {"file": "test.tenor", "line": 27},
+                    "tenor": "1.0"
+                }
+            ]
+        });
+
+        let facts = json!({"amount": 500, "is_compliant": true});
+
+        // Evaluate both
+        let contract_with =
+            Contract::from_interchange(&bundle_with_sources).expect("with-sources contract");
+        let contract_without =
+            Contract::from_interchange(&bundle_without_sources).expect("without-sources contract");
+
+        let fact_set_with =
+            crate::assemble::assemble_facts(&contract_with, &facts).expect("assemble with");
+        let fact_set_without =
+            crate::assemble::assemble_facts(&contract_without, &facts).expect("assemble without");
+
+        let verdicts_with =
+            crate::rules::eval_strata(&contract_with, &fact_set_with).expect("eval with");
+        let verdicts_without =
+            crate::rules::eval_strata(&contract_without, &fact_set_without).expect("eval without");
+
+        // Verdicts must be identical
+        assert_eq!(
+            verdicts_with.to_json(),
+            verdicts_without.to_json(),
+            "Source declarations must not affect evaluation results"
+        );
     }
 }

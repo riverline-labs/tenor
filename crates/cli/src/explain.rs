@@ -54,8 +54,10 @@ pub fn explain(
             InterchangeConstruct::Rule(r) => rules.push(r),
             InterchangeConstruct::Operation(o) => operations.push(o),
             InterchangeConstruct::Flow(f) => flows.push(f),
-            // TypeDecl and System are not rendered in explain output
-            InterchangeConstruct::TypeDecl(_) | InterchangeConstruct::System(_) => {}
+            // Source, TypeDecl, and System are not rendered in explain output
+            InterchangeConstruct::Source(_)
+            | InterchangeConstruct::TypeDecl(_)
+            | InterchangeConstruct::System(_) => {}
         }
     }
 

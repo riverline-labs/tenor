@@ -83,6 +83,7 @@ pub fn from_interchange(bundle: &serde_json::Value) -> Result<InterchangeBundle,
             "Operation" => Some(InterchangeConstruct::Operation(parse_operation(obj)?)),
             "Flow" => Some(InterchangeConstruct::Flow(parse_flow(obj)?)),
             "Persona" => Some(InterchangeConstruct::Persona(parse_persona(obj)?)),
+            "Source" => Some(InterchangeConstruct::Source(parse_source(obj)?)),
             "System" => Some(InterchangeConstruct::System(parse_system(obj)?)),
             "TypeDecl" => Some(InterchangeConstruct::TypeDecl(parse_type_decl(obj)?)),
             _ => None, // Skip unknown kinds for forward compatibility
@@ -348,6 +349,38 @@ fn parse_persona(obj: &serde_json::Value) -> Result<PersonaConstruct, Interchang
 
     Ok(PersonaConstruct {
         id,
+        provenance,
+        tenor,
+    })
+}
+
+fn parse_source(obj: &serde_json::Value) -> Result<SourceConstruct, InterchangeError> {
+    let id = required_str(obj, "id")?;
+    let protocol = required_str(obj, "protocol")?;
+
+    let fields = obj
+        .get("fields")
+        .and_then(|f| f.as_object())
+        .map(|map| {
+            map.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let description = obj
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let provenance = parse_provenance(obj);
+    let tenor = parse_tenor(obj);
+
+    Ok(SourceConstruct {
+        id,
+        protocol,
+        fields,
+        description,
         provenance,
         tenor,
     })
@@ -806,6 +839,62 @@ mod tests {
                 assert_eq!(td.type_def["base"], "Enum");
             }
             other => panic!("expected TypeDecl, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_source() {
+        let bundle = make_bundle(vec![json!({
+            "id": "order_service",
+            "kind": "Source",
+            "protocol": "http",
+            "fields": {
+                "auth": "bearer_token",
+                "base_url": "https://api.orders.com/v2",
+                "schema_ref": "https://api.orders.com/v2/openapi.json"
+            },
+            "description": "Order management REST API",
+            "provenance": {"file": "escrow.tenor", "line": 1},
+            "tenor": "1.0"
+        })]);
+
+        let result = from_interchange(&bundle).unwrap();
+        assert_eq!(result.constructs.len(), 1);
+        match &result.constructs[0] {
+            InterchangeConstruct::Source(s) => {
+                assert_eq!(s.id, "order_service");
+                assert_eq!(s.protocol, "http");
+                assert_eq!(s.fields.len(), 3);
+                assert_eq!(s.fields["base_url"], "https://api.orders.com/v2");
+                assert_eq!(s.fields["auth"], "bearer_token");
+                assert_eq!(s.description, Some("Order management REST API".to_string()));
+                assert_eq!(s.provenance.as_ref().unwrap().file, "escrow.tenor");
+                assert_eq!(s.provenance.as_ref().unwrap().line, 1);
+            }
+            other => panic!("expected Source, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_source_minimal() {
+        let bundle = make_bundle(vec![json!({
+            "id": "config",
+            "kind": "Source",
+            "protocol": "static",
+            "fields": {},
+            "provenance": {"file": "test.tenor", "line": 5},
+            "tenor": "1.0"
+        })]);
+
+        let result = from_interchange(&bundle).unwrap();
+        match &result.constructs[0] {
+            InterchangeConstruct::Source(s) => {
+                assert_eq!(s.id, "config");
+                assert_eq!(s.protocol, "static");
+                assert!(s.fields.is_empty());
+                assert!(s.description.is_none());
+            }
+            other => panic!("expected Source, got {:?}", other),
         }
     }
 }

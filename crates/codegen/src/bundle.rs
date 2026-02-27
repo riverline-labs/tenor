@@ -188,8 +188,10 @@ impl CodegenBundle {
                 InterchangeConstruct::Persona(p) => {
                     personas.push(CodegenPersona { id: p.id.clone() });
                 }
-                InterchangeConstruct::System(_) | InterchangeConstruct::TypeDecl(_) => {
-                    // System and TypeDecl constructs are not relevant for TypeScript codegen
+                InterchangeConstruct::Source(_)
+                | InterchangeConstruct::System(_)
+                | InterchangeConstruct::TypeDecl(_) => {
+                    // Source, System, and TypeDecl constructs are not relevant for TypeScript codegen
                 }
             }
         }

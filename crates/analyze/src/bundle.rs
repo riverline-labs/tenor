@@ -295,7 +295,7 @@ impl AnalysisBundle {
                             .collect(),
                     });
                 }
-                InterchangeConstruct::TypeDecl(_) => {}
+                InterchangeConstruct::Source(_) | InterchangeConstruct::TypeDecl(_) => {}
             }
         }
 

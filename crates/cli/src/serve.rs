@@ -1182,7 +1182,8 @@ async fn handle_inspect(State(state): State<Arc<AppState>>) -> Response {
                         "steps": step_ids,
                     }));
                 }
-                tenor_interchange::InterchangeConstruct::System(_)
+                tenor_interchange::InterchangeConstruct::Source(_)
+                | tenor_interchange::InterchangeConstruct::System(_)
                 | tenor_interchange::InterchangeConstruct::TypeDecl(_) => {}
             }
         }

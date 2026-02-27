@@ -98,7 +98,9 @@ pub fn build_inspect(bundle: &serde_json::Value) -> Result<serde_json::Value, St
                     "steps": step_ids,
                 }));
             }
-            InterchangeConstruct::System(_) | InterchangeConstruct::TypeDecl(_) => {}
+            InterchangeConstruct::Source(_)
+            | InterchangeConstruct::System(_)
+            | InterchangeConstruct::TypeDecl(_) => {}
         }
     }
 
