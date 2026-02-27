@@ -11,7 +11,9 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::operation::{execute_operation, EffectRecord, EntityStateMap};
+use crate::operation::{
+    execute_operation, resolve_instance_id, EffectRecord, EntityStateMap, InstanceBindingMap,
+};
 use crate::predicate::{eval_pred, EvalContext};
 use crate::provenance::ProvenanceCollector;
 use crate::types::{
@@ -84,16 +86,35 @@ enum BranchOutcome {
     },
 }
 
+/// Resolve instance bindings for a specific operation's effects.
+///
+/// Per §11.4: for each entity referenced in the operation's effects, look up
+/// the instance_id in the flow-level bindings. Missing bindings fall back to
+/// DEFAULT_INSTANCE_ID for backward compat with single-instance contracts.
+///
+/// Returns a BTreeMap<entity_id, instance_id> for this operation's effect targets.
+fn resolve_bindings(op: &Operation, bindings: &InstanceBindingMap) -> InstanceBindingMap {
+    op.effects
+        .iter()
+        .map(|effect| {
+            let instance_id = resolve_instance_id(bindings, &effect.entity_id).to_string();
+            (effect.entity_id.clone(), instance_id)
+        })
+        .collect()
+}
+
 /// Handle a failure using the given FailureHandler. Returns either a terminal
 /// FlowResult or the next step ID to continue the flow from.
 ///
 /// Shared by OperationStep and SubFlowStep failure handling paths.
+#[allow(clippy::too_many_arguments)]
 fn handle_failure(
     handler: &FailureHandler,
     step_id: &str,
     op_index: &HashMap<&str, &Operation>,
     snapshot: &Snapshot,
     entity_states: &mut EntityStateMap,
+    instance_bindings: &InstanceBindingMap,
     steps_executed: &mut Vec<StepRecord>,
     entity_changes_all: &mut Vec<EffectRecord>,
 ) -> Result<Option<FlowResult>, EvalError> {
@@ -121,12 +142,14 @@ fn handle_failure(
                     }
                 })?;
 
+                let comp_bindings = resolve_bindings(comp_op, instance_bindings);
                 match execute_operation(
                     comp_op,
                     &comp_step.persona,
                     &snapshot.facts,
                     &snapshot.verdicts,
                     entity_states,
+                    &comp_bindings,
                 ) {
                     Ok(comp_result) => {
                         entity_changes_all.extend(comp_result.effects_applied.clone());
@@ -211,12 +234,17 @@ fn handle_failure(
 /// changes go to the mutable EntityStateMap, but verdicts in the
 /// snapshot are never recomputed.
 ///
-/// Sub-flows inherit the parent snapshot per spec E5.
+/// Per §11.1 and §11.4: the `instance_bindings` map tells the executor which
+/// specific instance of each entity type to act on at each operation step.
+/// Sub-flows inherit the parent's instance bindings per §11.4/§11.5.
+/// An empty binding map falls back to DEFAULT_INSTANCE_ID for all entities
+/// (backward compat with single-instance contracts per §6.5).
 pub fn execute_flow(
     flow: &Flow,
     contract: &Contract,
     snapshot: &Snapshot,
     entity_states: &mut EntityStateMap,
+    instance_bindings: &InstanceBindingMap,
     max_steps: Option<usize>,
 ) -> Result<FlowResult, EvalError> {
     let mut steps_executed = Vec::new();
@@ -277,6 +305,10 @@ pub fn execute_flow(
                             message: format!("operation '{}' not found in contract", op),
                         })?;
 
+                // Resolve instance bindings for this operation's effects.
+                // Per §11.4: maps entity_id -> instance_id for each entity this op targets.
+                let op_bindings = resolve_bindings(operation, instance_bindings);
+
                 // Execute the operation against the FROZEN snapshot
                 match execute_operation(
                     operation,
@@ -284,6 +316,7 @@ pub fn execute_flow(
                     &snapshot.facts,
                     &snapshot.verdicts,
                     entity_states,
+                    &op_bindings,
                 ) {
                     Ok(op_result) => {
                         entity_changes_all.extend(op_result.effects_applied.clone());
@@ -331,6 +364,7 @@ pub fn execute_flow(
                             &op_index,
                             snapshot,
                             entity_states,
+                            instance_bindings,
                             &mut steps_executed,
                             &mut entity_changes_all,
                         )? {
@@ -412,8 +446,16 @@ pub fn execute_flow(
                             message: format!("sub-flow '{}' not found in contract", sub_flow_id),
                         })?;
 
-                // Sub-flows INHERIT the parent snapshot (spec E5)
-                match execute_flow(sub_flow, contract, snapshot, entity_states, None) {
+                // Sub-flows INHERIT the parent snapshot AND instance bindings (spec E5, §11.4).
+                // Per §11.4: sub-flows use the same InstanceBindingMap as the parent flow.
+                match execute_flow(
+                    sub_flow,
+                    contract,
+                    snapshot,
+                    entity_states,
+                    instance_bindings,
+                    None,
+                ) {
                     Ok(sub_result) => {
                         entity_changes_all.extend(sub_result.entity_state_changes);
                         steps_executed.push(StepRecord {
@@ -449,6 +491,7 @@ pub fn execute_flow(
                             &op_index,
                             snapshot,
                             entity_states,
+                            instance_bindings,
                             &mut steps_executed,
                             &mut entity_changes_all,
                         )? {
@@ -511,6 +554,7 @@ pub fn execute_flow(
                         contract,
                         snapshot,
                         &mut branch_entity_states,
+                        instance_bindings,
                         None,
                     ) {
                         Ok(branch_result) => {
@@ -574,15 +618,11 @@ pub fn execute_flow(
                     {
                         entity_changes_all.extend(entity_changes.clone());
                         // Apply branch's final entity states to parent.
-                        // EffectRecord.entity_id is a plain entity ID; use DEFAULT_INSTANCE_ID
-                        // for the composite key. Multi-instance support (Plan 04-02) will extend
-                        // EffectRecord to carry instance_id.
+                        // EffectRecord now carries instance_id per Plan 04-02, so we use it
+                        // directly to form the composite (entity_id, instance_id) key.
                         for change in entity_changes {
                             entity_states.insert(
-                                (
-                                    change.entity_id.clone(),
-                                    crate::operation::DEFAULT_INSTANCE_ID.to_string(),
-                                ),
+                                (change.entity_id.clone(), change.instance_id.clone()),
                                 change.to_state.clone(),
                             );
                         }
@@ -627,6 +667,7 @@ pub fn execute_flow(
                             &op_index,
                             snapshot,
                             entity_states,
+                            instance_bindings,
                             &mut steps_executed,
                             &mut entity_changes_all,
                         )? {
@@ -801,7 +842,15 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        )
+        .unwrap();
         assert_eq!(result.outcome, "order_approved");
         assert_eq!(result.steps_executed.len(), 1);
         assert_eq!(result.steps_executed[0].step_type, "operation");
@@ -862,7 +911,15 @@ mod tests {
         };
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        )
+        .unwrap();
         assert_eq!(result.outcome, "valid_path");
         assert_eq!(result.steps_executed[0].result, "true");
     }
@@ -895,7 +952,15 @@ mod tests {
         };
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        )
+        .unwrap();
         assert_eq!(result.outcome, "invalid_path");
         assert_eq!(result.steps_executed[0].result, "false");
     }
@@ -1014,7 +1079,15 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        )
+        .unwrap();
 
         // CRITICAL ASSERTION: The branch must use the FROZEN verdict
         // Even though the operation changed entity state to "rejected",
@@ -1158,8 +1231,15 @@ mod tests {
                 .collect(),
         );
 
-        let result =
-            execute_flow(&parent_flow, &contract, &snapshot, &mut entity_states, None).unwrap();
+        let result = execute_flow(
+            &parent_flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        )
+        .unwrap();
 
         // Sub-flow should have seen "parent_verdict" from the inherited snapshot
         assert_eq!(result.outcome, "parent_success");
@@ -1243,7 +1323,15 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        )
+        .unwrap();
         assert_eq!(result.outcome, "failure_handled");
     }
 
@@ -1340,7 +1428,15 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None).unwrap();
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        )
+        .unwrap();
         assert_eq!(result.outcome, "submitted_valid");
         assert_eq!(result.steps_executed.len(), 2);
         assert_eq!(
@@ -1436,7 +1532,14 @@ mod tests {
 
         let mut entity_states = EntityStateMap::new();
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None);
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        );
         assert!(result.is_err());
         match result.unwrap_err() {
             EvalError::FlowError { flow_id, message } => {
@@ -1611,7 +1714,14 @@ mod tests {
                 .collect(),
         );
 
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, None);
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            None,
+        );
 
         // ── Characterize actual behavior ──
 
@@ -1770,7 +1880,14 @@ mod tests {
 
         // With max_steps=5, should fail
         let mut entity_states = EntityStateMap::new();
-        let result = execute_flow(&flow, &contract, &snapshot, &mut entity_states, Some(5));
+        let result = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+            Some(5),
+        );
         assert!(result.is_err());
         match result.unwrap_err() {
             EvalError::FlowError { flow_id, message } => {
@@ -1787,7 +1904,14 @@ mod tests {
         // With None (default 1000), the same flow would also eventually fail
         // but at step 1000 -- just verify it returns a FlowError
         let mut entity_states2 = EntityStateMap::new();
-        let result2 = execute_flow(&flow, &contract, &snapshot, &mut entity_states2, None);
+        let result2 = execute_flow(
+            &flow,
+            &contract,
+            &snapshot,
+            &mut entity_states2,
+            &InstanceBindingMap::new(),
+            None,
+        );
         assert!(result2.is_err());
         match result2.unwrap_err() {
             EvalError::FlowError { message, .. } => {

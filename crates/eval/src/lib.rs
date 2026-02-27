@@ -36,8 +36,8 @@ pub use adapter::{
 pub use fact_provider::{FactProvider, FactProviderError, StaticFactProvider};
 pub use flow::{FlowEvalResult, FlowResult, Snapshot, StepRecord};
 pub use operation::{
-    get_instance_state, single_instance, EffectRecord, EntityStateMap, OperationError,
-    OperationProvenance, OperationResult, DEFAULT_INSTANCE_ID,
+    get_instance_state, resolve_instance_id, single_instance, EffectRecord, EntityStateMap,
+    InstanceBindingMap, OperationError, OperationProvenance, OperationResult, DEFAULT_INSTANCE_ID,
 };
 pub use policy::{AgentPolicy, AgentSnapshot, FirstAvailablePolicy, PriorityPolicy, RandomPolicy};
 pub use types::{Contract, EvalError, FactSet, Value, VerdictInstance, VerdictSet};
@@ -89,6 +89,8 @@ pub fn evaluate(
 /// * `override_entity_states` - If provided, used instead of contract initial states.
 ///   This allows callers (e.g. the executor) to pass DB-observed entity states so that
 ///   multi-flow progressions work correctly.
+/// * `instance_bindings` - Maps entity_id → instance_id for instance targeting per §11.1.
+///   An empty map falls back to DEFAULT_INSTANCE_ID for all entities (backward compat).
 ///
 /// # Returns
 /// * `FlowEvalResult` containing verdicts and flow execution result
@@ -98,6 +100,7 @@ pub fn evaluate_flow(
     flow_id: &str,
     persona: &str,
     override_entity_states: Option<&EntityStateMap>,
+    instance_bindings: &InstanceBindingMap,
 ) -> Result<FlowEvalResult, EvalError> {
     let contract = Contract::from_interchange(bundle)?;
     let fact_set = assemble::assemble_facts(&contract, facts)?;
@@ -122,9 +125,15 @@ pub fn evaluate_flow(
             message: format!("flow '{}' not found in contract", flow_id),
         })?;
 
-    // Execute the flow
-    let mut flow_result =
-        flow::execute_flow(target_flow, &contract, &snapshot, &mut entity_states, None)?;
+    // Execute the flow with instance bindings per §11.1
+    let mut flow_result = flow::execute_flow(
+        target_flow,
+        &contract,
+        &snapshot,
+        &mut entity_states,
+        instance_bindings,
+        None,
+    )?;
 
     // Per spec Section 11.4: initiating_persona is recorded for provenance.
     // Flow-level persona authorization is delegated to step-level Operation

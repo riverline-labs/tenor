@@ -376,7 +376,14 @@ fn run_flow(
 ) {
     let facts_json = serde_json::Value::Object(current_facts.clone());
 
-    match tenor_eval::evaluate_flow(bundle, &facts_json, flow_id, persona, None) {
+    match tenor_eval::evaluate_flow(
+        bundle,
+        &facts_json,
+        flow_id,
+        persona,
+        None,
+        &tenor_eval::InstanceBindingMap::new(),
+    ) {
         Ok(result) => {
             println!();
             println!("  Flow: {}", flow_id);

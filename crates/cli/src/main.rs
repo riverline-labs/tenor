@@ -550,7 +550,14 @@ fn cmd_eval(
             }
         };
 
-        match tenor_eval::evaluate_flow(&bundle, &facts, fid, p, None) {
+        match tenor_eval::evaluate_flow(
+            &bundle,
+            &facts,
+            fid,
+            p,
+            None,
+            &tenor_eval::InstanceBindingMap::new(),
+        ) {
             Ok(result) => {
                 if !quiet {
                     match output {

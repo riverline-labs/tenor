@@ -140,6 +140,7 @@ pub fn simulate_flow(
             &stored.contract,
             &snapshot,
             &mut entity_states,
+            &tenor_eval::InstanceBindingMap::new(),
             None,
         ) {
             Ok(r) => r,

@@ -612,7 +612,14 @@ async fn handle_evaluate(
         let fid_for_response = fid.clone();
 
         let result = tokio::task::spawn_blocking(move || {
-            tenor_eval::evaluate_flow(&bundle, &facts, &fid, &p, None)
+            tenor_eval::evaluate_flow(
+                &bundle,
+                &facts,
+                &fid,
+                &p,
+                None,
+                &tenor_eval::InstanceBindingMap::new(),
+            )
         })
         .await;
 
@@ -843,9 +850,15 @@ fn simulate_flow_inner(
         .collect();
 
     // Execute the flow
-    let flow_result =
-        tenor_eval::flow::execute_flow(target_flow, &contract, &snapshot, &mut entity_states, None)
-            .map_err(SimulateError::Eval)?;
+    let flow_result = tenor_eval::flow::execute_flow(
+        target_flow,
+        &contract,
+        &snapshot,
+        &mut entity_states,
+        &tenor_eval::InstanceBindingMap::new(),
+        None,
+    )
+    .map_err(SimulateError::Eval)?;
 
     // Build path
     let path: Vec<serde_json::Value> = flow_result
