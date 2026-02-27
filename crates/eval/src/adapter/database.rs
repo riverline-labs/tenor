@@ -209,4 +209,166 @@ mod tests {
         let result = adapter.fetch("f1", &source, &BTreeMap::new()).await;
         assert!(matches!(result, Err(AdapterError::FetchFailed { .. })));
     }
+
+    // -----------------------------------------------------------------------
+    // Database adapter protocol tests (Wave 2E)
+    // -----------------------------------------------------------------------
+
+    /// Mock that returns a successful JSON value for any query.
+    struct SuccessfulQuery {
+        value: serde_json::Value,
+    }
+
+    #[async_trait]
+    impl DatabaseQuery for SuccessfulQuery {
+        async fn query(
+            &self,
+            _source_id: &str,
+            _query_str: &str,
+            _source_fields: &BTreeMap<String, String>,
+        ) -> Result<serde_json::Value, AdapterError> {
+            Ok(self.value.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn database_successful_query_returns_correct_value() {
+        let adapter = DatabaseAdapter::new(
+            "test_db",
+            Box::new(SuccessfulQuery {
+                value: serde_json::json!({"balance": 1500}),
+            }),
+        );
+        let source = StructuredSourceRef {
+            source_id: "test_db".to_string(),
+            path: "accounts.balance".to_string(),
+        };
+        let result = adapter
+            .fetch("account_balance", &source, &BTreeMap::new())
+            .await;
+        assert_eq!(result.unwrap(), serde_json::json!({"balance": 1500}));
+    }
+
+    /// Mock that simulates "no rows returned" (empty result).
+    struct NoRowsQuery;
+
+    #[async_trait]
+    impl DatabaseQuery for NoRowsQuery {
+        async fn query(
+            &self,
+            source_id: &str,
+            query_str: &str,
+            _source_fields: &BTreeMap<String, String>,
+        ) -> Result<serde_json::Value, AdapterError> {
+            Err(AdapterError::FetchFailed {
+                source_id: source_id.to_string(),
+                message: format!("query returned no rows: {}", query_str),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn database_no_rows_returns_fetch_failed() {
+        let adapter = DatabaseAdapter::new("test_db", Box::new(NoRowsQuery));
+        let source = StructuredSourceRef {
+            source_id: "test_db".to_string(),
+            path: "users.email".to_string(),
+        };
+        let result = adapter.fetch("user_email", &source, &BTreeMap::new()).await;
+        assert!(
+            matches!(result, Err(AdapterError::FetchFailed { .. })),
+            "no rows should produce FetchFailed, got: {:?}",
+            result
+        );
+        if let Err(AdapterError::FetchFailed { message, .. }) = &result {
+            assert!(
+                message.contains("no rows"),
+                "error should mention no rows, got: {}",
+                message
+            );
+        }
+    }
+
+    /// Mock that simulates a type mismatch (wrong column type).
+    struct WrongTypeQuery;
+
+    #[async_trait]
+    impl DatabaseQuery for WrongTypeQuery {
+        async fn query(
+            &self,
+            _source_id: &str,
+            _query_str: &str,
+            _source_fields: &BTreeMap<String, String>,
+        ) -> Result<serde_json::Value, AdapterError> {
+            Err(AdapterError::TypeMismatch {
+                fact_id: "price".to_string(),
+                message: "expected numeric type, got TEXT".to_string(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn database_wrong_type_returns_type_mismatch() {
+        let adapter = DatabaseAdapter::new("test_db", Box::new(WrongTypeQuery));
+        let source = StructuredSourceRef {
+            source_id: "test_db".to_string(),
+            path: "products.price".to_string(),
+        };
+        let result = adapter.fetch("price", &source, &BTreeMap::new()).await;
+        assert!(
+            matches!(result, Err(AdapterError::TypeMismatch { .. })),
+            "wrong type should produce TypeMismatch, got: {:?}",
+            result
+        );
+        if let Err(AdapterError::TypeMismatch { message, .. }) = &result {
+            assert!(
+                message.contains("expected numeric type"),
+                "error should describe the type mismatch, got: {}",
+                message
+            );
+        }
+    }
+
+    /// Mock that simulates a connection failure.
+    struct ConnectionFailureQuery;
+
+    #[async_trait]
+    impl DatabaseQuery for ConnectionFailureQuery {
+        async fn query(
+            &self,
+            source_id: &str,
+            _query_str: &str,
+            _source_fields: &BTreeMap<String, String>,
+        ) -> Result<serde_json::Value, AdapterError> {
+            Err(AdapterError::FetchFailed {
+                source_id: source_id.to_string(),
+                message: "connection refused: could not connect to database at localhost:5432"
+                    .to_string(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn database_connection_failure_returns_fetch_failed() {
+        let adapter = DatabaseAdapter::new("test_db", Box::new(ConnectionFailureQuery));
+        let source = StructuredSourceRef {
+            source_id: "test_db".to_string(),
+            path: "orders.total".to_string(),
+        };
+        let result = adapter
+            .fetch("order_total", &source, &BTreeMap::new())
+            .await;
+        assert!(
+            matches!(result, Err(AdapterError::FetchFailed { .. })),
+            "connection failure should produce FetchFailed, got: {:?}",
+            result
+        );
+        if let Err(AdapterError::FetchFailed { message, .. }) = &result {
+            assert!(
+                message.contains("connection refused"),
+                "error should mention connection refused, got: {}",
+                message
+            );
+        }
+    }
 }

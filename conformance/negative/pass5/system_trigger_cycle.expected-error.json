@@ -1,0 +1,9 @@
+{
+  "construct_id": "cycle_trigger_system",
+  "construct_kind": "System",
+  "field": "triggers",
+  "file": "system_trigger_cycle.tenor",
+  "line": 4,
+  "message": "trigger cycle detected: contract_a.application_flow \u2192 contract_b.review_flow \u2192 contract_a.application_flow",
+  "pass": 5
+}

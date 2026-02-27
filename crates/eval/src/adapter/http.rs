@@ -166,4 +166,217 @@ mod tests {
         let adapter = HttpAdapter::new("api", &config);
         assert_eq!(adapter.auth_token, None);
     }
+
+    // -----------------------------------------------------------------------
+    // HTTP adapter protocol tests (Wave 2E)
+    // -----------------------------------------------------------------------
+
+    /// Spin up a tiny TCP server that returns a fixed HTTP response, then
+    /// returns the base URL to connect to.
+    fn spawn_mock_http(status: u16, body: &str) -> String {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let response = format!(
+            "HTTP/1.1 {} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            status,
+            body.len(),
+            body
+        );
+
+        std::thread::spawn(move || {
+            // Accept up to 2 connections (some tests may retry)
+            for _ in 0..2 {
+                if let Ok((mut stream, _)) = listener.accept() {
+                    let mut buf = [0u8; 4096];
+                    let _ = stream.read(&mut buf);
+                    let _ = stream.write_all(response.as_bytes());
+                    let _ = stream.flush();
+                }
+            }
+        });
+
+        format!("http://127.0.0.1:{}", port)
+    }
+
+    #[tokio::test]
+    async fn http_successful_fetch_returns_json_value() {
+        let base_url = spawn_mock_http(200, r#"{"amount": 42.5}"#);
+        let config = AdapterConfig::default();
+        let adapter = HttpAdapter::new("test_src", &config);
+
+        let mut fields = BTreeMap::new();
+        fields.insert("base_url".to_string(), base_url);
+
+        let source = StructuredSourceRef {
+            source_id: "test_src".to_string(),
+            path: "orders.balance".to_string(),
+        };
+
+        let result = adapter.fetch("f1", &source, &fields).await;
+        let value = result.unwrap();
+        assert_eq!(value, serde_json::json!({"amount": 42.5}));
+    }
+
+    #[tokio::test]
+    async fn http_404_returns_fetch_failed() {
+        let base_url = spawn_mock_http(404, r#"{"error": "not found"}"#);
+        let config = AdapterConfig::default();
+        let adapter = HttpAdapter::new("test_src", &config);
+
+        let mut fields = BTreeMap::new();
+        fields.insert("base_url".to_string(), base_url);
+
+        let source = StructuredSourceRef {
+            source_id: "test_src".to_string(),
+            path: "missing.resource".to_string(),
+        };
+
+        let result = adapter.fetch("f1", &source, &fields).await;
+        assert!(
+            matches!(result, Err(AdapterError::FetchFailed { .. })),
+            "HTTP 404 should produce FetchFailed, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn http_500_returns_fetch_failed() {
+        let base_url = spawn_mock_http(500, r#"{"error": "internal"}"#);
+        let config = AdapterConfig::default();
+        let adapter = HttpAdapter::new("test_src", &config);
+
+        let mut fields = BTreeMap::new();
+        fields.insert("base_url".to_string(), base_url);
+
+        let source = StructuredSourceRef {
+            source_id: "test_src".to_string(),
+            path: "broken.endpoint".to_string(),
+        };
+
+        let result = adapter.fetch("f1", &source, &fields).await;
+        assert!(
+            matches!(result, Err(AdapterError::FetchFailed { .. })),
+            "HTTP 500 should produce FetchFailed, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn http_connection_refused_returns_fetch_failed() {
+        // Use a port that nothing listens on (timeout / connection refused)
+        let config = AdapterConfig::default();
+        let adapter = HttpAdapter::new("test_src", &config);
+
+        let mut fields = BTreeMap::new();
+        // Port 1 is unlikely to have a server listening
+        fields.insert("base_url".to_string(), "http://127.0.0.1:1".to_string());
+
+        let source = StructuredSourceRef {
+            source_id: "test_src".to_string(),
+            path: "x.y".to_string(),
+        };
+
+        let result = adapter.fetch("f1", &source, &fields).await;
+        assert!(
+            matches!(result, Err(AdapterError::FetchFailed { .. })),
+            "connection refused should produce FetchFailed, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn http_non_json_response_returns_fetch_failed() {
+        // Server returns valid HTTP but body is not valid JSON
+        let base_url = spawn_mock_http(200, "this is not json");
+        let config = AdapterConfig::default();
+        let adapter = HttpAdapter::new("test_src", &config);
+
+        let mut fields = BTreeMap::new();
+        fields.insert("base_url".to_string(), base_url);
+
+        let source = StructuredSourceRef {
+            source_id: "test_src".to_string(),
+            path: "text.endpoint".to_string(),
+        };
+
+        let result = adapter.fetch("f1", &source, &fields).await;
+        assert!(
+            matches!(result, Err(AdapterError::FetchFailed { .. })),
+            "non-JSON response should produce FetchFailed, got: {:?}",
+            result
+        );
+        if let Err(AdapterError::FetchFailed { message, .. }) = &result {
+            assert!(
+                message.contains("JSON"),
+                "error should mention JSON parsing, got: {}",
+                message
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn http_bearer_token_auth_header_included() {
+        // Verify auth token is passed by checking the request on the server side
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::{Arc, Mutex};
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let captured_request = Arc::new(Mutex::new(String::new()));
+        let captured_clone = Arc::clone(&captured_request);
+
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 4096];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let request = String::from_utf8_lossy(&buf[..n]).to_string();
+                *captured_clone.lock().unwrap() = request;
+
+                let body = r#"{"ok": true}"#;
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(response.as_bytes());
+                let _ = stream.flush();
+            }
+        });
+
+        let mut config = AdapterConfig::default();
+        config.source_configs.insert(
+            "auth_src".to_string(),
+            [("auth_token".to_string(), "my-secret-token".to_string())]
+                .into_iter()
+                .collect(),
+        );
+        let adapter = HttpAdapter::new("auth_src", &config);
+
+        let mut fields = BTreeMap::new();
+        fields.insert("base_url".to_string(), format!("http://127.0.0.1:{}", port));
+
+        let source = StructuredSourceRef {
+            source_id: "auth_src".to_string(),
+            path: "protected.resource".to_string(),
+        };
+
+        let result = adapter.fetch("f1", &source, &fields).await;
+        assert!(result.is_ok(), "authenticated request should succeed");
+
+        // Give the thread a moment to capture
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let request_text = captured_request.lock().unwrap().clone();
+        assert!(
+            request_text
+                .to_lowercase()
+                .contains("authorization: bearer my-secret-token"),
+            "request should contain bearer auth header, got: {}",
+            request_text
+        );
+    }
 }

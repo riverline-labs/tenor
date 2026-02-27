@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_entity_system",
+  "construct_kind": "System",
+  "field": "shared_entities",
+  "file": "system_shared_entity_unknown_contract.tenor",
+  "line": 4,
+  "message": "contract 'contract_z' in shared_entity 'application' is not a System member",
+  "pass": 5
+}

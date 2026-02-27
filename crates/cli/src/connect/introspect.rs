@@ -1730,4 +1730,120 @@ type Query {
         let result = introspect_schema("database", &schema_path).unwrap();
         assert_eq!(result.format, SchemaFormat::SqlDdl);
     }
+
+    // -----------------------------------------------------------------------
+    // Failure / edge-case tests (Wave 2D)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_malformed_openapi_json_truncated() {
+        // Truncated/invalid JSON should produce a parse error
+        let dir = tempfile::tempdir().unwrap();
+        let schema_path = dir.path().join("bad.json");
+        std::fs::write(&schema_path, r#"{"openapi": "3.0.0", "paths": {"#).unwrap();
+
+        let result = introspect_openapi(&schema_path);
+        assert!(result.is_err(), "truncated JSON should fail");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("invalid JSON"),
+            "error should mention invalid JSON, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_invalid_openapi_structure_missing_version() {
+        // Valid JSON but missing the "openapi" field -> error
+        let dir = tempfile::tempdir().unwrap();
+        let schema_path = dir.path().join("no_version.json");
+        let json = serde_json::json!({
+            "info": { "title": "Test", "version": "1.0" },
+            "paths": { "/test": { "get": {} } }
+        });
+        std::fs::write(&schema_path, serde_json::to_string(&json).unwrap()).unwrap();
+
+        let result = introspect_openapi(&schema_path);
+        assert!(result.is_err(), "missing openapi field should fail");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("unsupported OpenAPI version"),
+            "error should mention unsupported version, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_empty_openapi_schema_no_paths() {
+        // OpenAPI spec with no paths -> empty endpoint list (not an error)
+        let dir = tempfile::tempdir().unwrap();
+        let schema_path = dir.path().join("empty_paths.json");
+        let json = serde_json::json!({
+            "openapi": "3.0.0",
+            "info": { "title": "Empty API", "version": "1.0" },
+            "paths": {}
+        });
+        std::fs::write(&schema_path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+
+        let result = introspect_openapi(&schema_path);
+        assert!(result.is_ok(), "empty paths should succeed");
+        let schema = result.unwrap();
+        assert_eq!(schema.format, SchemaFormat::OpenApi3);
+        assert!(
+            schema.endpoints.is_empty(),
+            "empty paths should yield no endpoints"
+        );
+    }
+
+    #[test]
+    fn test_malformed_graphql_sdl_syntax_error() {
+        // Invalid GraphQL SDL syntax -> empty type defs -> error
+        let dir = tempfile::tempdir().unwrap();
+        let schema_path = dir.path().join("bad.graphql");
+        // Missing field types and mismatched braces
+        std::fs::write(
+            &schema_path,
+            r#"
+typ Query {
+    broken field without colon
+}
+"#,
+        )
+        .unwrap();
+
+        let result = introspect_graphql(&schema_path);
+        // The parser won't find any type definitions with "typ" instead of "type"
+        assert!(result.is_err(), "malformed GraphQL SDL should fail");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("no type definitions found"),
+            "error should mention no type definitions, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_malformed_sql_ddl_no_tables() {
+        // Invalid SQL with no CREATE TABLE statements -> error
+        let dir = tempfile::tempdir().unwrap();
+        let schema_path = dir.path().join("bad.sql");
+        std::fs::write(
+            &schema_path,
+            r#"
+SELECT * FROM nonexistent;
+INSERT INTO nowhere VALUES (1, 2, 3);
+ALTER TABLE phantom ADD COLUMN ghost INT;
+"#,
+        )
+        .unwrap();
+
+        let result = introspect_sql_ddl(&schema_path);
+        assert!(result.is_err(), "SQL with no CREATE TABLE should fail");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("no CREATE TABLE"),
+            "error should mention no CREATE TABLE, got: {}",
+            err
+        );
+    }
 }

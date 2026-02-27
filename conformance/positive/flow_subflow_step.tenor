@@ -1,0 +1,93 @@
+// Positive test: SubFlowStep
+// Covers: SubFlowStep with flow reference, on_success Terminal, on_failure Terminate
+// Expected: elaborates without error, produces flow_subflow_step.expected.json
+
+entity Ticket {
+  states:  [open, triaged, resolved, closed]
+  initial: open
+  transitions: [
+    (open, triaged),
+    (triaged, resolved),
+    (resolved, closed)
+  ]
+}
+
+fact is_priority {
+  type:   Bool
+  source: "ticket_service.priority"
+}
+
+rule priority_check {
+  stratum: 0
+  when:    is_priority = true
+  produce: verdict priority_confirmed { payload: Bool = true }
+}
+
+operation triage_ticket {
+  allowed_personas: [agent]
+  precondition:     is_priority = true
+  effects:          [(Ticket, open, triaged)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation resolve_ticket {
+  allowed_personas: [agent]
+  precondition:     verdict_present(priority_confirmed)
+  effects:          [(Ticket, triaged, resolved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation close_ticket {
+  allowed_personas: [agent]
+  precondition:     verdict_present(priority_confirmed)
+  effects:          [(Ticket, resolved, closed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow resolve_flow {
+  snapshot: at_initiation
+  entry:    step_resolve
+
+  steps: {
+    step_resolve: OperationStep {
+      op:      resolve_ticket
+      persona: agent
+      outcomes: {
+        success: Terminal(done)
+      }
+      on_failure: Terminate(outcome: resolve_failed)
+    }
+  }
+}
+
+flow main_flow {
+  snapshot: at_initiation
+  entry:    step_triage
+
+  steps: {
+    step_triage: OperationStep {
+      op:      triage_ticket
+      persona: agent
+      outcomes: {
+        success: step_invoke_resolve
+      }
+      on_failure: Terminate(outcome: triage_failed)
+    }
+
+    step_invoke_resolve: SubFlowStep {
+      flow:       resolve_flow
+      persona:    agent
+      on_success: step_close
+      on_failure: Terminate(outcome: subflow_failed)
+    }
+
+    step_close: OperationStep {
+      op:      close_ticket
+      persona: agent
+      outcomes: {
+        success: Terminal(completed)
+      }
+      on_failure: Terminate(outcome: close_failed)
+    }
+  }
+}

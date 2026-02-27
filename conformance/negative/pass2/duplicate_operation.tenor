@@ -1,0 +1,27 @@
+// Negative test — Pass 2
+// Two Operations with the same id in one file. Must be rejected.
+
+entity Order {
+  states:  [open, closed]
+  initial: open
+  transitions: [(open, closed)]
+}
+
+fact ready {
+  type:   Bool
+  source: "svc.ready"
+}
+
+operation close_order {
+  allowed_personas: [agent]
+  precondition:     ready = true
+  effects:          [(Order, open, closed)]
+  error_contract:   [precondition_failed]
+}
+
+operation close_order {
+  allowed_personas: [admin]
+  precondition:     ready = true
+  effects:          [(Order, open, closed)]
+  error_contract:   [precondition_failed]
+}

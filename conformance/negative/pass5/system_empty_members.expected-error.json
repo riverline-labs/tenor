@@ -1,0 +1,9 @@
+{
+  "construct_id": "empty_system",
+  "construct_kind": "System",
+  "field": "members",
+  "file": "system_empty_members.tenor",
+  "line": 4,
+  "message": "System must declare at least one member contract",
+  "pass": 5
+}

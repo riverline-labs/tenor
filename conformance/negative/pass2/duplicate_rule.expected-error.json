@@ -1,0 +1,9 @@
+{
+  "construct_id": "check_active",
+  "construct_kind": "Rule",
+  "field": "id",
+  "file": "duplicate_rule.tenor",
+  "line": 15,
+  "message": "duplicate Rule id 'check_active': first declared at line 9",
+  "pass": 2
+}

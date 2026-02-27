@@ -1,0 +1,9 @@
+{
+  "construct_id": "self_trigger_system",
+  "construct_kind": "System",
+  "field": "triggers",
+  "file": "system_self_referential_trigger.tenor",
+  "line": 4,
+  "message": "self-referential trigger: contract_a.application_flow triggers itself",
+  "pass": 5
+}

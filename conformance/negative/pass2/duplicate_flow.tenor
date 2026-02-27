@@ -1,0 +1,48 @@
+// Negative test — Pass 2
+// Two Flows with the same id in one file. Must be rejected.
+
+entity Task {
+  states:  [pending, done]
+  initial: pending
+  transitions: [(pending, done)]
+}
+
+fact task_ready {
+  type:   Bool
+  source: "svc.task_ready"
+}
+
+operation complete_task {
+  allowed_personas: [worker]
+  precondition:     task_ready = true
+  effects:          [(Task, pending, done)]
+  error_contract:   [precondition_failed]
+}
+
+flow task_flow {
+  snapshot: at_initiation
+  entry:    step_do
+
+  steps: {
+    step_do: OperationStep {
+      op:      complete_task
+      persona: worker
+      outcomes: { success: Terminal(done) }
+      on_failure: Terminate(outcome: fail)
+    }
+  }
+}
+
+flow task_flow {
+  snapshot: at_initiation
+  entry:    step_redo
+
+  steps: {
+    step_redo: OperationStep {
+      op:      complete_task
+      persona: worker
+      outcomes: { success: Terminal(done) }
+      on_failure: Terminate(outcome: fail)
+    }
+  }
+}

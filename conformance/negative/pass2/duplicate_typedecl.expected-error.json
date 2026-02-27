@@ -1,0 +1,9 @@
+{
+  "construct_id": "Amount",
+  "construct_kind": "TypeDecl",
+  "field": "id",
+  "file": "duplicate_typedecl.tenor",
+  "line": 9,
+  "message": "duplicate TypeDecl id 'Amount': first declared at line 4",
+  "pass": 2
+}

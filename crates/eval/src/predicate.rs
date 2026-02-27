@@ -885,3 +885,455 @@ mod tests {
         assert_eq!(result, Value::Bool(false));
     }
 }
+
+// ──────────────────────────────────────────────
+// Wave 2B: Failure / edge-case tests
+// ──────────────────────────────────────────────
+
+#[cfg(test)]
+mod failure_tests {
+    use super::*;
+    use crate::provenance::ProvenanceCollector;
+    use crate::types::{EvalError, FactSet, TypeSpec, Value, VerdictSet};
+    use std::collections::BTreeMap;
+
+    fn empty_verdicts() -> VerdictSet {
+        VerdictSet::new()
+    }
+
+    fn make_type_spec(base: &str) -> TypeSpec {
+        TypeSpec {
+            base: base.to_string(),
+            precision: None,
+            scale: None,
+            currency: None,
+            min: None,
+            max: None,
+            max_length: None,
+            values: None,
+            fields: None,
+            element_type: None,
+            unit: None,
+            variants: None,
+        }
+    }
+
+    // ── 1. Type mismatch: Int fact compared to Text literal ──
+    // The predicate evaluator delegates to numeric::compare_values,
+    // which returns a TypeError when comparing incompatible types.
+    #[test]
+    fn type_mismatch_int_vs_text_returns_error() {
+        let mut facts = FactSet::new();
+        facts.insert("age".to_string(), Value::Int(25));
+
+        let pred = Predicate::Compare {
+            left: Box::new(Predicate::FactRef("age".to_string())),
+            op: "=".to_string(),
+            right: Box::new(Predicate::Literal {
+                value: Value::Text("twenty-five".to_string()),
+                type_spec: make_type_spec("Text"),
+            }),
+            comparison_type: None,
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        // Int vs Text comparison produces a TypeError (not false).
+        assert!(result.is_err(), "comparing Int to Text should error");
+        match result.unwrap_err() {
+            EvalError::TypeError { message } => {
+                assert!(
+                    message.contains("cannot compare"),
+                    "error message should mention 'cannot compare', got: {}",
+                    message
+                );
+            }
+            other => panic!("expected TypeError, got: {:?}", other),
+        }
+    }
+
+    // ── 2. Undefined verdict reference with empty verdict set ──
+    // VerdictPresent on a nonexistent verdict evaluates to false (not error).
+    #[test]
+    fn verdict_present_nonexistent_returns_false() {
+        let facts = FactSet::new();
+        let verdicts = empty_verdicts();
+
+        let pred = Predicate::VerdictPresent("nonexistent_verdict".to_string());
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &verdicts, &ctx, &mut collector).unwrap();
+
+        assert_eq!(result, Value::Bool(false));
+        // The verdict id is still recorded for provenance tracking.
+        assert_eq!(collector.verdicts_used, vec!["nonexistent_verdict"]);
+    }
+
+    // ── 3. Overflow: Decimal multiplication near precision bounds ──
+    // Multiplying a large Decimal value that exceeds declared precision
+    // should produce an Overflow error.
+    #[test]
+    fn decimal_mul_overflow_at_precision_boundary() {
+        let mut facts = FactSet::new();
+        // Value of 999.99 in Decimal(5,2) -- max representable
+        facts.insert(
+            "amount".to_string(),
+            Value::Decimal(rust_decimal::Decimal::new(99999, 2)),
+        );
+
+        // Multiply by 2, result_type has precision=5, scale=2 (max integer part = 999)
+        // 999.99 * 2 = 1999.98 which exceeds precision(5,2) max of 999.99
+        let pred = Predicate::Mul {
+            left: Box::new(Predicate::FactRef("amount".to_string())),
+            literal: 2,
+            result_type: TypeSpec {
+                base: "Decimal".to_string(),
+                precision: Some(5),
+                scale: Some(2),
+                currency: None,
+                min: None,
+                max: None,
+                max_length: None,
+                values: None,
+                fields: None,
+                element_type: None,
+                unit: None,
+                variants: None,
+            },
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err(), "should overflow at precision boundary");
+        match result.unwrap_err() {
+            EvalError::Overflow { message } => {
+                assert!(
+                    message.contains("exceeds declared precision"),
+                    "overflow message should mention precision, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected Overflow, got: {:?}", other),
+        }
+    }
+
+    // ── 3b. Integer multiplication overflow (i64 boundary) ──
+    #[test]
+    fn int_mul_overflow_at_i64_boundary() {
+        let mut facts = FactSet::new();
+        facts.insert("big".to_string(), Value::Int(i64::MAX));
+
+        let pred = Predicate::Mul {
+            left: Box::new(Predicate::FactRef("big".to_string())),
+            literal: 2,
+            result_type: TypeSpec {
+                base: "Int".to_string(),
+                precision: None,
+                scale: None,
+                currency: None,
+                min: None,
+                max: None,
+                max_length: None,
+                values: None,
+                fields: None,
+                element_type: None,
+                unit: None,
+                variants: None,
+            },
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err(), "i64::MAX * 2 should overflow");
+        match result.unwrap_err() {
+            EvalError::Overflow { message } => {
+                assert!(
+                    message.contains("overflow"),
+                    "error should mention overflow, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected Overflow, got: {:?}", other),
+        }
+    }
+
+    // ── 4. Empty list quantification: forall over empty list = vacuous truth ──
+    #[test]
+    fn forall_empty_list_is_vacuous_truth() {
+        let mut facts = FactSet::new();
+        facts.insert("items".to_string(), Value::List(vec![]));
+
+        let pred = Predicate::Forall {
+            variable: "item".to_string(),
+            variable_type: make_type_spec("Record"),
+            domain: Box::new(Predicate::FactRef("items".to_string())),
+            body: Box::new(Predicate::Compare {
+                left: Box::new(Predicate::FieldRef {
+                    var: "item".to_string(),
+                    field: "valid".to_string(),
+                }),
+                op: "=".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Bool(true),
+                    type_spec: make_type_spec("Bool"),
+                }),
+                comparison_type: None,
+            }),
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector).unwrap();
+
+        // Vacuous truth: forall over empty domain is true.
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    // ── 4b. Exists over empty list = false ──
+    #[test]
+    fn exists_empty_list_is_false() {
+        let mut facts = FactSet::new();
+        facts.insert("items".to_string(), Value::List(vec![]));
+
+        let pred = Predicate::Exists {
+            variable: "item".to_string(),
+            variable_type: make_type_spec("Record"),
+            domain: Box::new(Predicate::FactRef("items".to_string())),
+            body: Box::new(Predicate::Compare {
+                left: Box::new(Predicate::FieldRef {
+                    var: "item".to_string(),
+                    field: "valid".to_string(),
+                }),
+                op: "=".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Bool(true),
+                    type_spec: make_type_spec("Bool"),
+                }),
+                comparison_type: None,
+            }),
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector).unwrap();
+
+        // Exists over empty domain is false.
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    // ── 5. Null/missing fact in predicate: FactRef to nonexistent fact ──
+    // When a predicate references a fact that has no value and no default,
+    // the evaluator returns an UnknownFact error (not a silent null/false).
+    #[test]
+    fn missing_fact_returns_unknown_fact_error() {
+        let facts = FactSet::new(); // no facts at all
+
+        let pred = Predicate::Compare {
+            left: Box::new(Predicate::FactRef("nonexistent_fact".to_string())),
+            op: "=".to_string(),
+            right: Box::new(Predicate::Literal {
+                value: Value::Bool(true),
+                type_spec: make_type_spec("Bool"),
+            }),
+            comparison_type: None,
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err(), "missing fact should produce an error");
+        match result.unwrap_err() {
+            EvalError::UnknownFact { fact_id } => {
+                assert_eq!(fact_id, "nonexistent_fact");
+            }
+            other => panic!("expected UnknownFact, got: {:?}", other),
+        }
+    }
+
+    // ── 5b. Missing fact in AND short-circuits: left error propagates ──
+    #[test]
+    fn missing_fact_in_and_left_propagates_error() {
+        let facts = FactSet::new();
+
+        let pred = Predicate::And {
+            left: Box::new(Predicate::Compare {
+                left: Box::new(Predicate::FactRef("missing".to_string())),
+                op: "=".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Bool(true),
+                    type_spec: make_type_spec("Bool"),
+                }),
+                comparison_type: None,
+            }),
+            right: Box::new(Predicate::VerdictPresent("something".to_string())),
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        // Error from left side propagates (does not short-circuit to false).
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            EvalError::UnknownFact { fact_id } => {
+                assert_eq!(fact_id, "missing");
+            }
+            other => panic!("expected UnknownFact, got: {:?}", other),
+        }
+    }
+
+    // ── 5c. Field ref on non-record value ──
+    #[test]
+    fn field_ref_on_non_record_returns_error() {
+        let mut facts = FactSet::new();
+        facts.insert("name".to_string(), Value::Text("hello".to_string()));
+
+        let pred = Predicate::FieldRef {
+            var: "name".to_string(),
+            field: "length".to_string(),
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            EvalError::NotARecord { message } => {
+                assert!(
+                    message.contains("not a Record"),
+                    "error should mention not a Record, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected NotARecord, got: {:?}", other),
+        }
+    }
+
+    // ── 5d. Field ref on record with missing field ──
+    #[test]
+    fn field_ref_missing_field_on_record_returns_error() {
+        let mut facts = FactSet::new();
+        let mut record = BTreeMap::new();
+        record.insert("name".to_string(), Value::Text("Alice".to_string()));
+        facts.insert("person".to_string(), Value::Record(record));
+
+        let pred = Predicate::FieldRef {
+            var: "person".to_string(),
+            field: "age".to_string(), // field does not exist
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            EvalError::NotARecord { message } => {
+                assert!(
+                    message.contains("not found"),
+                    "error should mention 'not found', got: {}",
+                    message
+                );
+            }
+            other => panic!("expected NotARecord for missing field, got: {:?}", other),
+        }
+    }
+
+    // ── 5e. Mul on non-numeric type produces TypeError ──
+    #[test]
+    fn mul_on_text_returns_type_error() {
+        let mut facts = FactSet::new();
+        facts.insert("label".to_string(), Value::Text("hello".to_string()));
+
+        let pred = Predicate::Mul {
+            left: Box::new(Predicate::FactRef("label".to_string())),
+            literal: 3,
+            result_type: make_type_spec("Int"),
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            EvalError::TypeError { message } => {
+                assert!(
+                    message.contains("multiplication requires numeric"),
+                    "error should mention numeric operand, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected TypeError, got: {:?}", other),
+        }
+    }
+
+    // ── Forall on non-list domain produces TypeError ──
+    #[test]
+    fn forall_on_non_list_domain_returns_type_error() {
+        let mut facts = FactSet::new();
+        facts.insert("count".to_string(), Value::Int(5));
+
+        let pred = Predicate::Forall {
+            variable: "item".to_string(),
+            variable_type: make_type_spec("Int"),
+            domain: Box::new(Predicate::FactRef("count".to_string())),
+            body: Box::new(Predicate::Literal {
+                value: Value::Bool(true),
+                type_spec: make_type_spec("Bool"),
+            }),
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            EvalError::TypeError { message } => {
+                assert!(
+                    message.contains("forall domain must be a List"),
+                    "error should mention List domain, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected TypeError, got: {:?}", other),
+        }
+    }
+
+    // ── Not on non-boolean value produces TypeError ──
+    #[test]
+    fn not_on_non_bool_returns_type_error() {
+        let mut facts = FactSet::new();
+        facts.insert("count".to_string(), Value::Int(5));
+
+        let pred = Predicate::Not {
+            operand: Box::new(Predicate::FactRef("count".to_string())),
+        };
+
+        let mut collector = ProvenanceCollector::new();
+        let ctx = EvalContext::new();
+        let result = eval_pred(&pred, &facts, &empty_verdicts(), &ctx, &mut collector);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            EvalError::TypeError { message } => {
+                assert!(
+                    message.contains("expected Bool"),
+                    "error should mention expected Bool, got: {}",
+                    message
+                );
+            }
+            other => panic!("expected TypeError, got: {:?}", other),
+        }
+    }
+}

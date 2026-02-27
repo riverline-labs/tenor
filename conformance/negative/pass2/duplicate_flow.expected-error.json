@@ -1,0 +1,9 @@
+{
+  "construct_id": "task_flow",
+  "construct_kind": "Flow",
+  "field": "id",
+  "file": "duplicate_flow.tenor",
+  "line": 36,
+  "message": "duplicate Flow id 'task_flow': first declared at line 22",
+  "pass": 2
+}

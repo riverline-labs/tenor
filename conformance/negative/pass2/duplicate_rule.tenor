@@ -1,0 +1,19 @@
+// Negative test — Pass 2
+// Two Rules with the same id in one file. Must be rejected.
+
+fact active {
+  type:   Bool
+  source: "svc.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    active = true
+  produce: verdict active_ok { payload: Bool = true }
+}
+
+rule check_active {
+  stratum: 0
+  when:    active = true
+  produce: verdict active_dup { payload: Bool = true }
+}

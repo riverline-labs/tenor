@@ -1225,3 +1225,279 @@ mod tests {
         ));
     }
 }
+
+// ──────────────────────────────────────────────
+// Wave 2C: Failure / edge-case tests
+// ──────────────────────────────────────────────
+
+#[cfg(test)]
+mod failure_tests {
+    use super::*;
+    use crate::migration::diff::{
+        diff_bundles, BundleDiff, ConstructChange, ConstructSummary, FieldDiff,
+    };
+    use serde_json::json;
+
+    fn make_bundle(constructs: Vec<serde_json::Value>) -> serde_json::Value {
+        json!({
+            "constructs": constructs,
+            "id": "test_bundle",
+            "kind": "Bundle",
+            "tenor": "1.0",
+            "tenor_version": "1.0.0"
+        })
+    }
+
+    fn make_fact(id: &str, base: &str, line: u64) -> serde_json::Value {
+        json!({
+            "id": id,
+            "kind": "Fact",
+            "provenance": { "file": "test.tenor", "line": line },
+            "source": { "field": id, "system": "test_service" },
+            "tenor": "1.0",
+            "type": { "base": base }
+        })
+    }
+
+    // ── 1. Unknown construct kind in added list ──
+    // DiffEntry with kind "UnknownThing" falls to default classification
+    // (NonBreaking for add, Breaking for remove).
+    #[test]
+    fn unknown_construct_kind_add_falls_to_default() {
+        let diff = BundleDiff {
+            added: vec![ConstructSummary {
+                kind: "UnknownThing".to_string(),
+                id: "mystery".to_string(),
+            }],
+            removed: vec![],
+            changed: vec![],
+        };
+
+        let classified = classify_diff(&diff);
+
+        assert_eq!(classified.added.len(), 1);
+        assert_eq!(
+            classified.added[0].classification.severity,
+            ChangeSeverity::NonBreaking,
+            "Unknown kind addition should fall to NonBreaking default"
+        );
+        assert!(
+            classified.added[0]
+                .classification
+                .reason
+                .contains("Adding a UnknownThing"),
+            "reason should mention the unknown kind"
+        );
+    }
+
+    // ── 1b. Unknown construct kind in removed list ──
+    #[test]
+    fn unknown_construct_kind_remove_falls_to_breaking() {
+        let diff = BundleDiff {
+            added: vec![],
+            removed: vec![ConstructSummary {
+                kind: "UnknownThing".to_string(),
+                id: "mystery".to_string(),
+            }],
+            changed: vec![],
+        };
+
+        let classified = classify_diff(&diff);
+
+        assert_eq!(classified.removed.len(), 1);
+        assert_eq!(
+            classified.removed[0].classification.severity,
+            ChangeSeverity::Breaking,
+            "Unknown kind removal should fall to Breaking default"
+        );
+    }
+
+    // ── 2. Unknown construct kind in changed list with unknown field ──
+    // A changed construct with unknown kind and field falls to default
+    // field classification (RequiresAnalysis).
+    #[test]
+    fn unknown_construct_kind_changed_field_falls_to_default() {
+        let diff = BundleDiff {
+            added: vec![],
+            removed: vec![],
+            changed: vec![ConstructChange {
+                kind: "UnknownThing".to_string(),
+                id: "mystery".to_string(),
+                fields: vec![FieldDiff {
+                    field: "weird_field".to_string(),
+                    before: json!("old"),
+                    after: json!("new"),
+                }],
+            }],
+        };
+
+        let classified = classify_diff(&diff);
+
+        assert_eq!(classified.changed.len(), 1);
+        assert_eq!(classified.changed[0].fields.len(), 1);
+        // The default classification for an unknown (kind, field) combo
+        // should not panic -- it falls through to the catch-all.
+        let severity = &classified.changed[0].fields[0].classification.severity;
+        assert!(
+            matches!(
+                severity,
+                ChangeSeverity::RequiresAnalysis | ChangeSeverity::NonBreaking
+            ),
+            "unknown field on unknown kind should get a default classification, got: {:?}",
+            severity
+        );
+    }
+
+    // ── 3. Empty diff: no changes between v1 and v2 ──
+    // An empty BundleDiff produces an empty classification with zero counts.
+    #[test]
+    fn empty_diff_produces_empty_classification() {
+        let diff = BundleDiff {
+            added: vec![],
+            removed: vec![],
+            changed: vec![],
+        };
+
+        let classified = classify_diff(&diff);
+
+        assert_eq!(classified.added.len(), 0);
+        assert_eq!(classified.removed.len(), 0);
+        assert_eq!(classified.changed.len(), 0);
+        assert_eq!(classified.summary.total_changes, 0);
+        assert_eq!(classified.summary.breaking_count, 0);
+        assert_eq!(classified.summary.non_breaking_count, 0);
+        assert_eq!(classified.summary.requires_analysis_count, 0);
+        assert_eq!(classified.summary.infrastructure_count, 0);
+        assert!(
+            !classified.has_breaking(),
+            "empty diff should not be breaking"
+        );
+    }
+
+    // ── 3b. Empty diff via identical bundles through diff_bundles ──
+    #[test]
+    fn identical_bundles_classify_to_empty() {
+        let bundle = make_bundle(vec![make_fact("x", "Bool", 1), make_fact("y", "Int", 2)]);
+
+        let diff = diff_bundles(&bundle, &bundle).unwrap();
+        let classified = classify_diff(&diff);
+
+        assert_eq!(classified.summary.total_changes, 0);
+        assert!(!classified.has_breaking());
+    }
+
+    // ── 4. All NonBreaking: only additive changes, no policy required ──
+    // Adding multiple Facts (which are NonBreaking) should result in
+    // zero breaking changes and has_breaking() = false.
+    #[test]
+    fn all_non_breaking_additions_no_policy_required() {
+        let t1 = make_bundle(vec![make_fact("x", "Bool", 1)]);
+        let t2 = make_bundle(vec![
+            make_fact("x", "Bool", 1),
+            make_fact("y", "Int", 2),
+            make_fact("z", "Text", 3),
+        ]);
+
+        let diff = diff_bundles(&t1, &t2).unwrap();
+        let classified = classify_diff(&diff);
+
+        assert_eq!(classified.added.len(), 2);
+        assert_eq!(classified.summary.non_breaking_count, 2);
+        assert_eq!(classified.summary.breaking_count, 0);
+        assert_eq!(classified.summary.requires_analysis_count, 0);
+        assert!(
+            !classified.has_breaking(),
+            "purely additive changes should not require policy"
+        );
+    }
+
+    // ── 5. Mixed severity: BREAKING + INFRASTRUCTURE + NON_BREAKING ──
+    // When the diff contains changes of all severity levels, the summary
+    // correctly counts each, and has_breaking() returns true.
+    #[test]
+    fn mixed_severity_breaking_dominates() {
+        let t1 = make_bundle(vec![
+            make_fact("removed_fact", "Bool", 1),
+            json!({
+                "id": "crm_source",
+                "kind": "Source",
+                "tenor": "1.0",
+                "provenance": { "file": "test.tenor", "line": 5 },
+                "protocol": "rest"
+            }),
+        ]);
+
+        let t2 = make_bundle(vec![
+            // removed_fact is gone (BREAKING)
+            // crm_source is gone (INFRASTRUCTURE)
+            make_fact("new_fact", "Int", 10), // added (NON_BREAKING)
+        ]);
+
+        let diff = diff_bundles(&t1, &t2).unwrap();
+        let classified = classify_diff(&diff);
+
+        // Verify all three severity levels are present
+        assert!(
+            classified.summary.breaking_count >= 1,
+            "should have at least 1 breaking change"
+        );
+        assert!(
+            classified.summary.infrastructure_count >= 1,
+            "should have at least 1 infrastructure change"
+        );
+        assert!(
+            classified.summary.non_breaking_count >= 1,
+            "should have at least 1 non-breaking change"
+        );
+
+        // BREAKING dominates: has_breaking() is true
+        assert!(
+            classified.has_breaking(),
+            "mixed diff with any breaking change should flag as breaking"
+        );
+
+        // Total should be sum of all
+        assert_eq!(
+            classified.summary.total_changes,
+            classified.summary.breaking_count
+                + classified.summary.non_breaking_count
+                + classified.summary.requires_analysis_count
+                + classified.summary.infrastructure_count,
+            "total should equal sum of all severity counts"
+        );
+    }
+
+    // ── 5b. Mixed severity text output includes all sections ──
+    #[test]
+    fn mixed_severity_text_output_shows_all_sections() {
+        let t1 = make_bundle(vec![
+            make_fact("old_fact", "Bool", 1),
+            json!({
+                "id": "old_source",
+                "kind": "Source",
+                "tenor": "1.0",
+                "provenance": { "file": "test.tenor", "line": 5 },
+                "protocol": "rest"
+            }),
+        ]);
+
+        let t2 = make_bundle(vec![make_fact("new_fact", "Int", 10)]);
+
+        let diff = diff_bundles(&t1, &t2).unwrap();
+        let classified = classify_diff(&diff);
+        let text = classified.to_text();
+
+        assert!(
+            text.contains("BREAKING:"),
+            "text output should have BREAKING section"
+        );
+        assert!(
+            text.contains("INFRASTRUCTURE:"),
+            "text output should have INFRASTRUCTURE section"
+        );
+        assert!(
+            text.contains("NON_BREAKING:"),
+            "text output should have NON_BREAKING section"
+        );
+    }
+}

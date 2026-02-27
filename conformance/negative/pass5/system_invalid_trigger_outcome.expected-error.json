@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_outcome_system",
+  "construct_kind": "System",
+  "field": "triggers",
+  "file": "system_invalid_trigger_outcome.tenor",
+  "line": 4,
+  "message": "invalid trigger outcome 'completed'; must be 'success', 'failure', or 'escalation'",
+  "pass": 5
+}
