@@ -199,6 +199,40 @@ enum Commands {
 
     /// Start the Language Server Protocol server over stdio
     Lsp,
+
+    /// Generate an Ed25519 signing keypair
+    Keygen {
+        /// Signing algorithm (default: ed25519, only option for v1)
+        #[arg(long, default_value = "ed25519")]
+        algorithm: String,
+        /// Output file prefix (default: tenor-key)
+        #[arg(long, default_value = "tenor-key")]
+        output: String,
+    },
+
+    /// Sign an interchange bundle with a detached attestation
+    Sign {
+        /// Path to the interchange JSON bundle or manifest
+        bundle: PathBuf,
+        /// Path to the Ed25519 secret key file
+        #[arg(long)]
+        key: PathBuf,
+        /// Output file path (default: <bundle>.signed.json)
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Attestation format identifier
+        #[arg(long, default_value = "ed25519-detached")]
+        format: String,
+    },
+
+    /// Verify a signed interchange bundle
+    Verify {
+        /// Path to the signed bundle JSON
+        bundle: PathBuf,
+        /// Path to the public key file (optional if signer_public_key in bundle)
+        #[arg(long)]
+        pubkey: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -320,6 +354,20 @@ fn main() {
                 eprintln!("LSP server error: {}", e);
                 process::exit(1);
             }
+        }
+        Commands::Keygen { algorithm, output } => {
+            trust::keygen::cmd_keygen(&algorithm, &output);
+        }
+        Commands::Sign {
+            bundle,
+            key,
+            output,
+            format,
+        } => {
+            trust::sign::cmd_sign(&bundle, &key, output.as_deref(), &format);
+        }
+        Commands::Verify { bundle, pubkey } => {
+            trust::verify::cmd_verify(&bundle, pubkey.as_deref());
         }
     }
 }
