@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 7 of 11 — SDKs
-**Plan**: 4 of 4 completed in current phase
-**Status**: Phase 7 complete
-**Last activity**: 2026-02-27 — Phase 7 Plan 4 complete (Cross-SDK Conformance Suite)
+**Phase**: 8 of 11 — Automatic UI
+**Plan**: 1 of ? completed in current phase
+**Status**: Phase 8 in progress
+**Last activity**: 2026-02-27 — Phase 8 Plan 1 complete (tenor ui CLI command and React project scaffold)
 
-Progress: ████████████████░░░░ 63% (Phases 1-7 complete)
+Progress: ████████████████░░░░ 64% (Phases 1-7 complete, Phase 8 started)
 
 ## Decisions
 
@@ -82,6 +82,10 @@ Progress: ████████████████░░░░ 63% (Phas
 - [Phase 07-04] Go SDK omitempty removed from VerdictProvenance.VerdictsUsed, BlockedAction.InstanceBindings, FlowResult.InstanceBindings — Rust always emits these even when empty
 - [Phase 07-04] Conformance fixture-gen Cargo.toml uses [workspace] stub to avoid workspace conflict (same as Python SDK)
 - [Phase 07-04] Python runner uses .venv (maturin develop) if available, falls back to PYTHONPATH for pre-built .so
+- [Phase 08-01] Ui subcommand uses --out flag (not --output) to avoid clap global arg conflict with --output OutputFormat
+- [Phase 08-01] types.ts uses plain string for Decimal/Money/Date/DateTime (not branded types) for simpler UI usage
+- [Phase 08-01] theme.ts uses djb2 hash of contract_id for hue derivation — deterministic HSL color palette
+- [Phase 08-01] generate_ui_project uses vec![] macro to build file list (clippy::vec_init_then_push)
 
 ## Blockers/Concerns
 
@@ -114,9 +118,10 @@ Progress: ████████████████░░░░ 63% (Phas
 | 07 | 02 | 1997 | 8 | 12 |
 | 07 | 03 | 1695 | 8 | 11 |
 | 07 | 04 | 686 | 6 | 23 |
+| 08 | 01 | 438 | 6 | 5 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 07-04-PLAN.md (Cross-SDK Conformance Suite) — Phase 7 complete
-Next action: Execute Phase 8
+Stopped at: Completed 08-01-PLAN.md (tenor ui CLI command and React project scaffold)
+Next action: Execute Phase 8 Plan 2 (component implementations)
