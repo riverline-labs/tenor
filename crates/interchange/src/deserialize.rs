@@ -94,11 +94,14 @@ pub fn from_interchange(bundle: &serde_json::Value) -> Result<InterchangeBundle,
         }
     }
 
+    let trust = parse_trust_metadata(bundle);
+
     Ok(InterchangeBundle {
         id,
         tenor,
         tenor_version,
         constructs,
+        trust,
     })
 }
 
@@ -122,6 +125,32 @@ fn parse_tenor(obj: &serde_json::Value) -> Option<String> {
     obj.get("tenor")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
+}
+
+fn parse_trust_metadata(obj: &serde_json::Value) -> Option<TrustMetadata> {
+    let trust = obj.get("trust")?;
+    if trust.is_null() {
+        return None;
+    }
+    let trust_obj = trust.as_object()?;
+    Some(TrustMetadata {
+        bundle_attestation: trust_obj
+            .get("bundle_attestation")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        trust_domain: trust_obj
+            .get("trust_domain")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        attestation_format: trust_obj
+            .get("attestation_format")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        signer_public_key: trust_obj
+            .get("signer_public_key")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+    })
 }
 
 fn parse_fact(obj: &serde_json::Value) -> Result<FactConstruct, InterchangeError> {
@@ -896,5 +925,109 @@ mod tests {
             }
             other => panic!("expected Source, got {:?}", other),
         }
+    }
+
+    // ── Trust type tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_bundle_without_trust() {
+        let bundle = make_bundle(vec![]);
+        let result = from_interchange(&bundle).unwrap();
+        assert!(result.trust.is_none());
+    }
+
+    #[test]
+    fn test_bundle_with_trust_metadata() {
+        let bundle = json!({
+            "id": "test-bundle",
+            "kind": "Bundle",
+            "tenor": "1.0",
+            "tenor_version": "1.0.0",
+            "constructs": [],
+            "trust": {
+                "bundle_attestation": "c2lnbmF0dXJl",
+                "trust_domain": "acme.prod.us-east-1",
+                "attestation_format": "ed25519-detached",
+                "signer_public_key": "cHVia2V5"
+            }
+        });
+
+        let result = from_interchange(&bundle).unwrap();
+        let trust = result.trust.expect("trust should be Some");
+        assert_eq!(trust.bundle_attestation, Some("c2lnbmF0dXJl".to_string()));
+        assert_eq!(trust.trust_domain, Some("acme.prod.us-east-1".to_string()));
+        assert_eq!(
+            trust.attestation_format,
+            Some("ed25519-detached".to_string())
+        );
+        assert_eq!(trust.signer_public_key, Some("cHVia2V5".to_string()));
+    }
+
+    #[test]
+    fn test_bundle_with_partial_trust() {
+        let bundle = json!({
+            "id": "test-bundle",
+            "kind": "Bundle",
+            "tenor": "1.0",
+            "tenor_version": "1.0.0",
+            "constructs": [],
+            "trust": { "trust_domain": "acme.prod" }
+        });
+
+        let result = from_interchange(&bundle).unwrap();
+        let trust = result.trust.expect("trust should be Some");
+        assert_eq!(trust.trust_domain, Some("acme.prod".to_string()));
+        assert!(trust.bundle_attestation.is_none());
+        assert!(trust.attestation_format.is_none());
+        assert!(trust.signer_public_key.is_none());
+    }
+
+    #[test]
+    fn test_bundle_with_null_trust() {
+        let bundle = json!({
+            "id": "test-bundle",
+            "kind": "Bundle",
+            "tenor": "1.0",
+            "tenor_version": "1.0.0",
+            "constructs": [],
+            "trust": null
+        });
+
+        let result = from_interchange(&bundle).unwrap();
+        assert!(result.trust.is_none());
+    }
+
+    #[test]
+    fn test_trust_metadata_serialization_roundtrip() {
+        let trust = TrustMetadata {
+            bundle_attestation: Some("c2lnbmF0dXJl".to_string()),
+            trust_domain: Some("acme.prod.us-east-1".to_string()),
+            attestation_format: Some("ed25519-detached".to_string()),
+            signer_public_key: Some("cHVia2V5".to_string()),
+        };
+
+        let json = serde_json::to_string(&trust).unwrap();
+        let deserialized: TrustMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(trust, deserialized);
+    }
+
+    #[test]
+    fn test_provenance_trust_fields_serialization() {
+        let fields = ProvenanceTrustFields {
+            trust_domain: Some("acme.prod".to_string()),
+            attestation: None,
+        };
+
+        let json = serde_json::to_value(&fields).unwrap();
+        // attestation should be omitted (skip_serializing_if = None)
+        assert!(json.get("trust_domain").is_some());
+        assert!(json.get("attestation").is_none());
+
+        let full = ProvenanceTrustFields {
+            trust_domain: Some("acme.prod".to_string()),
+            attestation: Some("c2ln".to_string()),
+        };
+        let full_json = serde_json::to_value(&full).unwrap();
+        assert!(full_json.get("attestation").is_some());
     }
 }

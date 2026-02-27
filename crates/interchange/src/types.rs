@@ -14,6 +14,37 @@ pub struct Provenance {
     pub line: u64,
 }
 
+/// Trust metadata for signed bundles and manifest trust sections (Section 19.1).
+/// All fields are optional — deployments without trust infrastructure omit this entirely.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TrustMetadata {
+    /// Base64-encoded signature of the canonical bundle bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bundle_attestation: Option<String>,
+    /// Trust domain identifier (e.g. "acme.prod.us-east-1").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trust_domain: Option<String>,
+    /// Attestation format identifier (e.g. "ed25519-detached").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attestation_format: Option<String>,
+    /// Base64-encoded public key of the signer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signer_public_key: Option<String>,
+}
+
+/// Optional trust fields on provenance records (Section 17.4 E19-E20).
+/// When trust is configured, provenance records carry these fields for
+/// tamper-evident audit trails.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProvenanceTrustFields {
+    /// Trust domain identifier from executor configuration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trust_domain: Option<String>,
+    /// Base64-encoded signature of the provenance record content.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attestation: Option<String>,
+}
+
 /// Top-level interchange bundle containing all constructs.
 #[derive(Debug, Clone)]
 pub struct InterchangeBundle {
@@ -25,6 +56,8 @@ pub struct InterchangeBundle {
     pub tenor_version: String,
     /// All constructs in the bundle.
     pub constructs: Vec<InterchangeConstruct>,
+    /// Optional trust metadata for signed bundles (Section 19.1).
+    pub trust: Option<TrustMetadata>,
 }
 
 /// A single construct from the interchange bundle, dispatched by kind.
