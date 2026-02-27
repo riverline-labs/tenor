@@ -449,7 +449,23 @@ impl Contract {
                         parse_predicate(pre)?
                     } else {
                         // Null precondition means no precondition -- always true.
-                        parse_predicate(&serde_json::json!(null))?
+                        Predicate::Literal {
+                            value: Value::Bool(true),
+                            type_spec: TypeSpec {
+                                base: "Bool".to_string(),
+                                precision: None,
+                                scale: None,
+                                currency: None,
+                                min: None,
+                                max: None,
+                                max_length: None,
+                                values: None,
+                                fields: None,
+                                element_type: None,
+                                unit: None,
+                                variants: None,
+                            },
+                        }
                     };
                     let effects: Vec<Effect> = op
                         .effects
