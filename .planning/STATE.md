@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 9 of 11 — Builder SPA
-**Plan**: 4 of 7 completed in current phase
+**Plan**: 5 of 7 completed in current phase
 **Status**: Phase 9 in progress
-**Last activity**: 2026-02-27 — Phase 9 Plan 4 complete (FlowDag + FlowEditor + SystemEditor)
+**Last activity**: 2026-02-27 — Phase 9 Plan 5 complete (Simulation mode: FactInputPanel, VerdictPanel, ActionSpacePanel, FlowRunner, ProvenanceView)
 
 Progress: ██████████████████░░ 72% (Phases 1-8 complete, Phase 9 started)
 
@@ -114,6 +114,9 @@ Progress: ██████████████████░░ 72% (Phas
 - [Phase 09-04]: FlowDag uses SVG viewBox pan/zoom — no external graph library dependency
 - [Phase 09-04]: Step detail panel shown as right sidebar when step selected in DAG
 - [Phase 09-04]: FlowConstruct.steps is FlowStep[] (array) not Record<string,FlowStep> — PM plan had stale assumption
+- [Phase 09-05]: Client-side step replay: simulateFlow() runs full WASM simulation at once; stepFlowForward() reveals steps from stored result — no per-step WASM calls
+- [Phase 09-05]: FactInputPanel derives zero-defaults from type.base when no explicit fact.default declared
+- [Phase 09-05]: ActionSpacePanel computes "unauthorized" client-side by diffing persona allowed_personas vs WASM action space result
 - [Phase 09-04]: ParallelStep branches rendered as swim lanes within a single node (not recursive sub-DAG)
 
 ## Blockers/Concerns
@@ -156,9 +159,10 @@ Progress: ██████████████████░░ 72% (Phas
 | 09 | 02 | 403 | 6 | 6 |
 | 09 | 03 | 408 | 6 | 6 |
 | 09 | 04 | 474 | 5 | 4 |
+| 09 | 05 | 437 | 7 | 8 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 09-04-PLAN.md (FlowDag + FlowEditor + SystemEditor)
-Next action: Phase 9 Plan 5 — Simulation panel
+Stopped at: Completed 09-05-PLAN.md (Simulation mode — FactInputPanel, VerdictPanel, ActionSpacePanel, FlowRunner, ProvenanceView, SimulationPage)
+Next action: Phase 9 Plan 6
