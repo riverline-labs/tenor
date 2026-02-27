@@ -8,6 +8,7 @@ mod migrate;
 mod runner;
 mod serve;
 mod tap;
+mod trust;
 
 use std::path::{Path, PathBuf};
 use std::process;
