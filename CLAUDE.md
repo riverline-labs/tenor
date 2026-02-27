@@ -59,7 +59,7 @@ cargo run -p tenor-cli -- validate path/to/bundle.json
 cargo run -p tenor-cli -- --help
 ```
 
-CI pipeline: `.github/workflows/ci.yml` runs on push/PR to `main` and `v1` branches.
+CI pipeline: `.github/workflows/ci.yml` runs on push/PR to `main`.
 Stages: workspace build, conformance suite, schema validation + unit tests, formatting, clippy.
 
 ## Repository layout
