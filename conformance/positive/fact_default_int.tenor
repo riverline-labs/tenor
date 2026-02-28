@@ -1,5 +1,5 @@
 // Positive test: Fact with Int type and integer default value
-// Exercises int_literal serialization in fact defaults.
+// Exercises IntLiteral default serialization in fact defaults.
 
 fact retry_count {
   type:    Int(min: 0, max: 10)

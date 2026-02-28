@@ -253,14 +253,25 @@
       }
     },
 
+    "IntLiteral": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "description": "Structured integer literal for default values.",
+      "properties": {
+        "kind": { "const": "int_literal" },
+        "value": { "type": "integer" }
+      }
+    },
+
     "FactDefault": {
       "description": "Default value for a Fact. Structure depends on the Fact's type.",
       "oneOf": [
         { "$ref": "#/$defs/DecimalValue" },
         { "$ref": "#/$defs/MoneyValue" },
         { "$ref": "#/$defs/BoolLiteral" },
+        { "$ref": "#/$defs/IntLiteral" },
         { "type": "boolean" },
-        { "type": "integer" },
         { "type": "string" }
       ]
     },
