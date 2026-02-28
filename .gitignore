@@ -14,5 +14,8 @@ dist/
 # Local protocol/process artifacts
 cffp.cue
 
+# Template packaging artifacts
+*.tenor-template.tar.gz
+
 # GSD planning (local-only)
 .planning/
