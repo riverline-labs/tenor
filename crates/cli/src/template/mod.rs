@@ -3,6 +3,8 @@
 //! Provides the `tenor-template.toml` manifest format and the `tenor pack`
 //! command that produces `.tenor-template.tar.gz` archives.
 
+pub mod deploy;
+pub mod deploy_config;
 pub mod install;
 pub mod manifest;
 pub mod pack;

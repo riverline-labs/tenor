@@ -290,6 +290,30 @@ enum Commands {
         registry: Option<String>,
     },
 
+    /// Deploy a contract template to the hosted platform
+    Deploy {
+        /// Template name (from registry)
+        template_name: String,
+        /// Organization ID (overrides org_id in config file)
+        #[arg(long)]
+        org: Option<String>,
+        /// Template version (default: latest)
+        #[arg(long)]
+        version: Option<String>,
+        /// Deployment configuration file (sources, persona mappings)
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Registry URL
+        #[arg(long)]
+        registry: Option<String>,
+        /// Platform API URL
+        #[arg(long)]
+        platform: Option<String>,
+        /// Platform auth token (or set TENOR_PLATFORM_TOKEN)
+        #[arg(long)]
+        token: Option<String>,
+    },
+
     /// Start the Language Server Protocol server over stdio
     Lsp,
 
@@ -558,6 +582,27 @@ fn main() {
                 version.as_deref(),
                 &out,
                 registry.as_deref(),
+                cli.output,
+                cli.quiet,
+            );
+        }
+        Commands::Deploy {
+            template_name,
+            org,
+            version,
+            config,
+            registry,
+            platform,
+            token,
+        } => {
+            template::deploy::cmd_deploy(
+                &template_name,
+                org.as_deref(),
+                version.as_deref(),
+                config.as_deref(),
+                registry.as_deref(),
+                platform.as_deref(),
+                token.as_deref(),
                 cli.output,
                 cli.quiet,
             );
