@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 10 of 11 — Hosted Platform — IN PROGRESS
-**Plan**: 4 of 7 completed in current phase
-**Status**: Phase 10 Plan 4 complete
-**Last activity**: 2026-02-27 — Phase 10 Plan 4 complete (token bucket rate limiting, CORS, request logging, 11 gateway tests)
+**Plan**: 5 of 7 completed in current phase (plans 1, 2, 3, 4 done; plan 3 completed out of order)
+**Status**: Phase 10 Plan 3 complete
+**Last activity**: 2026-02-28 — Phase 10 Plan 3 complete (contract deployment, dynamic AppState, tenant-scoped routes, 9 provisioning tests)
 
 Progress: ████████████████████░░ 80% (Phases 1-9 complete, Phase 10 in progress)
 
@@ -146,6 +146,10 @@ Progress: ████████████████████░░ 80%
 - [Phase 10]: [Phase 10-04] MigrationPolicy::from_str renamed to parse() (clippy::should_implement_trait)
 - [Phase 10]: [Phase 10-04] ContractsMap<S> type alias for Arc<RwLock<HashMap<(Uuid, String), ContractEntry<S>>>> (clippy::type_complexity)
 - [Phase 10]: [Phase 10-04] sqlx promoted from dev-dependency to production dependency in platform-serve
+- [Phase 10-03] ManagementState bundles TenantStore + ContractsMap + PgPool (management handlers need both control-plane and data-plane access)
+- [Phase 10-03] ContractsMap keyed by (Uuid, String) = (org_id, contract_id) for tenant isolation; nil UUID for static startup contracts
+- [Phase 10-03] deploy_contract re-fetches deployment after status update — returned record has status=active not provisioning
+- [Phase 10-03] Admin keys bypass org_id check in tenant-scoped handlers (super-admin semantics); tests for tenant isolation use execute_only keys
 
 ## Blockers/Concerns
 
@@ -196,9 +200,10 @@ Progress: ████████████████████░░ 80%
 | 10 | 01 | 790 | 6 | 7 |
 | 10 | 02 | 753 | 7 | 13 |
 | 10 | 04 | 1266 | 7 | 7 |
+| 10 | 03 | ~7200 | 6 | 8 |
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Completed 10-04-PLAN.md (token bucket rate limiting, CORS, request logging, 11 gateway tests)
+Last session: 2026-02-28
+Stopped at: Completed 10-03-PLAN.md (contract deployment, dynamic AppState, tenant-scoped routes, 9 provisioning tests)
 Next action: Phase 10 Plan 5
