@@ -9,6 +9,7 @@ mod migrate;
 mod runner;
 mod serve;
 mod tap;
+mod template;
 mod trust;
 mod ui;
 
@@ -234,6 +235,16 @@ enum Commands {
         /// Pre-load a .tenor or .json contract file
         #[arg(long)]
         contract: Option<PathBuf>,
+    },
+
+    /// Package a contract template for publishing
+    Pack {
+        /// Template directory (default: current directory)
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// Output archive path
+        #[arg(long = "out", name = "pack_out")]
+        out: Option<PathBuf>,
     },
 
     /// Start the Language Server Protocol server over stdio
@@ -462,6 +473,9 @@ fn main() {
                 });
             }
         },
+        Commands::Pack { dir, out } => {
+            template::cmd_pack(&dir, out.as_deref(), cli.quiet);
+        }
         Commands::Lsp => {
             if let Err(e) = tenor_lsp::run() {
                 eprintln!("LSP server error: {}", e);
