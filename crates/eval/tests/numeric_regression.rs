@@ -956,8 +956,8 @@ fn cross_text_comparison() {
 }
 
 #[test]
-fn cross_text_less_than() {
-    // Text lexicographic comparison
+fn cross_text_less_than_rejected() {
+    // Per spec, Text supports only = and !=. Ordering operators are rejected.
     let bundle = comparison_bundle(
         "name",
         json!({"base": "Text", "max_length": 100}),
@@ -965,8 +965,8 @@ fn cross_text_less_than() {
         json!({"literal": "Bob"}),
         None,
     );
-    assert_verdict_produced(&bundle, &json!({"name": "Alice"})); // "Alice" < "Bob"
-    assert_no_verdict(&bundle, &json!({"name": "Charlie"})); // "Charlie" < "Bob" is false
+    let result = tenor_eval::evaluate(&bundle, &json!({"name": "Alice"}));
+    assert!(result.is_err(), "Text < should be rejected by evaluator");
 }
 
 // ──────────────────────────────────────────────────────────

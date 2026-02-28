@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "bad_text_compare",
+  "field": "body.when",
+  "file": "text_ordering_operator.tenor",
+  "line": 12,
+  "message": "type error: operator '<' not defined for Text; Text supports only = and !="
+}

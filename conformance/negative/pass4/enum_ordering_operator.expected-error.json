@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "bad_enum_compare",
+  "field": "body.when",
+  "file": "enum_ordering_operator.tenor",
+  "line": 12,
+  "message": "type error: operator '>' not defined for Enum; Enum supports only = and !="
+}

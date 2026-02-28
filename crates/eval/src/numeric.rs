@@ -135,8 +135,28 @@ pub fn compare_values(
         (Value::Bool(l), Value::Bool(r)) => compare_bools(*l, *r, op),
         (Value::Int(l), Value::Int(r)) => compare_ints(*l, *r, op),
         (Value::Decimal(l), Value::Decimal(r)) => compare_decimals(*l, *r, op),
-        (Value::Text(l), Value::Text(r)) => compare_strings(l, r, op),
-        (Value::Enum(l), Value::Enum(r)) => compare_strings(l, r, op),
+        (Value::Text(l), Value::Text(r)) => {
+            if op != "=" && op != "!=" {
+                return Err(EvalError::TypeError {
+                    message: format!(
+                        "operator '{}' not defined for Text; Text supports only = and !=",
+                        op
+                    ),
+                });
+            }
+            compare_strings(l, r, op)
+        }
+        (Value::Enum(l), Value::Enum(r)) => {
+            if op != "=" && op != "!=" {
+                return Err(EvalError::TypeError {
+                    message: format!(
+                        "operator '{}' not defined for Enum; Enum supports only = and !=",
+                        op
+                    ),
+                });
+            }
+            compare_strings(l, r, op)
+        }
         (
             Value::Money {
                 amount: la,

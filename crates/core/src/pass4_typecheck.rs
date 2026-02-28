@@ -290,6 +290,20 @@ fn type_check_expr(
                             format!("type error: operator '{}' not defined for Bool; Bool supports only = and \u{2260}", op),
                         ));
                     }
+                    RawType::Text { .. } if op != "=" && op != "!=" => {
+                        return Err(ElabError::new(
+                            4, Some("Rule"), Some(rule_id), Some("body.when"),
+                            &prov.file, *line,
+                            format!("type error: operator '{}' not defined for Text; Text supports only = and !=", op),
+                        ));
+                    }
+                    RawType::Enum { .. } if op != "=" && op != "!=" => {
+                        return Err(ElabError::new(
+                            4, Some("Rule"), Some(rule_id), Some("body.when"),
+                            &prov.file, *line,
+                            format!("type error: operator '{}' not defined for Enum; Enum supports only = and !=", op),
+                        ));
+                    }
                     RawType::Money { currency: lc } => {
                         if let Some(RawType::Money { currency: rc }) =
                             type_of_fact_term(right, fact_types, bound_vars)
