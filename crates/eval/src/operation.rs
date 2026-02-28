@@ -9,7 +9,7 @@
 //! 3. Effect execution (entity state transitions)
 //! 4. Outcome determination (single or multi-outcome routing)
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::predicate::{eval_pred, EvalContext};
 use crate::provenance::ProvenanceCollector;
@@ -85,7 +85,13 @@ pub struct EffectRecord {
 pub struct OperationProvenance {
     pub operation_id: String,
     pub persona: String,
+    /// The outcome label selected for this operation execution.
+    pub outcome: String,
     pub effects: Vec<EffectRecord>,
+    /// Fact ids examined during precondition evaluation.
+    pub facts_used: BTreeSet<String>,
+    /// Verdict type ids used in precondition evaluation.
+    pub verdicts_used: BTreeSet<String>,
     /// Maps entity_id → instance_id for the instances targeted by this operation.
     /// Per §9.5: records which specific instance was acted on for each entity effect.
     pub instance_binding: BTreeMap<String, String>,
@@ -209,11 +215,12 @@ pub fn init_entity_states(contract: &crate::types::Contract) -> EntityStateMap {
 
 /// Execute an operation against the current state.
 ///
-/// Follows spec Section 9.2:
+/// Follows spec §9.3:
 /// 1. Persona check
 /// 2. Precondition evaluation
-/// 3. Effect execution (entity state transitions)
-/// 4. Outcome determination
+/// 3. Outcome determination
+/// 4. Transition source validation
+/// 5. Atomic effect application
 ///
 /// The `instance_bindings` parameter maps entity_id → instance_id to identify
 /// which specific instance each entity effect targets. An empty map falls back
@@ -247,16 +254,18 @@ pub fn execute_operation(
         });
     }
 
-    // Step 3: Effect execution
-    let mut effects_applied = Vec::new();
-    let mut outcome_from_effects: Option<String> = None;
+    // Capture facts_used and verdicts_used from precondition evaluation.
+    let facts_used: BTreeSet<String> = collector.facts_used.into_iter().collect();
+    let verdicts_used: BTreeSet<String> = collector.verdicts_used.into_iter().collect();
 
-    // Per §9.5: snapshot state_before for all targeted instances before applying any effects.
+    // Step 3: Outcome determination (per §9.3: outcome before effects)
+    let outcome = determine_outcome(op)?;
+
+    // Step 4: Transition source validation — resolve all target instances
+    // and verify from-state before any mutation.
     let mut instance_binding_map: BTreeMap<String, String> = BTreeMap::new();
     let mut state_before: BTreeMap<(String, String), String> = BTreeMap::new();
 
-    // First pass: resolve all target instances and capture pre-effect states.
-    // This must be done before any effects are applied.
     for effect in &op.effects {
         let instance_id = resolve_instance_id(instance_bindings, &effect.entity_id).to_string();
         instance_binding_map
@@ -281,16 +290,15 @@ pub fn execute_operation(
             });
         }
 
-        // Capture state_before for this (entity_id, instance_id) pair.
         state_before.entry(key).or_insert_with(|| current_state);
     }
 
-    // Second pass: apply effects and collect EffectRecords.
+    // Step 5: Atomic effect application
+    let mut effects_applied = Vec::new();
     for effect in &op.effects {
         let instance_id = resolve_instance_id(instance_bindings, &effect.entity_id).to_string();
         let key = (effect.entity_id.clone(), instance_id.clone());
 
-        // Apply state transition to the targeted (entity_id, instance_id) pair
         entity_states.insert(key, effect.to.clone());
         effects_applied.push(EffectRecord {
             entity_id: effect.entity_id.clone(),
@@ -298,11 +306,6 @@ pub fn execute_operation(
             from_state: effect.from.clone(),
             to_state: effect.to.clone(),
         });
-
-        // Track outcome from effect (for multi-outcome routing)
-        if let Some(ref effect_outcome) = effect.outcome {
-            outcome_from_effects = Some(effect_outcome.clone());
-        }
     }
 
     // Capture state_after for all targeted instances after effects applied.
@@ -314,29 +317,13 @@ pub fn execute_operation(
         }
     }
 
-    // Step 4: Outcome determination
-    let outcome = if let Some(effect_outcome) = outcome_from_effects {
-        // Multi-outcome: outcome determined by which effects triggered
-        effect_outcome
-    } else if op.outcomes.len() == 1 {
-        // Single outcome -- implicit default is valid
-        op.outcomes[0].clone()
-    } else if op.outcomes.len() > 1 {
-        // Multi-outcome operations REQUIRE effect-to-outcome mapping.
-        // If no effect carried an outcome field, this is a contract error.
-        return Err(OperationError::PreconditionFailed {
-            operation_id: op.id.clone(),
-            condition_desc: "multi-outcome operation has no effect-to-outcome mapping".to_string(),
-        });
-    } else {
-        // No declared outcomes -- use "success" as default
-        "success".to_string()
-    };
-
     let provenance = OperationProvenance {
         operation_id: op.id.clone(),
         persona: persona.to_string(),
+        outcome: outcome.clone(),
         effects: effects_applied.clone(),
+        facts_used,
+        verdicts_used,
         instance_binding: instance_binding_map,
         state_before,
         state_after,
@@ -347,6 +334,31 @@ pub fn execute_operation(
         effects_applied,
         provenance,
     })
+}
+
+/// Determine the outcome label for an operation.
+///
+/// Per §9.3: outcome is determined before effects are applied.
+/// - If any effect has an `outcome` field, use that (multi-outcome routing).
+/// - If a single outcome is declared, use it.
+/// - If multiple outcomes are declared with no effect-to-outcome mapping, error.
+/// - If no outcomes declared, default to "success".
+fn determine_outcome(op: &Operation) -> Result<String, OperationError> {
+    // Check effect-to-outcome mapping first
+    let outcome_from_effects: Option<String> = op.effects.iter().find_map(|e| e.outcome.clone());
+
+    if let Some(effect_outcome) = outcome_from_effects {
+        Ok(effect_outcome)
+    } else if op.outcomes.len() == 1 {
+        Ok(op.outcomes[0].clone())
+    } else if op.outcomes.len() > 1 {
+        Err(OperationError::PreconditionFailed {
+            operation_id: op.id.clone(),
+            condition_desc: "multi-outcome operation has no effect-to-outcome mapping".to_string(),
+        })
+    } else {
+        Ok("success".to_string())
+    }
 }
 
 // ──────────────────────────────────────────────
@@ -883,6 +895,7 @@ mod tests {
         .unwrap();
         assert_eq!(result.provenance.operation_id, "approve");
         assert_eq!(result.provenance.persona, "admin");
+        assert_eq!(result.provenance.outcome, "approved");
         assert_eq!(result.provenance.effects.len(), 1);
         assert_eq!(
             result.provenance.effects[0],
@@ -893,8 +906,11 @@ mod tests {
                 to_state: "approved".to_string(),
             }
         );
+        // No facts or verdicts in precondition (literal true) — both empty
+        assert!(result.provenance.facts_used.is_empty());
+        assert!(result.provenance.verdicts_used.is_empty());
 
-        // New §9.5 fields: instance_binding, state_before, state_after
+        // §9.5 fields: instance_binding, state_before, state_after
         assert_eq!(
             result
                 .provenance
@@ -1099,6 +1115,135 @@ mod tests {
                 .get(&("payment".to_string(), "pay-1".to_string()))
                 .map(|s| s.as_str()),
             Some("captured")
+        );
+    }
+
+    #[test]
+    fn provenance_tracks_facts_and_verdicts_from_precondition() {
+        // Operation with a precondition that references a fact and a verdict.
+        let mut facts = FactSet::new();
+        facts.insert("balance".to_string(), Value::Int(100));
+
+        let mut verdicts = VerdictSet::new();
+        verdicts.push(VerdictInstance {
+            verdict_type: "eligible".to_string(),
+            payload: Value::Bool(true),
+            provenance: crate::provenance::VerdictProvenance {
+                rule_id: "check_eligible".to_string(),
+                stratum: 0,
+                facts_used: vec![],
+                verdicts_used: vec![],
+            },
+        });
+
+        // Precondition: balance > 0 ∧ eligible?
+        let precondition = Predicate::And {
+            left: Box::new(Predicate::Compare {
+                left: Box::new(Predicate::FactRef("balance".to_string())),
+                op: ">".to_string(),
+                right: Box::new(Predicate::Literal {
+                    value: Value::Int(0),
+                    type_spec: TypeSpec {
+                        base: "Int".to_string(),
+                        precision: None,
+                        scale: None,
+                        currency: None,
+                        min: None,
+                        max: None,
+                        max_length: None,
+                        values: None,
+                        fields: None,
+                        element_type: None,
+                        unit: None,
+                        variants: None,
+                    },
+                }),
+                comparison_type: None,
+            }),
+            right: Box::new(Predicate::VerdictPresent("eligible".to_string())),
+        };
+
+        let op = make_operation_with_precondition(
+            "withdraw",
+            vec!["user"],
+            precondition,
+            vec![Effect {
+                entity_id: "account".to_string(),
+                from: "active".to_string(),
+                to: "withdrawn".to_string(),
+                outcome: None,
+            }],
+            vec!["withdrawn"],
+        );
+
+        let mut entity_states = single_instance(
+            [("account".to_string(), "active".to_string())]
+                .into_iter()
+                .collect(),
+        );
+
+        let result = execute_operation(
+            &op,
+            "user",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        )
+        .unwrap();
+
+        assert_eq!(result.provenance.outcome, "withdrawn");
+        assert!(
+            result.provenance.facts_used.contains("balance"),
+            "facts_used should contain 'balance'"
+        );
+        assert!(
+            result.provenance.verdicts_used.contains("eligible"),
+            "verdicts_used should contain 'eligible'"
+        );
+    }
+
+    #[test]
+    fn provenance_outcome_matches_effect_outcome_for_multi_outcome() {
+        let op = Operation {
+            id: "process".to_string(),
+            allowed_personas: vec!["system".to_string()],
+            precondition: Predicate::Literal {
+                value: Value::Bool(true),
+                type_spec: bool_type(),
+            },
+            effects: vec![Effect {
+                entity_id: "order".to_string(),
+                from: "pending".to_string(),
+                to: "completed".to_string(),
+                outcome: Some("success".to_string()),
+            }],
+            error_contract: vec![],
+            outcomes: vec!["success".to_string(), "failure".to_string()],
+        };
+
+        let facts = FactSet::new();
+        let verdicts = VerdictSet::new();
+        let mut entity_states = single_instance(
+            [("order".to_string(), "pending".to_string())]
+                .into_iter()
+                .collect(),
+        );
+
+        let result = execute_operation(
+            &op,
+            "system",
+            &facts,
+            &verdicts,
+            &mut entity_states,
+            &InstanceBindingMap::new(),
+        )
+        .unwrap();
+
+        assert_eq!(result.outcome, "success");
+        assert_eq!(
+            result.provenance.outcome, "success",
+            "provenance.outcome should match result.outcome"
         );
     }
 
