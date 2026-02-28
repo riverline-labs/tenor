@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 10 of 11 — Hosted Platform — IN PROGRESS
-**Plan**: 1 of 7 completed in current phase
-**Status**: Phase 10 Plan 1 complete
-**Last activity**: 2026-02-27 — Phase 10 Plan 1 complete (multi-tenancy data model: Organization/ApiKey/Deployment/RLS)
+**Plan**: 2 of 7 completed in current phase
+**Status**: Phase 10 Plan 2 complete
+**Last activity**: 2026-02-28 — Phase 10 Plan 2 complete (auth middleware, persona enforcement, management API)
 
 Progress: ████████████████████░░ 80% (Phases 1-9 complete, Phase 10 in progress)
 
@@ -131,9 +131,14 @@ Progress: ████████████████████░░ 80%
 - [Phase 10-01] PgSnapshot carries org_id; begin_snapshot sets SET LOCAL app.current_org_id for RLS activation
 - [Phase 10-01] Nil UUID (00000000-0000-0000-0000-000000000000) as default org — all pre-existing data uses it; PostgresStorage::new() defaults to it
 - [Phase 10-01] current_setting('app.current_org_id', true) with missing_ok=true — RLS policy non-fatal when setting absent (superuser bypasses RLS anyway)
-- [Phase 10-01] bcrypt DEFAULT_COST for API key hashing; generate_plaintext produces tk_<uuid_v4_simple> format (35 chars)
 - [Phase 10-01] API key format: tk_<uuid_v4_simple> — 35 chars, URL-safe, tk_ prefix for identification
 - [Phase 10-01] Test org names use UUID suffix via unique_org_name() to avoid cross-run collisions
+- [Phase 10-02] SHA-256 (not bcrypt) for API key hash storage: bcrypt is non-deterministic, making WHERE key_hash = $1 DB lookup impossible; plaintext has 128+ bits entropy so SHA-256 is sufficient
+- [Phase 10-02] Backward-compat router split: serve() takes Option<Arc<TenantStore>>; None = single-tenant legacy mode (no auth middleware, no management routes)
+- [Phase 10-02] Auth middleware uses route_layer (not layer) so /health public route cleanly excluded
+- [Phase 10-02] fire-and-forget last_used_at update: tokio::spawn with cloned Arc<TenantStore> — auth latency not blocked
+- [Phase 10-02] AuthContext extracted as Option<Extension<AuthContext>> in handlers — works in both authenticated and unauthenticated modes
+- [Phase 10-02] ApiError::Http(StatusCode, String) variant for persona/auth errors without changing executor error types
 
 ## Blockers/Concerns
 
@@ -181,9 +186,10 @@ Progress: ████████████████████░░ 80%
 
 | 09 | 07 | 754 | 8 | 12 |
 | 10 | 01 | 790 | 6 | 7 |
+| 10 | 02 | 753 | 7 | 13 |
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Completed 10-01-PLAN.md (multi-tenancy data model: Organization/ApiKey/Deployment/RLS, 15 tests pass)
-Next action: Phase 10 Plan 2
+Last session: 2026-02-28
+Stopped at: Completed 10-02-PLAN.md (auth middleware, persona enforcement, management API, 14 new tests)
+Next action: Phase 10 Plan 3

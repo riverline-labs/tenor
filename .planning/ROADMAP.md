@@ -162,7 +162,7 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
    **Plans**: 7 (10-01 through 10-07)
 
 - [x] 10-01: Multi-tenancy
-- [ ] 10-02: Authentication and authorization
+- [x] 10-02: Authentication and authorization
 - [ ] 10-03: Contract deployment
 - [ ] 10-04: API gateway
 - [ ] 10-05: Billing and metering
