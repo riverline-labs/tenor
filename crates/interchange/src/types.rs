@@ -52,7 +52,7 @@ pub struct InterchangeBundle {
     pub id: String,
     /// Tenor spec version (e.g. "1.0").
     pub tenor: String,
-    /// Tenor interchange bundle version (e.g. "1.1.0").
+    /// Tenor interchange bundle version (e.g. "1.0.0").
     pub tenor_version: String,
     /// All constructs in the bundle.
     pub constructs: Vec<InterchangeConstruct>,

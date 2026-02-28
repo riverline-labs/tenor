@@ -5,7 +5,7 @@ Tenor is a **v1.0 stable** project.
 ## Stable
 
 - **Specification:** v1.0 with three amendments (Source Declarations, Multi-Instance Entities, Trust & Security)
-- **Interchange format:** v1.1.0 (minor version bumps from additive amendments)
+- **Interchange format:** v1.0.0
 - **Elaborator:** Stable — the DSL parser and 6-pass elaboration pipeline produce conformant interchange output
 - **Evaluator:** Stable — the contract evaluator (tenor-eval) honors all v1.0 semantics
 - **Contract language syntax:** Stable — existing `.tenor` files will continue to elaborate correctly
