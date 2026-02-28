@@ -1,0 +1,54 @@
+{
+  "constructs": [
+    {
+      "id": "payment_method",
+      "kind": "Fact",
+      "provenance": {
+        "file": "tagged_union_basic.tenor",
+        "line": 3
+      },
+      "source": {
+        "field": "method",
+        "system": "payment_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "TaggedUnion",
+        "variants": {
+          "BankTransfer": {
+            "base": "Record",
+            "fields": {
+              "account": {
+                "base": "Text",
+                "max_length": 17
+              },
+              "routing": {
+                "base": "Text",
+                "max_length": 9
+              }
+            }
+          },
+          "Cash": {
+            "base": "Bool"
+          },
+          "CreditCard": {
+            "base": "Record",
+            "fields": {
+              "expiry": {
+                "base": "Date"
+              },
+              "last4": {
+                "base": "Text",
+                "max_length": 4
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "id": "tagged_union_basic",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

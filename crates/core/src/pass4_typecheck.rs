@@ -94,6 +94,13 @@ fn resolve_raw_type(
             }
             Ok(RawType::Record { fields: resolved })
         }
+        RawType::TaggedUnion { variants } => {
+            let mut resolved = BTreeMap::new();
+            for (k, v) in variants {
+                resolved.insert(k.clone(), resolve_raw_type(v, env, file, line)?);
+            }
+            Ok(RawType::TaggedUnion { variants: resolved })
+        }
         RawType::List { element_type, max } => {
             let et = resolve_raw_type(element_type, env, file, line)?;
             Ok(RawType::List {
@@ -226,6 +233,7 @@ pub fn type_name(t: &RawType) -> String {
         RawType::Duration { .. } => "Duration".to_owned(),
         RawType::List { .. } => "List".to_owned(),
         RawType::Record { .. } => "Record".to_owned(),
+        RawType::TaggedUnion { .. } => "TaggedUnion".to_owned(),
         RawType::TypeRef(n) => n.clone(),
     }
 }

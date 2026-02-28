@@ -55,6 +55,9 @@ pub enum RawType {
         element_type: Box<RawType>,
         max: u32,
     },
+    TaggedUnion {
+        variants: BTreeMap<String, RawType>,
+    },
     /// Named type reference -- resolved during Pass 3/4
     TypeRef(String),
 }

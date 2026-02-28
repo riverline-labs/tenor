@@ -1,0 +1,47 @@
+{
+  "constructs": [
+    {
+      "id": "contact_info",
+      "kind": "Fact",
+      "provenance": {
+        "file": "tagged_union_with_typedecl.tenor",
+        "line": 8
+      },
+      "source": {
+        "field": "info",
+        "system": "contact_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "TaggedUnion",
+        "variants": {
+          "Email": {
+            "base": "Text",
+            "max_length": 254
+          },
+          "Mail": {
+            "base": "Record",
+            "fields": {
+              "city": {
+                "base": "Text",
+                "max_length": 100
+              },
+              "street": {
+                "base": "Text",
+                "max_length": 200
+              }
+            }
+          },
+          "Phone": {
+            "base": "Text",
+            "max_length": 15
+          }
+        }
+      }
+    }
+  ],
+  "id": "tagged_union_with_typedecl",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

@@ -1,0 +1,9 @@
+{
+  "construct_id": null,
+  "construct_kind": null,
+  "field": "type",
+  "file": "tagged_union_unknown_type_ref.tenor",
+  "line": 4,
+  "message": "unknown type reference 'CardDetails'",
+  "pass": 4
+}

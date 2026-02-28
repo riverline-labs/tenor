@@ -424,6 +424,16 @@ fn serialize_type(t: &RawType) -> Value {
             ins(&mut m, "max", json!(max));
             Value::Object(m)
         }
+        RawType::TaggedUnion { variants } => {
+            let mut vm = Map::new();
+            for (tag, payload_type) in variants {
+                vm.insert(tag.clone(), serialize_type(payload_type));
+            }
+            let mut m = Map::new();
+            ins(&mut m, K_BASE, json!("TaggedUnion"));
+            ins(&mut m, "variants", Value::Object(vm));
+            Value::Object(m)
+        }
         RawType::TypeRef(name) => json!({"base": "TypeRef", "id": name}),
     }
 }

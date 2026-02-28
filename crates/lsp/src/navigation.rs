@@ -710,6 +710,13 @@ fn format_raw_type(ty: &tenor_core::ast::RawType) -> String {
         RawType::List { element_type, max } => {
             format!("List({}, max: {})", format_raw_type(element_type), max)
         }
+        RawType::TaggedUnion { variants } => {
+            let vs: Vec<String> = variants
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, format_raw_type(v)))
+                .collect();
+            format!("TaggedUnion {{ {} }}", vs.join(", "))
+        }
         RawType::TypeRef(name) => name.clone(),
     }
 }

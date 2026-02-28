@@ -130,6 +130,10 @@ impl<'a> Parser<'a> {
                 self.expect_rparen()?;
                 Ok(RawType::Record { fields })
             }
+            "TaggedUnion" => {
+                let variants = self.parse_record_fields()?;
+                Ok(RawType::TaggedUnion { variants })
+            }
             other => Ok(RawType::TypeRef(other.to_owned())),
         }
     }

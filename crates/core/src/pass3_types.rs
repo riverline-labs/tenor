@@ -150,6 +150,7 @@ fn references_type(t: &RawType, target: &str) -> bool {
     match t {
         RawType::TypeRef(n) => n == target,
         RawType::Record { fields } => fields.values().any(|f| references_type(f, target)),
+        RawType::TaggedUnion { variants } => variants.values().any(|v| references_type(v, target)),
         RawType::List { element_type, .. } => references_type(element_type, target),
         _ => false,
     }
@@ -159,6 +160,7 @@ fn type_refs(t: &RawType) -> Vec<String> {
     match t {
         RawType::TypeRef(n) => vec![n.clone()],
         RawType::Record { fields } => fields.values().flat_map(type_refs).collect(),
+        RawType::TaggedUnion { variants } => variants.values().flat_map(type_refs).collect(),
         RawType::List { element_type, .. } => type_refs(element_type),
         _ => vec![],
     }
@@ -223,6 +225,13 @@ fn resolve_type_in_env(
                 resolved.insert(k.clone(), resolve_type_in_env(v, decls, env, file, line)?);
             }
             Ok(RawType::Record { fields: resolved })
+        }
+        RawType::TaggedUnion { variants } => {
+            let mut resolved = BTreeMap::new();
+            for (k, v) in variants {
+                resolved.insert(k.clone(), resolve_type_in_env(v, decls, env, file, line)?);
+            }
+            Ok(RawType::TaggedUnion { variants: resolved })
         }
         RawType::List { element_type, max } => {
             let et = resolve_type_in_env(element_type, decls, env, file, line)?;
