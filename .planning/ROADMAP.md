@@ -204,6 +204,6 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 | 8. Automatic UI            | 4/4 | Complete    | 2026-02-27 |
 | 9. Builder                 | 7/7 | Complete   | 2026-02-27 |
 | 10. Hosted Platform        | 7/7 | Complete    | 2026-02-28 |
-| 11. Marketplace            | 5/5 | Complete   | 2026-02-27 |
+| 11. Marketplace            | 5/5 | Complete    | 2026-02-28 |
 
 **Total**: 42 plans across 8 remaining phases
