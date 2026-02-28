@@ -19,3 +19,6 @@ cffp.cue
 
 # GSD planning (local-only)
 .planning/
+
+# Phase plans (local-only)
+docs/plans/
