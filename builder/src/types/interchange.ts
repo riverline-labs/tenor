@@ -1,6 +1,6 @@
 /**
  * TypeScript type definitions mirroring the Tenor interchange JSON schema.
- * Reference: docs/interchange-schema.json
+ * Reference: schema/interchange-schema.json
  */
 
 // ---------------------------------------------------------------------------

@@ -225,7 +225,7 @@ export function registerCommands(
     vscode.commands.registerCommand("tenor.openDocs", async () => {
       // Try local docs first
       const localDocs = await vscode.workspace.findFiles(
-        "docs/guide/author-guide.md",
+        "docs/author-guide.md",
         null,
         1
       );

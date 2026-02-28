@@ -6,7 +6,7 @@ pub(crate) fn cmd_ambiguity(suite_dir: &Path, spec: Option<&Path>, model: Option
         suite_dir
             .parent()
             .unwrap_or(std::path::Path::new(".."))
-            .join("docs/TENOR.md")
+            .join("docs/tenor-language-specification.md")
     });
 
     if !suite_dir.exists() {

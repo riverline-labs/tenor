@@ -10,9 +10,9 @@ pub const DEFAULT_SECTIONS: &[u32] = &[4, 7, 10, 12];
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
-/// Build the system prompt by reading TENOR.md and extracting relevant sections.
+/// Build the system prompt by reading the spec and extracting relevant sections.
 ///
-/// Reads the spec from `spec_path` (typically `docs/TENOR.md`) and extracts
+/// Reads the spec from `spec_path` (typically `docs/tenor-language-specification.md`) and extracts
 /// Sections 4 (BaseType/TypeDecl), 7 (Rule), 10 (PredicateExpression),
 /// and 12 (NumericModel).
 pub fn build_system_prompt(spec_path: &Path) -> Result<String, String> {

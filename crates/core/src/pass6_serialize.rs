@@ -497,7 +497,7 @@ fn money_decimal_precision_scale(_amount: &str) -> (u32, u32) {
 }
 
 /// Round a decimal string to `target_scale` fractional digits using
-/// round-half-to-even (banker's rounding, per TENOR.md §13).
+/// round-half-to-even (banker's rounding, per spec §13).
 fn round_decimal_to_scale(s: &str, target_scale: u32) -> String {
     let is_negative = s.starts_with('-');
     let abs_s = if is_negative { &s[1..] } else { s };
@@ -1129,7 +1129,7 @@ fn serialize_comp_step(step: &RawCompStep) -> Value {
 // ── System serialization ─────────────────────────────────────────────────────
 
 /// Serialize a System construct to canonical interchange JSON per Section 12.5
-/// of TENOR.md. All keys are lexicographically sorted within each object.
+/// of the Tenor specification. All keys are lexicographically sorted within each object.
 fn serialize_system(
     id: &str,
     members: &[(String, String)],

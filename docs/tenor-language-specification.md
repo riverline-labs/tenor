@@ -1810,7 +1810,7 @@ Input: Validated construct index with typed ASTs. Output: TenorInterchange JSON 
 
 ### 14.2.1 Interchange Format Versioning
 
-The TenorInterchange format is versioned independently of the Tenor language specification version. The canonical structure of TenorInterchange output is defined by the JSON Schema at `docs/interchange-schema.json`.
+The TenorInterchange format is versioned independently of the Tenor language specification version. The canonical structure of TenorInterchange output is defined by the JSON Schema at `schema/interchange-schema.json`.
 
 **Bundle-level `tenor_version` field:**
 
@@ -2645,8 +2645,8 @@ the manifest with the interchange bundle inlined. The manifest is a
 transformation of the elaborator output, not a separate pipeline. The elaborator
 computes the etag as part of manifest generation.
 
-**JSON Schema:** The manifest validates against `docs/manifest-schema.json`,
-a separate schema from the interchange schema (`docs/interchange-schema.json`).
+**JSON Schema:** The manifest validates against `schema/manifest-schema.json`,
+a separate schema from the interchange schema (`schema/interchange-schema.json`).
 The interchange schema is embedded in the manifest schema as the type of the
 `bundle` field.
 
@@ -3649,7 +3649,7 @@ This executes the release flow for escrow transaction esc-001 with delivery reco
 | **INFRASTRUCTURE** | A migration classification for changes that do not affect evaluation semantics but require coordinated updates to runtime infrastructure, adapters, credentials, or deployment configuration (§18.2). |
 | **InstanceBindingMap** | A mapping from EntityId to InstanceId that specifies which entity instances a flow execution targets. Supplied by the executor at flow invocation time (§11). |
 | **InstanceId** | A non-empty UTF-8 string that uniquely identifies a runtime instance of an entity type. The pair (EntityId, InstanceId) is globally unique within a contract's runtime environment. Assigned by the executor, opaque to the contract (§6.5). |
-| **Interchange Format** | The canonical JSON representation of a Tenor contract, produced by the elaborator. Defined by `docs/interchange-schema.json` (§14). |
+| **Interchange Format** | The canonical JSON representation of a Tenor contract, produced by the elaborator. Defined by `schema/interchange-schema.json` (§14). |
 | **Manifest** | A JSON document (TenorManifest) that wraps an interchange bundle with an etag and spec version. Served at `/.well-known/tenor` (§19.1). |
 | **NumericModel** | The specification of arithmetic behavior: fixed-point decimal arithmetic with the bounds specified in §13.6, `MidpointNearestEven` rounding, no floating-point anywhere in the evaluation path (§13). |
 | **Operation** | A persona-gated, precondition-guarded unit of work that produces entity state transitions. Declares allowed personas, preconditions, effects, outcomes, and error contracts (§9). |

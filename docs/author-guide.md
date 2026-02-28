@@ -47,7 +47,7 @@ Each layer is independently auditable. You do not need to trust the person who w
 
 Tenor contracts are built from seven constructs, introduced here in dependency order. Each later construct can reference earlier ones; none can reference later ones.
 
-For formal definitions, see the [Tenor Specification](../TENOR.md). This section teaches you how to think about each construct as a contract author.
+For formal definitions, see the [Tenor Specification](tenor-language-specification.md). This section teaches you how to think about each construct as a contract author.
 
 ### 1. Facts
 
@@ -726,4 +726,4 @@ The full execution sequence, from cargo arrival to LC payment, crosses two indep
 
 ---
 
-*For the formal specification of all constructs, properties, and executor obligations, see [docs/TENOR.md](../TENOR.md).*
+*For the formal specification of all constructs, properties, and executor obligations, see [tenor-language-specification.md](tenor-language-specification.md).*

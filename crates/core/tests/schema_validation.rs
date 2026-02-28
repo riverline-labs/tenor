@@ -1,5 +1,5 @@
 //! Validates all positive conformance test expected JSONs against the formal
-//! interchange schema at docs/interchange-schema.json.
+//! interchange schema at schema/interchange-schema.json.
 
 use std::path::Path;
 
@@ -38,7 +38,7 @@ fn collect_expected_json_files(dir: &Path) -> Vec<std::path::PathBuf> {
 #[test]
 fn validate_all_positive_conformance_outputs_against_schema() {
     let schema_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/interchange-schema.json");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schema/interchange-schema.json");
     let schema_src = std::fs::read_to_string(&schema_path)
         .unwrap_or_else(|e| panic!("Failed to read schema at {}: {}", schema_path.display(), e));
     let schema_value: serde_json::Value = serde_json::from_str(&schema_src).unwrap();

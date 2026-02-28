@@ -3,8 +3,8 @@ use std::process;
 
 use crate::{report_error, OutputFormat};
 
-static INTERCHANGE_SCHEMA_STR: &str = include_str!("../../../../docs/interchange-schema.json");
-static MANIFEST_SCHEMA_STR: &str = include_str!("../../../../docs/manifest-schema.json");
+static INTERCHANGE_SCHEMA_STR: &str = include_str!("../../../../schema/interchange-schema.json");
+static MANIFEST_SCHEMA_STR: &str = include_str!("../../../../schema/manifest-schema.json");
 
 pub(crate) fn cmd_validate(bundle_path: &Path, output: OutputFormat, quiet: bool) {
     // Parse the interchange schema

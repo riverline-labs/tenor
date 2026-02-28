@@ -4,7 +4,7 @@ Pass 3 is responsible for resolving TypeDecl definitions and detecting cycles
 in the TypeDecl reference graph via DFS. §12.2 Pass 3; §4.5.
 
 SC-4 (named type declaration syntax) is now resolved — §4.5 TypeDecl has been
-added to TENOR.md. The tests below exercise Pass 3 cycle detection.
+added to tenor-language-specification.md. The tests below exercise Pass 3 cycle detection.
 
 ## Tests
 

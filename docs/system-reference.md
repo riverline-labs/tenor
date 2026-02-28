@@ -364,20 +364,16 @@ tenor/
 │   └── eval/                     Evaluator tests (positive, numeric, frozen)
 │
 ├── docs/
-│   ├── TENOR.md                  Formal specification v1.0
-│   ├── index.md                  Documentation hub
-│   ├── METHODOLOGY.md            Contract methodology
-│   ├── policies.md               Policy system documentation
-│   ├── system-contract-coordinator.md  System construct documentation
-│   ├── interchange-schema.json   JSON Schema for interchange format
-│   ├── manifest-schema.json      JSON Schema for TenorManifest
-│   └── guide/
-│       ├── what-is-tenor.md      High-level introduction
-│       ├── author-guide.md       Contract authoring guide
-│       ├── narrative.md          Design narrative
-│       └── minimal-kernel.md     Minimal language subset
+│   ├── tenor-language-specification.md  Formal specification v1.0
+│   ├── agent-orientation.md      Architecture, constraints, trust model (agent briefing)
+│   ├── author-guide.md           Contract authoring guide
+│   ├── narrative.md              Design narrative
+│   ├── what-is-tenor.md          High-level introduction
+│   └── minimal-kernel.md         Minimal language subset
 │
-├── schema/                       JSON Schema definitions
+├── schema/
+│   ├── interchange-schema.json   JSON Schema for interchange format
+│   └── manifest-schema.json      JSON Schema for TenorManifest
 └── domains/                      Example domain contracts
 ```
 
@@ -398,7 +394,7 @@ All private crates depend on public repo crates via git dependency. A local `.ca
 
 ## 5. Spec Summary
 
-The Tenor specification (`docs/TENOR.md`) is a formal v1.0 document defining the complete language semantics.
+The Tenor specification (`docs/tenor-language-specification.md`) is a formal v1.0 document defining the complete language semantics.
 
 ### §4 BaseType
 
@@ -1301,7 +1297,7 @@ cd crates/tenor-eval-wasm && wasm-pack build --target nodejs && wasm-pack test -
 | Command                                             | Description                      |
 | --------------------------------------------------- | -------------------------------- |
 | `tenor test conformance`                            | Run elaborator conformance suite |
-| `tenor ambiguity conformance/ --spec docs/TENOR.md` | AI ambiguity testing             |
+| `tenor ambiguity conformance/ --spec docs/tenor-language-specification.md` | AI ambiguity testing             |
 
 ---
 

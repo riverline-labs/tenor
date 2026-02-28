@@ -2,7 +2,7 @@
 //!
 //! Provides a `TestableExecutor` trait and `executor_conformance_tests!`
 //! macro for validating any executor implementation against the full
-//! set of executor obligations from TENOR.md Section 17.
+//! set of executor obligations from the Tenor specification (Section 17).
 
 pub mod fixtures;
 pub mod suite;

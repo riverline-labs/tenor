@@ -9,7 +9,7 @@ fact, entity, rule, operation, flow, type
 ```
 
 Uppercase construct names (`Rule`, `Fact`, `Entity`, `Operation`, `Flow`) appear in:
-- `docs/TENOR.md` when referring to formal construct definitions as concepts
+- `docs/tenor-language-specification.md` when referring to formal construct definitions as concepts
 - Comments and prose that discuss the language rather than writing it
 - The interchange JSON `"kind"` field values
 
@@ -65,7 +65,7 @@ Stages: workspace build, conformance suite, schema validation + unit tests, form
 ## Repository layout
 
 ```
-docs/TENOR.md           — full formal specification (v1.0)
+docs/tenor-language-specification.md           — full formal specification (v1.0)
 conformance/            — elaborator conformance suite
   positive/             — valid DSL -> expected interchange JSON
   negative/             — invalid DSL -> expected error JSON

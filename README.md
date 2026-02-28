@@ -6,7 +6,7 @@ Tenor is a finite, stratified, verdict-producing formal system for describing th
 
 > Any agent that can read this specification can fully understand a system described in it, without reading any implementation code.
 
-**Status:** v1.0 spec complete, three amendments integrated (Source Declarations, Multi-Instance Entities, Trust & Security). Elaborator, evaluator, static analyzer, migration engine, adapter framework, multi-instance entities, LLM-powered fact wiring, and full trust/signing test suite implemented and validated. 849 workspace + 127 conformance tests passing (976 total). Six domain contracts proven across real industries.
+**Status:** v1.0 spec complete, three amendments integrated (Source Declarations, Multi-Instance Entities, Trust & Security). Elaborator, evaluator, static analyzer, migration engine, adapter framework, multi-instance entities, LLM-powered fact wiring, and full trust/signing test suite implemented and validated. 849 workspace + 127 conformance + 27 WASM tests passing (1003 total). Six domain contracts proven across real industries.
 
 ---
 
@@ -299,10 +299,11 @@ The System scenario composes the supply chain and trade finance contracts via cr
 
 | Document                                      | Audience              |
 | --------------------------------------------- | --------------------- |
-| [Narrative](docs/guide/narrative.md)          | Everyone              |
-| [Formal specification](docs/TENOR.md)         | Language implementors |
-| [Author guide](docs/guide/author-guide.md)    | Contract authors      |
-| [What is Tenor?](docs/guide/what-is-tenor.md) | Decision makers       |
+| [Narrative](docs/narrative.md)                               | Everyone              |
+| [Formal specification](docs/tenor-language-specification.md) | Language implementors |
+| [System reference](docs/system-reference.md)                 | Architects, auditors  |
+| [Author guide](docs/author-guide.md)                        | Contract authors      |
+| [What is Tenor?](docs/what-is-tenor.md)                     | Decision makers       |
 
 ---
 
@@ -322,10 +323,11 @@ Cross-SDK conformance fixtures live in `sdks/conformance/` — every SDK is vali
 
 ```
 docs/
-  TENOR.md                -- full formal specification (v1.0, three amendments)
+  tenor-language-specification.md                -- full formal specification (v1.0, three amendments)
   guide/                  -- documentation for authors and decision makers
 schema/
-  tenor-interchange-v1.0.json  -- JSON Schema for interchange format
+  interchange-schema.json   -- JSON Schema for interchange format
+  manifest-schema.json      -- JSON Schema for TenorManifest
 conformance/              -- elaborator conformance suite (127 tests)
   positive/               -- valid DSL -> expected interchange JSON
   negative/               -- invalid DSL -> expected error JSON

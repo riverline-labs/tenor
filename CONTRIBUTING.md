@@ -1,6 +1,6 @@
 # Contributing
 
-Tenor's spec is frozen at v1.0. The spec (`docs/TENOR.md`) and conformance suite are the source of truth.
+Tenor's spec is frozen at v1.0. The spec (`docs/tenor-language-specification.md`) and conformance suite are the source of truth.
 
 ## Before you start
 
