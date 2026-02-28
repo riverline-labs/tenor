@@ -9,4 +9,4 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
+tokio = { version = "1", features = ["rt"] } # Minimal features — workspace "full" pulls mio which breaks WASM
