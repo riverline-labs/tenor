@@ -138,11 +138,21 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
             if let Some(d) = default {
                 let default_val = match (type_, d) {
                     (RawType::Decimal { precision, scale }, RawLiteral::Str(s)) => {
+                        let rounded = round_decimal_to_scale(s, *scale);
                         let mut dm = Map::new();
                         ins(&mut dm, K_KIND, json!("decimal_value"));
                         ins(&mut dm, "precision", json!(precision));
                         ins(&mut dm, "scale", json!(scale));
-                        ins(&mut dm, K_VALUE, json!(s));
+                        ins(&mut dm, K_VALUE, json!(rounded));
+                        Value::Object(dm)
+                    }
+                    (RawType::Decimal { precision, scale }, RawLiteral::Float(s)) => {
+                        let rounded = round_decimal_to_scale(s, *scale);
+                        let mut dm = Map::new();
+                        ins(&mut dm, K_KIND, json!("decimal_value"));
+                        ins(&mut dm, "precision", json!(precision));
+                        ins(&mut dm, "scale", json!(scale));
+                        ins(&mut dm, K_VALUE, json!(rounded));
                         Value::Object(dm)
                     }
                     _ => serialize_literal(d),
@@ -460,6 +470,110 @@ fn serialize_literal(lit: &RawLiteral) -> Value {
 
 fn money_decimal_precision_scale(_amount: &str) -> (u32, u32) {
     (10, 2)
+}
+
+/// Round a decimal string to `target_scale` fractional digits using
+/// round-half-to-even (banker's rounding, per TENOR.md §13).
+fn round_decimal_to_scale(s: &str, target_scale: u32) -> String {
+    let is_negative = s.starts_with('-');
+    let abs_s = if is_negative { &s[1..] } else { s };
+    let (integer_part, frac_part) = if let Some(dot) = abs_s.find('.') {
+        (&abs_s[..dot], &abs_s[dot + 1..])
+    } else {
+        (abs_s, "")
+    };
+    let ts = target_scale as usize;
+
+    if frac_part.len() <= ts {
+        // Pad with zeros to reach target scale
+        let padded = if ts == 0 {
+            integer_part.to_string()
+        } else {
+            format!("{}.{:0<width$}", integer_part, frac_part, width = ts)
+        };
+        return if is_negative {
+            format!("-{}", padded)
+        } else {
+            padded
+        };
+    }
+
+    // Need to round — frac_part.len() > ts
+    let kept = &frac_part[..ts];
+    let rest = &frac_part[ts..];
+    let first_removed = rest.as_bytes()[0] - b'0';
+
+    let round_up = if first_removed < 5 {
+        false
+    } else if first_removed > 5 {
+        true
+    } else {
+        // Exactly 5 — check for trailing non-zero digits
+        let has_trailing = rest[1..].bytes().any(|b| b != b'0');
+        if has_trailing {
+            true
+        } else {
+            // Tie: round to even (the last kept digit)
+            let last_kept_digit = if ts > 0 {
+                kept.as_bytes()[ts - 1] - b'0'
+            } else {
+                integer_part
+                    .as_bytes()
+                    .last()
+                    .map(|b| b - b'0')
+                    .unwrap_or(0)
+            };
+            last_kept_digit % 2 != 0
+        }
+    };
+
+    if !round_up {
+        let result = if ts > 0 {
+            format!("{}.{}", integer_part, kept)
+        } else {
+            integer_part.to_string()
+        };
+        return if is_negative {
+            format!("-{}", result)
+        } else {
+            result
+        };
+    }
+
+    // Increment: collect integer + kept-fraction digits, add 1 from the end
+    let mut digits: Vec<u8> = integer_part
+        .bytes()
+        .chain(kept.bytes())
+        .map(|b| b - b'0')
+        .collect();
+    let mut carry = 1u8;
+    for d in digits.iter_mut().rev() {
+        let sum = *d + carry;
+        *d = sum % 10;
+        carry = sum / 10;
+        if carry == 0 {
+            break;
+        }
+    }
+
+    let int_len = integer_part.len();
+    let mut r = String::new();
+    if is_negative {
+        r.push('-');
+    }
+    if carry > 0 {
+        r.push('1');
+    }
+    for &d in &digits[..int_len] {
+        r.push((b'0' + d) as char);
+    }
+    if ts > 0 {
+        r.push('.');
+        for &d in &digits[int_len..] {
+            r.push((b'0' + d) as char);
+        }
+    }
+    r
 }
 
 fn decimal_precision_scale(s: &str) -> (u32, u32) {

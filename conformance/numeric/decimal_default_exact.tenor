@@ -1,0 +1,8 @@
+// Numeric test — decimal_default_exact
+// Decimal(10, 2) with default "2.30" requires no rounding; trailing zero preserved.
+
+fact exact_value {
+  type:    Decimal(precision: 10, scale: 2)
+  source:  "finance.exact_value"
+  default: "2.30"
+}

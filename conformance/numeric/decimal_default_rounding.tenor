@@ -1,0 +1,9 @@
+// Numeric test — decimal_default_rounding
+// Decimal(10, 2) with default "2.345" rounds to "2.34" using banker's rounding.
+// At the midpoint (5), the preceding digit 4 is even, so we round down.
+
+fact rounded_down {
+  type:    Decimal(precision: 10, scale: 2)
+  source:  "finance.rounded_down"
+  default: "2.345"
+}
