@@ -1,0 +1,45 @@
+// Positive test: Flow step with valid persona from operation's allowed_personas
+// Covers: KL-4 persona validation — persona is declared and authorized
+// Expected: elaborates without error
+
+persona agent
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [(draft, submitted)]
+}
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+operation submit {
+  allowed_personas: [agent]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed]
+}
+
+flow submit_flow {
+  snapshot: at_initiation
+  entry:    step_submit
+
+  steps: {
+    step_submit: OperationStep {
+      op:      submit
+      persona: agent
+      outcomes: {
+        success: Terminal(done)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

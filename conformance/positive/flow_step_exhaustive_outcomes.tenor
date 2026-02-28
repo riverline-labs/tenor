@@ -1,0 +1,47 @@
+// Positive test: Flow step with exhaustive outcome routing
+// Covers: KL-3 outcome exhaustiveness — all operation outcomes are routed
+// Expected: elaborates without error
+
+persona adjudicator
+
+entity Claim {
+  states:  [review, approved, rejected]
+  initial: review
+  transitions: [(review, approved), (review, rejected)]
+}
+
+fact claim_eligible {
+  type:   Bool
+  source: "claims.eligible"
+}
+
+rule check_eligible {
+  stratum: 0
+  when:    claim_eligible = true
+  produce: verdict eligible_v { payload: Bool = true }
+}
+
+operation decide_claim {
+  allowed_personas: [adjudicator]
+  precondition:     verdict_present(eligible_v)
+  outcomes:         [approved, rejected]
+  effects:          [(Claim, review, approved, approved), (Claim, review, rejected, rejected)]
+  error_contract:   [precondition_failed]
+}
+
+flow claim_decision {
+  snapshot: at_initiation
+  entry:    step_decide
+
+  steps: {
+    step_decide: OperationStep {
+      op:      decide_claim
+      persona: adjudicator
+      outcomes: {
+        approved: Terminal(success)
+        rejected: Terminal(failure)
+      }
+      on_failure: Terminate(outcome: error)
+    }
+  }
+}

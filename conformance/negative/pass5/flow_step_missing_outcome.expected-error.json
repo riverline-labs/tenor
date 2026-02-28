@@ -1,0 +1,9 @@
+{
+  "construct_id": "claim_flow",
+  "construct_kind": "Flow",
+  "field": "steps.step_decide.outcomes",
+  "file": "flow_step_missing_outcome.tenor",
+  "line": 35,
+  "message": "flow 'claim_flow' step 'step_decide': outcome 'denied' from operation 'decide_claim' is not handled in outcome routing",
+  "pass": 5
+}

@@ -3,7 +3,7 @@
 use crate::ast::*;
 use crate::error::ElabError;
 use crate::pass2_index::Index;
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 // ── Flow validation ───────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ pub(super) fn validate_flow(
     entry_line: u32,
     steps: &BTreeMap<String, RawStep>,
     prov: &Provenance,
-    _index: &Index,
+    index: &Index,
 ) -> Result<(), ElabError> {
     if !steps.contains_key(entry) {
         return Err(ElabError::new(
@@ -124,6 +124,99 @@ pub(super) fn validate_flow(
                 }
             }
             RawStep::ParallelStep { .. } => {}
+        }
+    }
+
+    // KL-3: Validate outcome exhaustiveness for OperationSteps
+    for (step_id, step) in steps {
+        if let RawStep::OperationStep {
+            op, outcomes, line, ..
+        } = step
+        {
+            if let Some(declared) = index.operation_outcomes.get(op.as_str()) {
+                let expected: BTreeSet<&str> = if declared.is_empty() {
+                    // No explicit outcomes => implicit single "success"
+                    std::iter::once("success").collect()
+                } else {
+                    declared.iter().map(String::as_str).collect()
+                };
+                let routed: BTreeSet<&str> = outcomes.keys().map(String::as_str).collect();
+
+                if let Some(missing) = expected.difference(&routed).next() {
+                    return Err(ElabError::new(
+                        5,
+                        Some("Flow"),
+                        Some(id),
+                        Some(&format!("steps.{}.outcomes", step_id)),
+                        &prov.file,
+                        *line,
+                        format!(
+                            "flow '{}' step '{}': outcome '{}' from operation '{}' is not handled in outcome routing",
+                            id, step_id, missing, op
+                        ),
+                    ));
+                }
+                if let Some(extra) = routed.difference(&expected).next() {
+                    return Err(ElabError::new(
+                        5,
+                        Some("Flow"),
+                        Some(id),
+                        Some(&format!("steps.{}.outcomes", step_id)),
+                        &prov.file,
+                        *line,
+                        format!(
+                            "flow '{}' step '{}': outcome routing references '{}' which is not declared by operation '{}'",
+                            id, step_id, extra, op
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
+    // KL-4: Validate persona references in flow steps
+    for (step_id, step) in steps {
+        let (persona, op, line) = match step {
+            RawStep::OperationStep {
+                persona, op, line, ..
+            } => (persona.as_str(), Some(op.as_str()), *line),
+            _ => continue,
+        };
+
+        // Check persona is declared (only if personas exist in the contract)
+        if !index.personas.is_empty() && !index.personas.contains_key(persona) {
+            return Err(ElabError::new(
+                5,
+                Some("Flow"),
+                Some(id),
+                Some(&format!("steps.{}.persona", step_id)),
+                &prov.file,
+                line,
+                format!(
+                    "flow '{}' step '{}': persona '{}' is not declared",
+                    id, step_id, persona
+                ),
+            ));
+        }
+
+        // Check persona is in the operation's allowed_personas
+        if let Some(op_id) = op {
+            if let Some(allowed) = index.operation_allowed_personas.get(op_id) {
+                if !allowed.iter().any(|p| p == persona) {
+                    return Err(ElabError::new(
+                        5,
+                        Some("Flow"),
+                        Some(id),
+                        Some(&format!("steps.{}.persona", step_id)),
+                        &prov.file,
+                        line,
+                        format!(
+                            "flow '{}' step '{}': persona '{}' is not in allowed_personas of operation '{}'",
+                            id, step_id, persona, op_id
+                        ),
+                    ));
+                }
+            }
         }
     }
 

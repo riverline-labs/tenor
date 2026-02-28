@@ -1,0 +1,44 @@
+// Negative test — Pass 5
+// An OperationStep does not route all outcomes declared by its operation.
+// KL-3: Flow outcome exhaustiveness validation
+
+entity Claim {
+  states:  [open, approved, denied]
+  initial: open
+  transitions: [(open, approved), (open, denied)]
+}
+
+fact eligible {
+  type:   Bool
+  source: "claims.eligible"
+}
+
+rule check_eligible {
+  stratum: 0
+  when:    eligible = true
+  produce: verdict eligible_v { payload: Bool = true }
+}
+
+operation decide_claim {
+  allowed_personas: [agent]
+  precondition:     verdict_present(eligible_v)
+  outcomes:         [approved, denied]
+  effects:          [(Claim, open, approved, approved), (Claim, open, denied, denied)]
+  error_contract:   [precondition_failed]
+}
+
+flow claim_flow {
+  snapshot: at_initiation
+  entry:    step_decide
+
+  steps: {
+    step_decide: OperationStep {
+      op:      decide_claim
+      persona: agent
+      outcomes: {
+        approved: Terminal(success)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

@@ -20,6 +20,10 @@ pub struct Index {
     pub rule_verdicts: HashMap<String, String>,
     /// Map from verdict_type -> (rule_id, stratum) of the producing rule
     pub verdict_strata: HashMap<String, (String, i64)>,
+    /// Map from operation_id -> declared outcomes (empty vec = implicit ["success"])
+    pub operation_outcomes: HashMap<String, Vec<String>>,
+    /// Map from operation_id -> allowed_personas list
+    pub operation_allowed_personas: HashMap<String, Vec<String>>,
 }
 
 pub fn build_index(constructs: &[RawConstruct]) -> Result<Index, ElabError> {
@@ -35,6 +39,8 @@ pub fn build_index(constructs: &[RawConstruct]) -> Result<Index, ElabError> {
         sources: HashMap::new(),
         rule_verdicts: HashMap::new(),
         verdict_strata: HashMap::new(),
+        operation_outcomes: HashMap::new(),
+        operation_allowed_personas: HashMap::new(),
     };
 
     for c in constructs {
@@ -99,7 +105,13 @@ pub fn build_index(constructs: &[RawConstruct]) -> Result<Index, ElabError> {
                 idx.verdict_strata
                     .insert(verdict_type.clone(), (id.clone(), *stratum));
             }
-            RawConstruct::Operation { id, prov, .. } => {
+            RawConstruct::Operation {
+                id,
+                outcomes,
+                allowed_personas,
+                prov,
+                ..
+            } => {
                 if let Some(first) = idx.operations.get(id) {
                     return Err(ElabError::new(
                         2,
@@ -115,6 +127,9 @@ pub fn build_index(constructs: &[RawConstruct]) -> Result<Index, ElabError> {
                     ));
                 }
                 idx.operations.insert(id.clone(), prov.clone());
+                idx.operation_outcomes.insert(id.clone(), outcomes.clone());
+                idx.operation_allowed_personas
+                    .insert(id.clone(), allowed_personas.clone());
             }
             RawConstruct::Flow { id, prov, .. } => {
                 if let Some(first) = idx.flows.get(id) {

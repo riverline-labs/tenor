@@ -1,0 +1,9 @@
+{
+  "construct_id": "submit_flow",
+  "construct_kind": "Flow",
+  "field": "steps.step_submit.outcomes",
+  "file": "flow_step_extra_outcome.tenor",
+  "line": 34,
+  "message": "flow 'submit_flow' step 'step_submit': outcome routing references 'approved' which is not declared by operation 'submit'",
+  "pass": 5
+}
