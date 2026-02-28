@@ -85,10 +85,9 @@ impl RegistryClient {
         archive_path: &Path,
         manifest: &TemplateManifest,
     ) -> Result<PublishResponse, String> {
-        let token = self
-            .token
-            .as_deref()
-            .ok_or_else(|| "error: --token or TENOR_REGISTRY_TOKEN required for publishing".to_string())?;
+        let token = self.token.as_deref().ok_or_else(|| {
+            "error: --token or TENOR_REGISTRY_TOKEN required for publishing".to_string()
+        })?;
 
         let archive_bytes = std::fs::read(archive_path)
             .map_err(|e| format!("could not read archive '{}': {}", archive_path.display(), e))?;
@@ -263,17 +262,20 @@ fn classify_http_error(err: ureq::Error, operation: &str) -> String {
         || msg.contains("os error 61")
         || msg.contains("os error 111")
     {
-        return format!(
-            "error: could not connect to registry ({operation}): {msg}"
-        );
+        return format!("error: could not connect to registry ({operation}): {msg}");
     }
 
     // Parse the HTTP status if present
     if let Some(status) = extract_status_from_ureq_error(&msg) {
         match status {
-            401 => return format!("error: registry returned 401 Unauthorized — check your token"),
-            403 => return format!("error: registry returned 403 Forbidden — insufficient permissions"),
-            404 => return format!("error: registry returned 404 Not Found"),
+            401 => {
+                return "error: registry returned 401 Unauthorized — check your token".to_string()
+            }
+            403 => {
+                return "error: registry returned 403 Forbidden — insufficient permissions"
+                    .to_string()
+            }
+            404 => return "error: registry returned 404 Not Found".to_string(),
             500..=599 => return format!("error: registry server error ({status})"),
             _ => {}
         }
@@ -305,7 +307,9 @@ fn classify_download_error(err: ureq::Error, name: &str, version: Option<&str>) 
                     format!("error: template '{name}' not found in registry")
                 };
             }
-            401 => return "error: registry returned 401 Unauthorized — check your token".to_string(),
+            401 => {
+                return "error: registry returned 401 Unauthorized — check your token".to_string()
+            }
             500..=599 => return format!("error: registry server error ({status})"),
             _ => {}
         }
