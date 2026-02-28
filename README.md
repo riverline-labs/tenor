@@ -6,7 +6,7 @@ Tenor is a finite, stratified, verdict-producing formal system for describing th
 
 > Any agent that can read this specification can fully understand a system described in it, without reading any implementation code.
 
-**Status:** v1.0 spec complete, three amendments integrated (Source Declarations, Multi-Instance Entities, Trust & Security). Elaborator, evaluator, static analyzer, migration engine, adapter framework, multi-instance entities, LLM-powered fact wiring, and full trust/signing test suite implemented and validated. 849 workspace + 119 conformance tests passing (968 total). Six domain contracts proven across real industries.
+**Status:** v1.0 spec complete, three amendments integrated (Source Declarations, Multi-Instance Entities, Trust & Security). Elaborator, evaluator, static analyzer, migration engine, adapter framework, multi-instance entities, LLM-powered fact wiring, and full trust/signing test suite implemented and validated. 849 workspace + 127 conformance tests passing (976 total). Six domain contracts proven across real industries.
 
 ---
 
@@ -326,7 +326,7 @@ docs/
   guide/                  -- documentation for authors and decision makers
 schema/
   tenor-interchange-v1.0.json  -- JSON Schema for interchange format
-conformance/              -- elaborator conformance suite (119 tests)
+conformance/              -- elaborator conformance suite (127 tests)
   positive/               -- valid DSL -> expected interchange JSON
   negative/               -- invalid DSL -> expected error JSON
   numeric/                -- decimal/money precision fixtures
@@ -366,10 +366,10 @@ crates/
 # Build all crates
 cargo build --workspace
 
-# Run conformance suite (119 tests)
+# Run conformance suite (127 tests)
 cargo run -p tenor-cli -- test conformance
 
-# Run all tests (849 workspace + 119 conformance)
+# Run all tests (849 workspace + 127 conformance)
 cargo test --workspace
 ```
 

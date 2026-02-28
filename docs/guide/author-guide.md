@@ -33,7 +33,7 @@ Tenor's guarantees come from four independent layers, each verifiable by a diffe
 
 **Layer 1: Language guarantees.** Properties S1 through S8 hold for any valid contract, by construction. If your contract elaborates without error, you know: every entity's state space is finite and fully enumerable (S1). Every reachable state has been verified (S2). Every persona's authority boundary is statically derivable (S4). Every flow path terminates (S6). Every verdict type is produced by exactly one rule (S8). These are not runtime checks. They are structural truths the elaborator proves during compilation.
 
-**Layer 2: Elaborator trust.** A conforming elaborator guarantees that the interchange JSON faithfully represents the contract. The conformance test suite (107 fixtures) verifies this. If two elaborators produce the same interchange JSON for the same `.tenor` file, they agree on the contract's meaning. This is how you get tool interoperability without trusting any single implementation.
+**Layer 2: Elaborator trust.** A conforming elaborator guarantees that the interchange JSON faithfully represents the contract. The conformance test suite (127 fixtures) verifies this. If two elaborators produce the same interchange JSON for the same `.tenor` file, they agree on the contract's meaning. This is how you get tool interoperability without trusting any single implementation.
 
 **Layer 3: Executor trust.** Executor obligations E1 through E14 are precisely specified in the Tenor specification. An executor that claims conformance must honor frozen verdict semantics, entity state machine transitions, persona authority checks, and flow orchestration rules. These obligations are testable: you can verify an executor's conformance against known contract/fact/expected-outcome triples.
 
@@ -209,6 +209,22 @@ system order_system {
 System composition preserves all single-contract guarantees and adds cross-contract analysis. The `tenor check` command reports cross-contract flow paths (S6 extended) and verifies that trigger chains do not form cycles.
 
 **Common mistake: sharing personas or entities that do not genuinely overlap.** If two contracts have no natural persona overlap, use empty `shared_personas: []`. Do not manufacture shared personas to "connect" contracts. The trigger mechanism handles cross-contract coordination. Shared personas mean the same role has authority in both contracts -- that is a domain truth, not a wiring convenience.
+
+### 8. Source Declarations
+
+A Source declaration describes how a Fact's external data is fetched — the protocol, endpoint, field mapping, and polling or subscription behavior. Sources separate the *what* (the Fact) from the *how* (the adapter wiring). A Fact names its source system and field; a Source declaration provides the connection details the adapter framework needs to actually retrieve the value. Sources support multiple protocols (`rest`, `graphql`, `grpc`, `database`, `message_queue`) and can declare extension-specific metadata for custom adapter implementations. See §5 of the specification for the full Source grammar.
+
+### 9. TaggedUnion Type
+
+A TaggedUnion is a sum type: a value that is exactly one of several named variants, where each variant carries its own typed payload. Declare a TaggedUnion with `type` and use it as a Fact type or Record field type. TaggedUnions are useful when a single Fact can take structurally different shapes depending on context — for example, a payment method that is either a credit card (with card number and expiry) or a bank transfer (with routing and account numbers). The elaborator resolves TaggedUnion references through TypeDecl and inlines the full variant structure into interchange JSON. See §4.4 of the specification.
+
+### 10. Multi-Instance Entities
+
+By default, an Entity tracks a single state machine instance. A multi-instance Entity tracks many instances of the same state machine, each identified by a key Fact. Declare a multi-instance Entity by adding `instance_key: <fact_id>` where the referenced Fact uniquely identifies each instance. Operations on multi-instance Entities apply their effects to the specific instance identified by the key value at execution time. The elaborator validates that the instance key references a declared Fact and that all structural guarantees (S1, S2) hold per-instance. See §6.2 of the specification.
+
+### 11. Migration
+
+When you change a contract — adding Facts, renaming states, modifying transitions — the `tenor migrate` command computes the structural diff between the old and new interchange JSON and generates a migration plan. The migration engine classifies each change by compatibility level (backward-compatible additions, breaking removals, state remappings) and produces executable migration steps. Migration plans are deterministic: given the same old and new contracts, the same plan is always generated. This lets you evolve contracts over time without manual diffing or ad-hoc upgrade scripts. See the migration engine in `crates/eval/src/migration/`.
 
 ---
 

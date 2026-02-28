@@ -18,6 +18,27 @@ pub(super) fn validate_operation(
     prov: &Provenance,
     index: &Index,
 ) -> Result<(), ElabError> {
+    // Validate outcome uniqueness (§9 — outcome labels must be unique)
+    {
+        let mut seen: HashSet<&str> = HashSet::new();
+        for outcome in outcomes {
+            if !seen.insert(outcome.as_str()) {
+                return Err(ElabError::new(
+                    5,
+                    Some("Operation"),
+                    Some(id),
+                    Some("outcomes"),
+                    &prov.file,
+                    prov.line,
+                    format!(
+                        "duplicate outcome '{}'; outcome labels must be unique within an Operation",
+                        outcome
+                    ),
+                ));
+            }
+        }
+    }
+
     if allowed_personas.is_empty() {
         return Err(ElabError::new(
             5, Some("Operation"), Some(id),

@@ -1,0 +1,9 @@
+// Numeric test: Money default at rounding boundary with banker's rounding.
+// Money(currency: "USD") amount "49.995" at scale-2 boundary.
+// Preceding digit 9 is odd, so round up: "49.995" -> "50.00".
+
+fact threshold {
+  type:    Money(currency: "USD")
+  source:  "finance.threshold"
+  default: Money { amount: "49.995", currency: "USD" }
+}

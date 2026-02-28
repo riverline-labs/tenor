@@ -16,3 +16,4 @@ are resolved relative to this directory.
 | missing_import | missing_import.tenor | Import of nonexistent file |
 | import_cycle | import_cycle_a.tenor, import_cycle_b.tenor | Circular import |
 | dup_across_files | dup_across_files_a.tenor, dup_across_files_b.tenor | Same-kind duplicate id across files |
+| type_library_import | type_library_import_a.tenor, type_library_import_b.tenor | Type library file contains import declaration (§4.6) |

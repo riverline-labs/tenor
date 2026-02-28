@@ -1,0 +1,8 @@
+// Positive test: Fact with DateTime type and datetime string default value
+// Exercises DateTime default serialization in fact defaults.
+
+fact created_at {
+  type:    DateTime
+  source:  "audit_service.created_at"
+  default: "2024-01-15T09:30:00Z"
+}

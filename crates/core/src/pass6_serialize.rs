@@ -155,6 +155,20 @@ fn serialize_construct(c: &RawConstruct, fact_types: &HashMap<String, RawType>) 
                         ins(&mut dm, K_VALUE, json!(rounded));
                         Value::Object(dm)
                     }
+                    (RawType::Money { .. }, RawLiteral::Money { amount, currency }) => {
+                        let (p, sc) = money_decimal_precision_scale(amount);
+                        let rounded = round_decimal_to_scale(amount, sc);
+                        let mut amount_m = Map::new();
+                        ins(&mut amount_m, K_KIND, json!("decimal_value"));
+                        ins(&mut amount_m, "precision", json!(p));
+                        ins(&mut amount_m, "scale", json!(sc));
+                        ins(&mut amount_m, K_VALUE, json!(rounded));
+                        let mut m = Map::new();
+                        ins(&mut m, "amount", Value::Object(amount_m));
+                        ins(&mut m, "currency", json!(currency));
+                        ins(&mut m, K_KIND, json!("money_value"));
+                        Value::Object(m)
+                    }
                     _ => serialize_literal(d),
                 };
                 ins(&mut m, "default", default_val);

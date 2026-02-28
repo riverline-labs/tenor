@@ -194,6 +194,39 @@ fn load_file(
     let tokens = lexer::lex(&src, &filename)?;
     let constructs = parser::parse(&tokens, &filename)?;
 
+    // Check type library import constraint (§4.6):
+    // A file containing only TypeDecl constructs is a type library.
+    // Type library files may not contain import declarations.
+    let has_imports = constructs
+        .iter()
+        .any(|c| matches!(c, RawConstruct::Import { .. }));
+    let has_non_import = constructs
+        .iter()
+        .any(|c| !matches!(c, RawConstruct::Import { .. }));
+    let all_non_import_are_typedecl = constructs
+        .iter()
+        .filter(|c| !matches!(c, RawConstruct::Import { .. }))
+        .all(|c| matches!(c, RawConstruct::TypeDecl { .. }));
+
+    if has_imports && has_non_import && all_non_import_are_typedecl {
+        let import_prov = constructs
+            .iter()
+            .find_map(|c| match c {
+                RawConstruct::Import { prov, .. } => Some(prov),
+                _ => None,
+            })
+            .expect("has_imports guarantees at least one Import");
+        return Err(ElabError::new(
+            1,
+            None,
+            None,
+            Some("import"),
+            &import_prov.file,
+            import_prov.line,
+            "type library files may not contain import declarations; a file containing only TypeDecl constructs is a type library and must be self-contained".to_string(),
+        ));
+    }
+
     stack_set.insert(canon.clone());
     stack.push(canon.clone());
 
