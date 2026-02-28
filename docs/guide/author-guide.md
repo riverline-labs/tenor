@@ -33,7 +33,7 @@ Tenor's guarantees come from four independent layers, each verifiable by a diffe
 
 **Layer 1: Language guarantees.** Properties S1 through S8 hold for any valid contract, by construction. If your contract elaborates without error, you know: every entity's state space is finite and fully enumerable (S1). Every reachable state has been verified (S2). Every persona's authority boundary is statically derivable (S4). Every flow path terminates (S6). Every verdict type is produced by exactly one rule (S8). These are not runtime checks. They are structural truths the elaborator proves during compilation.
 
-**Layer 2: Elaborator trust.** A conforming elaborator guarantees that the interchange JSON faithfully represents the contract. The conformance test suite (180+ fixtures) verifies this. If two elaborators produce the same interchange JSON for the same `.tenor` file, they agree on the contract's meaning. This is how you get tool interoperability without trusting any single implementation.
+**Layer 2: Elaborator trust.** A conforming elaborator guarantees that the interchange JSON faithfully represents the contract. The conformance test suite (96 fixtures) verifies this. If two elaborators produce the same interchange JSON for the same `.tenor` file, they agree on the contract's meaning. This is how you get tool interoperability without trusting any single implementation.
 
 **Layer 3: Executor trust.** Executor obligations E1 through E14 are precisely specified in the Tenor specification. An executor that claims conformance must honor frozen verdict semantics, entity state machine transitions, persona authority checks, and flow orchestration rules. These obligations are testable: you can verify an executor's conformance against known contract/fact/expected-outcome triples.
 
@@ -106,7 +106,7 @@ rule weight_acceptable {
 rule shipment_ready {
   stratum: 1
   when:    verdict_present(weight_ok)
-         ^ verdict_present(docs_complete)
+         ∧ verdict_present(docs_complete)
   produce: verdict ready_to_ship { payload: Bool = true }
 }
 ```
@@ -487,16 +487,16 @@ rule diagnosis_covered {
 rule documentation_sufficient {
   stratum: 1
   when:    verdict_present(records_complete)
-         ^ verdict_present(records_relevant)
+         ∧ verdict_present(records_relevant)
   produce: verdict documentation_ok { payload: Bool = true }
 }
 
 rule policy_criteria_satisfied {
   stratum: 1
   when:    verdict_present(diagnosis_is_covered)
-         ^ verdict_present(treatment_is_formulary)
-         ^ verdict_present(provider_in_network)
-         ^ verdict_present(step_therapy_done)
+         ∧ verdict_present(treatment_is_formulary)
+         ∧ verdict_present(provider_in_network)
+         ∧ verdict_present(step_therapy_done)
   produce: verdict policy_satisfied { payload: Bool = true }
 }
 ```
@@ -507,15 +507,15 @@ rule policy_criteria_satisfied {
 rule can_approve {
   stratum: 2
   when:    verdict_present(documentation_ok)
-         ^ verdict_present(policy_satisfied)
-         ^ verdict_present(clinical_criteria_passed)
+         ∧ verdict_present(policy_satisfied)
+         ∧ verdict_present(clinical_criteria_passed)
   produce: verdict authorization_approved { payload: Bool = true }
 }
 
 rule should_deny {
   stratum: 2
   when:    verdict_present(documentation_ok)
-         ^ ~verdict_present(clinical_criteria_passed)
+         ∧ ¬verdict_present(clinical_criteria_passed)
   produce: verdict authorization_denied { payload: Bool = true }
 }
 ```
@@ -526,7 +526,7 @@ rule should_deny {
 rule can_overturn_denial {
   stratum: 3
   when:    verdict_present(appeal_meritorious)
-         | verdict_present(new_evidence_available)
+         ∨ verdict_present(new_evidence_available)
   produce: verdict overturn_recommended { payload: Bool = true }
 }
 ```

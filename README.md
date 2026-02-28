@@ -6,7 +6,7 @@ Tenor is a finite, stratified, verdict-producing formal system for describing th
 
 > Any agent that can read this specification can fully understand a system described in it, without reading any implementation code.
 
-**Status:** v1.0 spec complete, three amendments integrated (Source Declarations, Multi-Instance Entities, Trust & Security). Elaborator, evaluator, static analyzer, migration engine, adapter framework, multi-instance entities, LLM-powered fact wiring, and full trust/signing test suite implemented and validated. 729 workspace + 82 conformance tests passing (811 total). Six domain contracts proven across real industries.
+**Status:** v1.0 spec complete, three amendments integrated (Source Declarations, Multi-Instance Entities, Trust & Security). Elaborator, evaluator, static analyzer, migration engine, adapter framework, multi-instance entities, LLM-powered fact wiring, and full trust/signing test suite implemented and validated. 846 workspace + 96 conformance tests passing (942 total). Six domain contracts proven across real industries.
 
 ---
 
@@ -209,11 +209,8 @@ The three-layer flow compatibility checker analyzes in-flight flows per-instance
 # Analyze migration impact
 tenor migrate v1.json v2.json
 
-# Dry-run against live database
-tenor migrate v1.json v2.json --dry-run
-
-# Execute with policy
-tenor migrate v1.json v2.json --policy force-migrate --state-map "Order:cancelled->archived"
+# Skip confirmation prompt
+tenor migrate v1.json v2.json --yes
 ```
 
 ---
@@ -309,6 +306,18 @@ The System scenario composes the supply chain and trade finance contracts via cr
 
 ---
 
+## SDKs
+
+| Language   | Directory          | Runtime                    | Install             |
+| ---------- | ------------------ | -------------------------- | ------------------- |
+| TypeScript | `sdks/typescript/` | WASM evaluator + HTTP client | `npm install`     |
+| Python     | `sdks/python/`     | PyO3 native module         | `pip install`       |
+| Go         | `sdks/go/`         | wazero WASM runtime        | `go get`            |
+
+Cross-SDK conformance fixtures live in `sdks/conformance/` — every SDK is validated against the same test cases.
+
+---
+
 ## Structure
 
 ```
@@ -317,7 +326,7 @@ docs/
   guide/                  -- documentation for authors and decision makers
 schema/
   tenor-interchange-v1.0.json  -- JSON Schema for interchange format
-conformance/              -- elaborator conformance suite (82 tests)
+conformance/              -- elaborator conformance suite (96 tests)
   positive/               -- valid DSL -> expected interchange JSON
   negative/               -- invalid DSL -> expected error JSON
   numeric/                -- decimal/money precision fixtures
@@ -328,8 +337,14 @@ conformance/              -- elaborator conformance suite (82 tests)
   analysis/               -- static analysis fixtures
   eval/                   -- evaluator fixtures
   manifest/               -- manifest-based test fixtures
-  source/                 -- source declaration fixtures
+  ambiguity/              -- AI ambiguity testing fixtures
 domains/                  -- validated domain contracts
+sdks/
+  typescript/             -- TypeScript SDK (WASM evaluator + HTTP client)
+  python/                 -- Python SDK (PyO3 native module)
+  go/                     -- Go SDK (wazero WASM runtime)
+  conformance/            -- cross-SDK conformance test fixtures
+builder/                  -- Tenor Builder SPA (visual contract editor)
 crates/
   core/                   -- library: elaboration pipeline (6-pass)
   cli/                    -- binary: tenor command-line tool
@@ -340,6 +355,7 @@ crates/
   codegen/                -- library: code generation (scaffold)
   lsp/                    -- library: Language Server Protocol (scaffold)
   tenor-eval-wasm/        -- library: WASM evaluator for browsers and edge
+  executor-conformance/   -- library: executor conformance suite
 ```
 
 ---
@@ -350,32 +366,62 @@ crates/
 # Build all crates
 cargo build --workspace
 
-# Run conformance suite (82 tests)
+# Run conformance suite (96 tests)
 cargo run -p tenor-cli -- test conformance
 
-# Run all tests (729 workspace + 82 conformance)
+# Run all tests (846 workspace + 96 conformance)
 cargo test --workspace
+```
 
-# Elaborate a .tenor file to interchange JSON
-cargo run -p tenor-cli -- elaborate path/to/file.tenor
+## CLI
 
-# Generate manifest with interchange bundle
-cargo run -p tenor-cli -- elaborate --manifest path/to/file.tenor
+25 subcommands. Run `tenor --help` for full details.
 
-# Validate interchange JSON against schema
-cargo run -p tenor-cli -- validate path/to/bundle.json
+```bash
+# Elaboration & validation
+tenor elaborate file.tenor              # Elaborate .tenor to interchange JSON
+tenor elaborate --manifest file.tenor   # Generate TenorManifest with interchange bundle
+tenor validate bundle.json              # Validate interchange JSON against schema
+tenor check file.tenor                  # Run static analysis (S1-S8)
+tenor diff v1.json v2.json              # Diff two interchange bundles
+tenor diff v1.json v2.json --breaking   # Classify changes as breaking/non-breaking
+tenor explain file.tenor                # Explain contract in natural language
 
-# Run static analysis on a contract
-cargo run -p tenor-cli -- check path/to/file.tenor
+# Evaluation & execution
+tenor eval bundle.json --facts facts.json                  # Evaluate contract against facts
+tenor eval bundle.json --facts facts.json --flow release   # Execute a flow
+tenor migrate v1.json v2.json                              # Analyze migration between versions
+tenor serve --port 8080 contract.tenor                     # Start HTTP API server
+tenor agent file.tenor                                     # Start interactive agent shell
 
-# Evaluate a contract against facts
-cargo run -p tenor-cli -- eval path/to/bundle.json --facts path/to/facts.json
+# Source wiring
+tenor connect file.tenor --environment openapi.json             # LLM-powered fact wiring
+tenor connect file.tenor --environment openapi.json --heuristic # Heuristic matching (no LLM)
+tenor connect --apply tenor-connect-review.toml                 # Apply reviewed mappings
 
-# Analyze migration between contract versions
-cargo run -p tenor-cli -- migrate v1.json v2.json
+# Code generation & UI
+tenor generate typescript file.tenor --out ./generated   # Generate TypeScript bindings
+tenor ui contract.tenor --out ./tenor-ui                 # Generate React application
+tenor builder                                            # Start Builder SPA dev server
 
-# Connect contract to environment (LLM-powered fact wiring)
-cargo run -p tenor-cli -- connect path/to/file.tenor --environment openapi.json
+# Template registry
+tenor pack                        # Package contract template
+tenor publish --token TOKEN       # Publish to registry
+tenor search "query"              # Search templates
+tenor install template-name       # Install template
+tenor deploy template-name        # Deploy to hosted platform
+
+# Trust & signing
+tenor keygen                             # Generate Ed25519 signing keypair
+tenor sign bundle.json --key secret.key  # Sign interchange bundle
+tenor verify bundle.signed.json          # Verify signed bundle
+tenor sign-wasm eval.wasm --key secret.key --bundle-etag ETAG  # Sign WASM binary
+tenor verify-wasm eval.wasm --sig eval.sig --pubkey key.pub    # Verify WASM binary
+
+# Tooling
+tenor test conformance    # Run conformance suite
+tenor lsp                 # Start Language Server Protocol server
+tenor ambiguity suite/    # Run AI ambiguity testing
 ```
 
 ---

@@ -2,8 +2,8 @@
 
 ## Engineering
 
-- [Claude and Claude Code](https://claude.ai) ([Anthropic](https://www.anthropic.com)) — Design partner, implementation collaborator, and the reason this shipped. Claude Code executed the majority of the implementation across 50+ phases. The author-guide prose, the trust model language, and significant portions of the spec were refined in conversation with Claude. The rate of speed and correctness was impossible to match on this project. I could not have done this without it. Hell, I'd still be writing the spec, trying to decide some pedantic thing about naming, etc.
-- [GSD (Get Shit Done)](https://github.com/gsd-build/get-shit-done) — The context engineering and planning framework that made it possible for Claude Code to execute a project of this scope coherently. Managing 50+ phases of implementation across a complex formal system requires more than a capable model — it requires structured context, phase planning, and assumption surfacing. GSD provided that scaffolding.
+- [Claude and Claude Code](https://claude.ai) ([Anthropic](https://www.anthropic.com)) — Design partner, implementation collaborator, and the reason this shipped. Claude Code executed the majority of the implementation across 50+ phases. Claude's celerity and correctness was impossible for me to match on this project. I could not have done this without it.
+- [GSD (Get Shit Done)](https://github.com/gsd-build/get-shit-done) — The context engineering and planning framework that made it possible for Claude Code to execute a project of this scope coherently. Managing so many phases of implementation across a complex formal system requires more than a capable model — it requires structured context, phase planning, and assumption surfacing. GSD provided that scaffolding.
 
 ## Ideation
 

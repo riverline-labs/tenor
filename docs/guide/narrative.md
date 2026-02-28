@@ -150,7 +150,7 @@ The executor enforces what the evaluator advises. The separation is the most imp
 
 You load a contract into the platform. The platform exposes HTTP endpoints: evaluate, inspect, simulate, execute, and actions. Your application calls these endpoints. It never implements business logic — it renders state (showing the user what's true and what's possible) and relays decisions (forwarding the user's chosen action to the executor). The contract is the authority. Your application is the interface.
 
-Entity states live in Postgres with optimistic concurrency control. Every transition is atomic. Every execution is recorded with its full provenance chain. The storage interface is defined as a trait with a 125-test conformance suite — any conforming storage backend is interchangeable.
+Entity states live in Postgres with optimistic concurrency control. Every transition is atomic. Every execution is recorded with its full provenance chain. The storage interface is defined as a trait with a conformance suite — any conforming storage backend is interchangeable.
 
 ### Step 5: Attach Decision-Makers
 
@@ -193,7 +193,7 @@ The six validated domain contracts demonstrate this across real industries: SaaS
 
 Your application doesn't implement business logic. It calls the evaluator to learn what's true and what's possible, renders that information for users, and forwards their decisions to the executor. The contract is the single source of truth. Your code is the delivery mechanism.
 
-The evaluator is a Rust library you can embed directly, a WASM module you can run in the browser, or an HTTP server you can call from any language. The executor provides atomic execution with Postgres-backed storage and complete provenance. The storage trait has a 125-test conformance suite — you can verify any backend implementation against the spec.
+The evaluator is a Rust library you can embed directly, a WASM module you can run in the browser, or an HTTP server you can call from any language. The executor provides atomic execution with Postgres-backed storage and complete provenance. The storage trait has a conformance suite — you can verify any backend implementation against the spec.
 
 When the contract changes, your application doesn't change. The new contract produces new verdicts, new action spaces, new authority boundaries. Your UI adapts because it renders contract output, not hardcoded logic. The contract is the API.
 
