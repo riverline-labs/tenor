@@ -5,6 +5,7 @@
 
 pub mod manifest;
 pub mod pack;
+pub mod registry;
 
 use std::path::Path;
 
