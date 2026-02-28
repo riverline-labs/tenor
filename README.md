@@ -375,7 +375,7 @@ cargo test --workspace
 
 ## CLI
 
-25 subcommands. Run `tenor --help` for full details.
+26 subcommands. Run `tenor --help` for full details.
 
 ```bash
 # Elaboration & validation

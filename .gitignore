@@ -22,3 +22,6 @@ cffp.cue
 
 # Phase plans (local-only)
 docs/plans/
+
+# Audit reports (local-only)
+docs/audits/

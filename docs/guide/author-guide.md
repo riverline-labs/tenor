@@ -212,7 +212,7 @@ System composition preserves all single-contract guarantees and adds cross-contr
 
 ### 8. Source Declarations
 
-A Source declaration describes how a Fact's external data is fetched — the protocol, endpoint, field mapping, and polling or subscription behavior. Sources separate the *what* (the Fact) from the *how* (the adapter wiring). A Fact names its source system and field; a Source declaration provides the connection details the adapter framework needs to actually retrieve the value. Sources support multiple protocols (`rest`, `graphql`, `grpc`, `database`, `message_queue`) and can declare extension-specific metadata for custom adapter implementations. See §5 of the specification for the full Source grammar.
+A Source declaration describes how a Fact's external data is fetched — the protocol, endpoint, field mapping, and polling or subscription behavior. Sources separate the *what* (the Fact) from the *how* (the adapter wiring). A Fact names its source system and field; a Source declaration provides the connection details the adapter framework needs to actually retrieve the value. Sources support multiple protocols (`http`, `graphql`, `grpc`, `database`, `static`, `manual`) and can declare extension-specific metadata via `x_`-prefixed protocol tags for custom adapter implementations. See §5 of the specification for the full Source grammar.
 
 ### 9. TaggedUnion Type
 

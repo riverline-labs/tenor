@@ -201,7 +201,7 @@ impl From<EvalError> for OperationError {
 /// Initialize entity states from contract entity declarations.
 ///
 /// Each entity starts in its declared initial state with the `_default` instance ID.
-/// Multi-instance support (Plan 04-02) will extend this to accept instance IDs.
+/// Multi-instance entities use the instance key Fact to identify distinct instances.
 pub fn init_entity_states(contract: &crate::types::Contract) -> EntityStateMap {
     let mut map = EntityStateMap::new();
     for entity in &contract.entities {
