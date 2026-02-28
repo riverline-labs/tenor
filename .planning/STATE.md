@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 9 of 11 — Builder SPA — COMPLETE
-**Plan**: 7 of 7 completed in current phase
-**Status**: Phase 9 complete, ready for Phase 10
-**Last activity**: 2026-02-27 — Phase 9 Plan 7 complete (Builder test suite: 153 tests, production build verified)
+**Phase**: 10 of 11 — Hosted Platform — IN PROGRESS
+**Plan**: 1 of 7 completed in current phase
+**Status**: Phase 10 Plan 1 complete
+**Last activity**: 2026-02-27 — Phase 10 Plan 1 complete (multi-tenancy data model: Organization/ApiKey/Deployment/RLS)
 
-Progress: ████████████████████░░ 78% (Phases 1-9 complete)
+Progress: ████████████████████░░ 80% (Phases 1-9 complete, Phase 10 in progress)
 
 ## Decisions
 
@@ -126,6 +126,15 @@ Progress: ████████████████████░░ 78%
 - [Phase 09]: happy-dom used over jsdom: jsdom v27 requires Node >=20.19; happy-dom works on Node 20.17
 - [Phase 09]: [09-07] WASM evaluator mocked in setup.ts via vi.mock() — WASM cannot run in jsdom/happy-dom test environment
 
+- [Phase 10-01] TenantStore is a separate struct from PostgresStorage: control-plane (management) vs data-plane (execution) separation
+- [Phase 10-01] org_id stored in PostgresStorage struct to preserve TenorStorage trait signatures (no per-call threading)
+- [Phase 10-01] PgSnapshot carries org_id; begin_snapshot sets SET LOCAL app.current_org_id for RLS activation
+- [Phase 10-01] Nil UUID (00000000-0000-0000-0000-000000000000) as default org — all pre-existing data uses it; PostgresStorage::new() defaults to it
+- [Phase 10-01] current_setting('app.current_org_id', true) with missing_ok=true — RLS policy non-fatal when setting absent (superuser bypasses RLS anyway)
+- [Phase 10-01] bcrypt DEFAULT_COST for API key hashing; generate_plaintext produces tk_<uuid_v4_simple> format (35 chars)
+- [Phase 10-01] API key format: tk_<uuid_v4_simple> — 35 chars, URL-safe, tk_ prefix for identification
+- [Phase 10-01] Test org names use UUID suffix via unique_org_name() to avoid cross-run collisions
+
 ## Blockers/Concerns
 
 - Part B (private repo) depends on Part A being pushed to main first
@@ -171,9 +180,10 @@ Progress: ████████████████████░░ 78%
 | 09 | 06 | 592 | 7 | 8 |
 
 | 09 | 07 | 754 | 8 | 12 |
+| 10 | 01 | 790 | 6 | 7 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 09-07-PLAN.md (Builder test suite: 153 tests, vitest, happy-dom, WASM mocks, production build verified)
-Next action: Phase 10
+Stopped at: Completed 10-01-PLAN.md (multi-tenancy data model: Organization/ApiKey/Deployment/RLS, 15 tests pass)
+Next action: Phase 10 Plan 2
