@@ -590,8 +590,7 @@ pub fn parse_predicate(v: &serde_json::Value) -> Result<Predicate, EvalError> {
     }
 
     // Check for literal (after op check, since Mul nodes also have "literal")
-    if v.get("literal").is_some() {
-        let literal_val = v.get("literal").unwrap();
+    if let Some(literal_val) = v.get("literal") {
         let (value, type_spec) = if let Some(type_val) = v.get("type") {
             let ts = TypeSpec::from_json(type_val)?;
             let val = parse_literal_value(literal_val, &ts)?;
