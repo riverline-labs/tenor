@@ -224,4 +224,4 @@ cd crates/tenor-eval-wasm && wasm-pack build --target nodejs --out-dir ../../sdk
 
 ## License
 
-MIT
+Apache-2.0

@@ -413,7 +413,7 @@ tenor deploy template-name        # Deploy to hosted platform
 
 # Trust & signing
 tenor keygen                             # Generate Ed25519 signing keypair
-tenor sign bundle.json --key secret.key  # Sign interchange bundle
+tenor sign bundle.json --key secret.key [--out signed.json]  # Sign interchange bundle
 tenor verify bundle.signed.json          # Verify signed bundle
 tenor sign-wasm eval.wasm --key secret.key --bundle-etag ETAG  # Sign WASM binary
 tenor verify-wasm eval.wasm --sig eval.sig --pubkey key.pub    # Verify WASM binary
