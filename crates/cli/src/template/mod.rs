@@ -7,6 +7,7 @@ pub mod manifest;
 pub mod pack;
 pub mod publish;
 pub mod registry;
+pub mod search;
 
 use std::path::Path;
 
