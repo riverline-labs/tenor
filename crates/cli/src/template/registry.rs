@@ -36,6 +36,8 @@ pub struct SearchResult {
 }
 
 /// Full template metadata returned by `get_template`.
+// Used by `tenor install --info` (planned future subcommand).
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TemplateInfo {
     pub name: String,
@@ -211,6 +213,8 @@ impl RegistryClient {
     /// Retrieve full metadata for a single template.
     ///
     /// GET `/api/v1/registry/templates/{name}`
+    // Planned for `tenor info <template>` subcommand in a future plan.
+    #[allow(dead_code)]
     pub fn get_template(&self, name: &str) -> Result<TemplateInfo, String> {
         let url = format!("{}/api/v1/registry/templates/{}", self.base_url, name);
 

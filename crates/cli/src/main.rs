@@ -247,6 +247,49 @@ enum Commands {
         out: Option<PathBuf>,
     },
 
+    /// Publish a contract template to the registry
+    Publish {
+        /// Template directory (default: current directory)
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// Registry URL
+        #[arg(long)]
+        registry: Option<String>,
+        /// Auth token for publishing
+        #[arg(long)]
+        token: Option<String>,
+    },
+
+    /// Search for contract templates in the registry
+    Search {
+        /// Search query
+        query: String,
+        /// Filter by category
+        #[arg(long)]
+        category: Option<String>,
+        /// Filter by tag
+        #[arg(long)]
+        tag: Option<String>,
+        /// Registry URL
+        #[arg(long)]
+        registry: Option<String>,
+    },
+
+    /// Install a contract template from the registry
+    Install {
+        /// Template name
+        template_name: String,
+        /// Specific version (default: latest)
+        #[arg(long)]
+        version: Option<String>,
+        /// Output directory
+        #[arg(long, default_value = ".")]
+        output: PathBuf,
+        /// Registry URL
+        #[arg(long)]
+        registry: Option<String>,
+    },
+
     /// Start the Language Server Protocol server over stdio
     Lsp,
 
@@ -475,6 +518,49 @@ fn main() {
         },
         Commands::Pack { dir, out } => {
             template::cmd_pack(&dir, out.as_deref(), cli.quiet);
+        }
+        Commands::Publish {
+            dir,
+            registry,
+            token,
+        } => {
+            template::publish::cmd_publish(
+                &dir,
+                registry.as_deref(),
+                token.as_deref(),
+                cli.output,
+                cli.quiet,
+            );
+        }
+        Commands::Search {
+            query,
+            category,
+            tag,
+            registry,
+        } => {
+            template::search::cmd_search(
+                &query,
+                category.as_deref(),
+                tag.as_deref(),
+                registry.as_deref(),
+                cli.output,
+                cli.quiet,
+            );
+        }
+        Commands::Install {
+            template_name,
+            version,
+            output,
+            registry,
+        } => {
+            template::install::cmd_install(
+                &template_name,
+                version.as_deref(),
+                &output,
+                registry.as_deref(),
+                cli.output,
+                cli.quiet,
+            );
         }
         Commands::Lsp => {
             if let Err(e) = tenor_lsp::run() {
