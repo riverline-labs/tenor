@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 10 of 11 — Hosted Platform — COMPLETE
-**Plan**: 7 of 7 completed in current phase (all plans done)
-**Status**: Phase 10 Plan 7 complete — Phase 10 COMPLETE
-**Last activity**: 2026-02-28 — Phase 10 Plan 7 complete (integration test suite: full lifecycle, tenant isolation, auth flow, rate limiting, deployment lifecycle, 238 total tests)
+**Phase**: 11 of 11 — Marketplace — IN PROGRESS
+**Plan**: 1 of 5 completed in current phase
+**Status**: Phase 11 Plan 1 complete — tenor-template.toml manifest + tenor pack command
+**Last activity**: 2026-02-27 — Phase 11 Plan 1 complete (TemplateManifest types, pack_template, tenor pack CLI, 6 e2e tests)
 
-Progress: ██████████████████████░ 90% (Phases 1-10 complete, Phase 11 pending)
+Progress: ██████████████████████░ 92% (Phases 1-10 complete, Phase 11 Plan 1/5 done)
 
 ## Decisions
 
@@ -166,6 +166,11 @@ Progress: ██████████████████████░ 
 - [Phase 10-06] SystemHealth auto-refetches every 30s via refetchInterval in useQuery
 - [Phase 10]: [Phase 10-07] Execute-only keys used for cross-org isolation tests — admin keys bypass org_id check by design (super-admin semantics)
 - [Phase 10]: [Phase 10-07] .well-known/tenor manifest returns 'etag' field (not 'bundle_etag'); evaluate calls require all declared facts
+- [Phase 11-01] Pack --output renamed to --out: avoids clap global arg naming conflict with OutputFormat --output
+- [Phase 11-01] unpack_template() marked #[allow(dead_code)]: public API for future tenor install (Phase 11 Plan 03)
+- [Phase 11-01] Semver validation is manual (no semver dep): check MAJOR.MINOR.PATCH prefix, allow pre-release suffix
+- [Phase 11-01] bundle.json placed at archive root (not contract/): clearly separates source from elaborated artifact
+- [Phase 11-01] SHA-256 computed over archive bytes (not manifest): integrity check covers all archive contents
 
 ## Blockers/Concerns
 
@@ -221,9 +226,10 @@ Progress: ██████████████████████░ 
 | 10 | 05 | 980 | 7 | 12 |
 | 10 | 06 | 1106 | 7 | 40 |
 | 10 | 07 | 1137 | 7 | 14 |
+| 11 | 01 | 582 | 5 | 6 |
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed 10-07-PLAN.md (integration test suite: full lifecycle, tenant isolation, auth flow, rate limiting, deployment lifecycle, 238 total tests)
-Next action: Phase 11 (if applicable)
+Last session: 2026-02-27
+Stopped at: Completed 11-01-PLAN.md (TemplateManifest types, pack_template, tenor pack CLI, 6 e2e tests, 96 conformance)
+Next action: Phase 11 Plan 02 (tenor publish command)
