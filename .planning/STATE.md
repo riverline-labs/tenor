@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 10 of 11 — Hosted Platform — IN PROGRESS
-**Plan**: 2 of 7 completed in current phase
-**Status**: Phase 10 Plan 2 complete
-**Last activity**: 2026-02-28 — Phase 10 Plan 2 complete (auth middleware, persona enforcement, management API)
+**Plan**: 4 of 7 completed in current phase
+**Status**: Phase 10 Plan 4 complete
+**Last activity**: 2026-02-27 — Phase 10 Plan 4 complete (token bucket rate limiting, CORS, request logging, 11 gateway tests)
 
 Progress: ████████████████████░░ 80% (Phases 1-9 complete, Phase 10 in progress)
 
@@ -133,12 +133,19 @@ Progress: ████████████████████░░ 80%
 - [Phase 10-01] current_setting('app.current_org_id', true) with missing_ok=true — RLS policy non-fatal when setting absent (superuser bypasses RLS anyway)
 - [Phase 10-01] API key format: tk_<uuid_v4_simple> — 35 chars, URL-safe, tk_ prefix for identification
 - [Phase 10-01] Test org names use UUID suffix via unique_org_name() to avoid cross-run collisions
-- [Phase 10-02] SHA-256 (not bcrypt) for API key hash storage: bcrypt is non-deterministic, making WHERE key_hash = $1 DB lookup impossible; plaintext has 128+ bits entropy so SHA-256 is sufficient
+- [Phase 10-02] SHA-256 (not bcrypt) for API key hash storage: bcrypt is non-deterministic, making WHERE key_hash = ## Decisions
+
+ DB lookup impossible; plaintext has 128+ bits entropy so SHA-256 is sufficient
 - [Phase 10-02] Backward-compat router split: serve() takes Option<Arc<TenantStore>>; None = single-tenant legacy mode (no auth middleware, no management routes)
 - [Phase 10-02] Auth middleware uses route_layer (not layer) so /health public route cleanly excluded
 - [Phase 10-02] fire-and-forget last_used_at update: tokio::spawn with cloned Arc<TenantStore> — auth latency not blocked
 - [Phase 10-02] AuthContext extracted as Option<Extension<AuthContext>> in handlers — works in both authenticated and unauthenticated modes
 - [Phase 10-02] ApiError::Http(StatusCode, String) variant for persona/auth errors without changing executor error types
+- [Phase 10]: [Phase 10-04] Token bucket rate limiter per (api_key_id, RateLimitCategory) with lazy 10-min eviction
+- [Phase 10]: [Phase 10-04] apply_middleware() takes Option<Arc<RateLimiterStore>> + Option<Arc<CorsConfig>>; None = single-tenant no-op
+- [Phase 10]: [Phase 10-04] MigrationPolicy::from_str renamed to parse() (clippy::should_implement_trait)
+- [Phase 10]: [Phase 10-04] ContractsMap<S> type alias for Arc<RwLock<HashMap<(Uuid, String), ContractEntry<S>>>> (clippy::type_complexity)
+- [Phase 10]: [Phase 10-04] sqlx promoted from dev-dependency to production dependency in platform-serve
 
 ## Blockers/Concerns
 
@@ -162,6 +169,7 @@ Progress: ████████████████████░░ 80%
 | 05 | 06 | ~10800 | 9 | 15 |
 | Phase 09 P03 | 408 | 6 tasks | 6 files |
 | Phase 09 P07 | 754 | 8 tasks | 12 files |
+| Phase 10 P04 | 1266 | 7 tasks | 7 files |
 
 ## Performance Metrics (continued)
 
@@ -187,9 +195,10 @@ Progress: ████████████████████░░ 80%
 | 09 | 07 | 754 | 8 | 12 |
 | 10 | 01 | 790 | 6 | 7 |
 | 10 | 02 | 753 | 7 | 13 |
+| 10 | 04 | 1266 | 7 | 7 |
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed 10-02-PLAN.md (auth middleware, persona enforcement, management API, 14 new tests)
-Next action: Phase 10 Plan 3
+Last session: 2026-02-27
+Stopped at: Completed 10-04-PLAN.md (token bucket rate limiting, CORS, request logging, 11 gateway tests)
+Next action: Phase 10 Plan 5
