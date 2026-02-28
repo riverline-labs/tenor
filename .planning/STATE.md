@@ -3,11 +3,11 @@
 ## Current Position
 
 **Phase**: 11 of 11 — Marketplace — IN PROGRESS
-**Plan**: 2 of 5 completed in current phase
-**Status**: Phase 11 Plan 2 complete — tenor publish/search/install CLI commands + RegistryClient
-**Last activity**: 2026-02-27 — Phase 11 Plan 2 complete (RegistryClient, publish/search/install commands, 7 e2e tests, 96 conformance)
+**Plan**: 3 of 5 completed in current phase
+**Status**: Phase 11 Plan 3 complete — Registry API (7 endpoints), PostgreSQL storage, full-text search, archive store, 10 integration tests
+**Last activity**: 2026-02-28 — Phase 11 Plan 3 complete (registry server: 7 endpoints, PostgreSQL RegistryStorage, LocalArchiveStore, 10 integration tests)
 
-Progress: ███████████████████████░ 94% (Phases 1-10 complete, Phase 11 Plan 2/5 done)
+Progress: ████████████████████████░ 96% (Phases 1-10 complete, Phase 11 Plan 3/5 done)
 
 ## Decisions
 
@@ -175,6 +175,12 @@ Progress: ███████████████████████�
 - [Phase 11-02] Manual multipart body construction for publish: ureq v3 has no built-in multipart; boundary-based construction used for two-part archive + manifest upload
 - [Phase 11-02] get_template/TemplateInfo marked #[allow(dead_code)]: public API for planned 'tenor info' subcommand, not yet wired to CLI
 - [Phase 11-02] TENOR_REGISTRY_TOKEN env var checked as fallback when --token not supplied (publish command)
+- [Phase 11-03] Registry routes inside authenticated router; is_public_route() lets GET /api/v1/registry/* through without token; resolve_auth_context() helper injects context when token provided
+- [Phase 11-03] StorageError::Backend (not ::Other) — matches actual tenor_storage error variant
+- [Phase 11-03] delete_version soft-deletes (status=withdrawn) rather than hard-deleting from DB
+- [Phase 11-03] update_latest_version picks most recent approved-or-pending version by published_at DESC
+- [Phase 11-03] Download counter incremented via tokio::spawn (non-blocking); integration tests verify via storage directly to avoid timing dependency
+- [Phase 11-03] registry_archive_dir defaults to ./data/registry/archives in ServerConfig; None disables registry (503)
 
 ## Blockers/Concerns
 
@@ -232,9 +238,10 @@ Progress: ███████████████████████�
 | 10 | 07 | 1137 | 7 | 14 |
 | 11 | 01 | 582 | 5 | 6 |
 | 11 | 02 | 360 | 7 | 7 |
+| 11 | 03 | 1201 | 6 | 13 |
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Completed 11-02-PLAN.md (RegistryClient, publish/search/install CLI commands, 7 e2e tests, 96 conformance)
-Next action: Phase 11 Plan 03 (registry server)
+Last session: 2026-02-28
+Stopped at: Completed 11-03-PLAN.md (registry API: 7 endpoints, PostgreSQL RegistryStorage, LocalArchiveStore, 10 integration tests)
+Next action: Phase 11 Plan 04 (registry server wiring / hosted mode)
