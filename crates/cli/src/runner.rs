@@ -19,6 +19,23 @@ pub struct RunResult {
 pub fn run_suite(suite_dir: &Path) -> RunResult {
     let mut tap = Tap::new();
 
+    // Known conformance gaps (cross-contract System constraints):
+    //
+    // The following constraints require cross-contract elaboration (validating
+    // references across multiple contracts within a System). The elaborator
+    // currently processes each contract independently, so these are tested at
+    // the unit level in crates/core, not in the conformance suite:
+    //
+    //   C-SYS-06  — shared_persona existence (cross-contract persona resolution)
+    //   C-SYS-09  — trigger source flow existence (cross-contract flow resolution)
+    //   C-SYS-10  — trigger target flow existence (cross-contract flow resolution)
+    //   C-SYS-13  — shared_entity existence (cross-contract entity resolution)
+    //   C-SYS-14  — shared_entity state set equality (cross-contract state comparison)
+    //
+    // Round-half-to-even midpoint rounding (§11.4) is an evaluation-time
+    // concern, not elaboration-time. It is tested in crates/eval numeric
+    // regression tests, not in the conformance suite.
+
     // Positive tests
     run_positive_dir(suite_dir, "positive", &mut tap);
 

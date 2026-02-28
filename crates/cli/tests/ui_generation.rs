@@ -839,3 +839,49 @@ fn test_different_contracts_different_themes() {
         "different contracts should produce different theme files"
     );
 }
+
+// ──────────────────────────────────────────────
+// Failure / error path tests
+// ──────────────────────────────────────────────
+
+#[test]
+fn test_ui_invalid_tenor_syntax() {
+    let tmp = TempDir::new().expect("temp dir");
+    let bad_file = tmp.path().join("bad_syntax.tenor");
+    let out_dir = tmp.path().join("bad-syntax-ui");
+
+    // Write a file with invalid Tenor syntax
+    fs::write(&bad_file, "this is not valid tenor").expect("write bad file");
+
+    tenor()
+        .args([
+            "ui",
+            bad_file.to_str().unwrap(),
+            "--out",
+            out_dir.to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .code(1);
+}
+
+#[test]
+fn test_ui_incomplete_construct() {
+    let tmp = TempDir::new().expect("temp dir");
+    let bad_file = tmp.path().join("incomplete.tenor");
+    let out_dir = tmp.path().join("incomplete-ui");
+
+    // Write a file with an incomplete construct (opening brace, no closing brace)
+    fs::write(&bad_file, "entity Order {\n  states: [draft").expect("write incomplete file");
+
+    tenor()
+        .args([
+            "ui",
+            bad_file.to_str().unwrap(),
+            "--out",
+            out_dir.to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .code(1);
+}

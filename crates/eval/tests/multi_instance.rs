@@ -1140,3 +1140,161 @@ fn operation_provenance_scoped_to_targeted_instance() {
         "submitted"
     );
 }
+
+// ──────────────────────────────────────────────
+// Test: Precondition failure on targeted instance
+// ──────────────────────────────────────────────
+
+/// Verifies that executing an operation whose precondition evaluates to false
+/// returns PreconditionFailed, even when the targeted instance is in the
+/// correct entity state and the persona is authorized.
+///
+/// This exercises the precondition check path in execute_operation for the
+/// multi-instance case: the operation is structurally valid (correct entity
+/// state, correct persona) but the business-logic precondition is not met.
+#[test]
+fn precondition_failure_on_targeted_instance() {
+    // Build an operation with a FALSE precondition (always fails)
+    let submit_op = Operation {
+        id: "submit_order".to_string(),
+        allowed_personas: vec!["buyer".to_string()],
+        precondition: Predicate::Literal {
+            value: Value::Bool(false),
+            type_spec: bool_type(),
+        },
+        effects: vec![Effect {
+            entity_id: "Order".to_string(),
+            from: "draft".to_string(),
+            to: "submitted".to_string(),
+            outcome: None,
+        }],
+        error_contract: vec![],
+        outcomes: vec!["submitted".to_string()],
+    };
+
+    let facts = FactSet::new();
+    let verdicts = VerdictSet::new();
+
+    let mut entity_states = EntityStateMap::new();
+    entity_states.insert(
+        ("Order".to_string(), "ord-001".to_string()),
+        "draft".to_string(),
+    );
+
+    // Target ord-001 (correct state, authorized persona, but precondition is false)
+    let mut bindings = InstanceBindingMap::new();
+    bindings.insert("Order".to_string(), "ord-001".to_string());
+
+    let result = execute_operation(
+        &submit_op,
+        "buyer",
+        &facts,
+        &verdicts,
+        &mut entity_states,
+        &bindings,
+    );
+
+    assert!(
+        result.is_err(),
+        "operation should fail when precondition evaluates to false"
+    );
+
+    match result.unwrap_err() {
+        OperationError::PreconditionFailed {
+            operation_id,
+            condition_desc,
+        } => {
+            assert_eq!(
+                operation_id, "submit_order",
+                "error should name the operation"
+            );
+            assert!(
+                !condition_desc.is_empty(),
+                "condition_desc should describe the failure"
+            );
+        }
+        other => panic!("expected PreconditionFailed, got {:?}", other),
+    }
+
+    // Entity state must be unchanged (no side effects from failed precondition)
+    assert_eq!(
+        get_instance_state(&entity_states, "Order", "ord-001").unwrap(),
+        "draft",
+        "ord-001 should remain in draft after precondition failure"
+    );
+}
+
+// ──────────────────────────────────────────────
+// Test: Unauthorized persona on instance operation
+// ──────────────────────────────────────────────
+
+/// Verifies that executing an operation with a persona not in the operation's
+/// allowed_personas list returns PersonaRejected, even when the targeted
+/// instance is in the correct entity state and the precondition would pass.
+///
+/// This exercises the persona authorization check in execute_operation for the
+/// multi-instance case: structurally valid (correct entity state, true
+/// precondition) but the caller is not authorized.
+#[test]
+fn unauthorized_persona_on_instance_operation() {
+    let submit_op = make_operation(
+        "submit_order",
+        vec!["buyer"],
+        vec![Effect {
+            entity_id: "Order".to_string(),
+            from: "draft".to_string(),
+            to: "submitted".to_string(),
+            outcome: None,
+        }],
+        vec!["submitted"],
+    );
+
+    let facts = FactSet::new();
+    let verdicts = VerdictSet::new();
+
+    let mut entity_states = EntityStateMap::new();
+    entity_states.insert(
+        ("Order".to_string(), "ord-001".to_string()),
+        "draft".to_string(),
+    );
+
+    // Target ord-001 (correct state, true precondition)
+    let mut bindings = InstanceBindingMap::new();
+    bindings.insert("Order".to_string(), "ord-001".to_string());
+
+    // Execute as "admin" — NOT in allowed_personas (only "buyer" is allowed)
+    let result = execute_operation(
+        &submit_op,
+        "admin",
+        &facts,
+        &verdicts,
+        &mut entity_states,
+        &bindings,
+    );
+
+    assert!(
+        result.is_err(),
+        "operation should fail when persona is not authorized"
+    );
+
+    match result.unwrap_err() {
+        OperationError::PersonaRejected {
+            operation_id,
+            persona,
+        } => {
+            assert_eq!(
+                operation_id, "submit_order",
+                "error should name the operation"
+            );
+            assert_eq!(persona, "admin", "error should name the rejected persona");
+        }
+        other => panic!("expected PersonaRejected, got {:?}", other),
+    }
+
+    // Entity state must be unchanged (no side effects from unauthorized attempt)
+    assert_eq!(
+        get_instance_state(&entity_states, "Order", "ord-001").unwrap(),
+        "draft",
+        "ord-001 should remain in draft after persona rejection"
+    );
+}
