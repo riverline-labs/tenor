@@ -43,9 +43,12 @@ pub use operation::{
 pub use policy::AnthropicClient;
 pub use policy::{
     AgentPolicy, AgentSnapshot, AlwaysApprove, ApprovalChannel, ApprovalPredicate, ApprovalResult,
-    CallbackApprovalChannel, CompositePolicy, EntityStatePredicate, FirstAvailablePolicy,
-    FlowIdPredicate, HumanInTheLoopPolicy, LlmClient, LlmError, LlmPolicy, Message, NeverApprove,
-    PriorityPolicy, RandomPolicy, StdinApprovalChannel, TimeoutBehavior,
+    CompositePolicy, EntityStatePredicate, FirstAvailablePolicy, FlowIdPredicate, LlmClient,
+    LlmError, LlmPolicy, Message, NeverApprove, PriorityPolicy, TimeoutBehavior,
+};
+#[cfg(feature = "interactive")]
+pub use policy::{
+    CallbackApprovalChannel, HumanInTheLoopPolicy, RandomPolicy, StdinApprovalChannel,
 };
 pub use types::{Contract, EvalError, FactSet, Value, VerdictInstance, VerdictSet};
 

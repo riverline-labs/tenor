@@ -8,10 +8,13 @@
 //! decision is an element of the action space.
 
 use async_trait::async_trait;
+#[cfg(feature = "interactive")]
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+#[cfg(feature = "interactive")]
 use std::io::{self, BufRead, Write};
+#[cfg(feature = "interactive")]
 use std::time::Duration;
 
 use crate::action_space::{Action, ActionSpace};
@@ -111,8 +114,10 @@ pub trait AgentPolicy: Send + Sync {
 ///
 /// Useful for testing, fuzzing, and proving that safety doesn't depend
 /// on the policy being smart.
+#[cfg(feature = "interactive")]
 pub struct RandomPolicy;
 
+#[cfg(feature = "interactive")]
 #[async_trait]
 impl AgentPolicy for RandomPolicy {
     async fn choose(
@@ -172,8 +177,10 @@ impl AgentPolicy for PriorityPolicy {
 ///
 /// Presents the proposed action and available alternatives, then waits
 /// for the user to approve, reject, or select a substitute.
+#[cfg(feature = "interactive")]
 pub struct StdinApprovalChannel;
 
+#[cfg(feature = "interactive")]
 #[async_trait]
 impl ApprovalChannel for StdinApprovalChannel {
     async fn request_approval(
@@ -262,6 +269,7 @@ impl ApprovalChannel for StdinApprovalChannel {
 }
 
 /// Type alias for the callback function used by CallbackApprovalChannel.
+#[cfg(feature = "interactive")]
 type ApprovalCallback =
     Box<dyn Fn(&Action, &ActionSpace, &AgentSnapshot) -> ApprovalResult + Send + Sync>;
 
@@ -269,10 +277,12 @@ type ApprovalCallback =
 ///
 /// Useful for automated testing, webhooks, or integration with external
 /// approval systems.
+#[cfg(feature = "interactive")]
 pub struct CallbackApprovalChannel {
     callback: ApprovalCallback,
 }
 
+#[cfg(feature = "interactive")]
 impl CallbackApprovalChannel {
     /// Create a new CallbackApprovalChannel with the given callback.
     pub fn new(
@@ -287,6 +297,7 @@ impl CallbackApprovalChannel {
     }
 }
 
+#[cfg(feature = "interactive")]
 #[async_trait]
 impl ApprovalChannel for CallbackApprovalChannel {
     async fn request_approval(
@@ -308,6 +319,7 @@ impl ApprovalChannel for CallbackApprovalChannel {
 ///
 /// If the delegate returns None (no action proposed), HumanInTheLoopPolicy
 /// returns None without consulting the human.
+#[cfg(feature = "interactive")]
 pub struct HumanInTheLoopPolicy {
     /// The inner policy that proposes actions.
     pub delegate: Box<dyn AgentPolicy>,
@@ -319,6 +331,7 @@ pub struct HumanInTheLoopPolicy {
     pub timeout_behavior: TimeoutBehavior,
 }
 
+#[cfg(feature = "interactive")]
 impl HumanInTheLoopPolicy {
     /// Create a new HumanInTheLoopPolicy.
     pub fn new(
@@ -336,6 +349,7 @@ impl HumanInTheLoopPolicy {
     }
 }
 
+#[cfg(feature = "interactive")]
 #[async_trait]
 impl AgentPolicy for HumanInTheLoopPolicy {
     async fn choose(&self, action_space: &ActionSpace, snapshot: &AgentSnapshot) -> Option<Action> {
@@ -940,6 +954,7 @@ mod tests {
 
     // ── RandomPolicy ──
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn random_policy_returns_some_when_actions_exist() {
         let policy = RandomPolicy;
@@ -952,6 +967,7 @@ mod tests {
         assert!(chosen.flow_id == "flow_a" || chosen.flow_id == "flow_b");
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn random_policy_returns_none_when_empty() {
         let policy = RandomPolicy;
@@ -1086,6 +1102,7 @@ mod tests {
 
     // ── Trait object safety ──
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn policy_is_object_safe() {
         // Verify AgentPolicy can be used as a trait object (dyn dispatch)
@@ -1108,6 +1125,7 @@ mod tests {
 
     // ── HumanInTheLoopPolicy ──
 
+    #[cfg(feature = "interactive")]
     fn make_hitl(result: ApprovalResult) -> HumanInTheLoopPolicy {
         HumanInTheLoopPolicy::new(
             Box::new(FirstAvailablePolicy),
@@ -1117,6 +1135,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_approve() {
         let policy = make_hitl(ApprovalResult::Approved);
@@ -1128,6 +1147,7 @@ mod tests {
         assert_eq!(result.unwrap().flow_id, "flow_a");
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_reject() {
         let policy = make_hitl(ApprovalResult::Rejected);
@@ -1138,6 +1158,7 @@ mod tests {
         assert!(result.is_none());
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_substitute_valid() {
         // Delegate proposes flow_a, callback substitutes flow_b (valid: in action space)
@@ -1158,6 +1179,7 @@ mod tests {
         assert_eq!(result.unwrap().flow_id, "flow_b");
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_substitute_invalid() {
         // Delegate proposes flow_a, callback substitutes flow_z (NOT in action space) -> None
@@ -1177,6 +1199,7 @@ mod tests {
         assert!(result.is_none());
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_empty_action_space() {
         // Empty action space: returns None without consulting the callback.
@@ -1196,6 +1219,7 @@ mod tests {
         assert!(result.is_none());
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_timeout_reject() {
         // Callback returns Timeout; timeout_behavior is Reject -> None
@@ -1214,6 +1238,7 @@ mod tests {
         assert!(result.is_none());
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_timeout_approve() {
         // Callback returns Timeout; timeout_behavior is Approve -> returns proposed action
@@ -1233,6 +1258,7 @@ mod tests {
         assert_eq!(result.unwrap().flow_id, "flow_a");
     }
 
+    #[cfg(feature = "interactive")]
     #[tokio::test]
     async fn hitl_delegate_returns_none() {
         // PriorityPolicy with no matches falls back to first; but empty space -> None.
