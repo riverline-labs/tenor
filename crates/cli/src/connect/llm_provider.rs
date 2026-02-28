@@ -196,7 +196,7 @@ struct MessagesResponse {
 
 #[derive(Deserialize)]
 struct ContentBlock {
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Required by serde for correct JSON deserialization
     #[serde(rename = "type")]
     block_type: String,
     text: Option<String>,

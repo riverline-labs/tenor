@@ -102,7 +102,7 @@ pub fn cmd_sign_wasm(wasm_path: &Path, key_path: &Path, bundle_etag: &str) {
 /// Core WASM signing — operates on in-memory bytes.
 ///
 /// Returns the attestation JSON value (with all required fields).
-#[allow(dead_code)]
+#[allow(dead_code)] // Public API for programmatic WASM signing; used by verify_wasm tests
 pub fn sign_wasm_bytes(
     wasm_bytes: &[u8],
     signing_key: &ed25519_dalek::SigningKey,

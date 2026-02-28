@@ -39,13 +39,13 @@ pub enum MappingStatus {
 
 /// A mapping that has been reviewed by a human (interactive or batch).
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ReviewedMapping {
     pub fact_id: String,
     pub source_id: String,
     pub endpoint: String,
     pub field_path: String,
     pub confidence: String,
+    #[allow(dead_code)] // Populated during review; used in batch file output
     pub explanation: String,
     pub status: MappingStatus,
 }

@@ -302,7 +302,11 @@ impl AdapterFactProvider {
 
     /// Returns collected provenance records from all adapter fetches.
     pub fn provenance(&self) -> Vec<EnrichedFactProvenance> {
-        self.provenance_log.lock().unwrap().clone()
+        // Recover data even if mutex was poisoned by a panic in another thread
+        self.provenance_log
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 }
 
@@ -346,7 +350,12 @@ impl crate::FactProvider for AdapterFactProvider {
                 match self.registry.fetch_fact(fact_id, sref).await {
                     Ok((value, provenance)) => {
                         result.insert(fact_id.to_string(), value);
-                        self.provenance_log.lock().unwrap().push(provenance);
+                        self.provenance_log
+                            .lock()
+                            .map_err(|e| {
+                                crate::FactProviderError::Provider(format!("lock poisoned: {e}"))
+                            })?
+                            .push(provenance);
                     }
                     Err(e) => {
                         return Err(crate::FactProviderError::Provider(e.to_string()));

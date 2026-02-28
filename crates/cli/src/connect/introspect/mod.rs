@@ -17,9 +17,9 @@ use sql::introspect_sql_ddl;
 
 /// An introspected external schema.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ExternalSchema {
     /// The format of the schema document.
+    #[allow(dead_code)] // Structural metadata; used by Debug output and future format-aware logic
     pub format: SchemaFormat,
     /// Endpoints / entry points extracted from the schema.
     pub endpoints: Vec<Endpoint>,
@@ -186,7 +186,7 @@ pub fn detect_and_introspect(schema_path: &Path) -> Result<ExternalSchema, Strin
 
 /// Build an ExternalSchema for a source with no schema_ref (degraded mode).
 /// Produces a minimal schema based on protocol metadata.
-#[allow(dead_code)]
+#[allow(dead_code)] // Kept for connect workflows with sources that have no schema_ref
 pub fn degraded_schema(source: &tenor_interchange::SourceConstruct) -> ExternalSchema {
     let endpoints = match source.protocol.as_str() {
         "http" => {

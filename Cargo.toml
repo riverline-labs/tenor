@@ -38,3 +38,4 @@ lsp-types = "0.97"
 ed25519-dalek = { version = "2.2", features = ["rand_core"] }
 base64 = "0.22"
 rand = "0.8"
+thiserror = "2"
