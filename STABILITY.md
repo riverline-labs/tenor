@@ -13,6 +13,6 @@ Tenor is a **v1.0 stable** project.
 
 ## Not Yet Stable
 
-- **Hosted platform** (Phase 10, in progress)
-- **Marketplace** (Phase 11, in progress)
-- **SDK packaging** (published but pre-1.0 semver)
+- **Hosted platform** — in development
+- **Marketplace** — in development
+- **SDK packaging** — published but pre-1.0 semver
