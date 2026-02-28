@@ -283,8 +283,8 @@ enum Commands {
         #[arg(long)]
         version: Option<String>,
         /// Output directory
-        #[arg(long, default_value = ".")]
-        output: PathBuf,
+        #[arg(long = "out", name = "install_out", default_value = ".")]
+        out: PathBuf,
         /// Registry URL
         #[arg(long)]
         registry: Option<String>,
@@ -550,13 +550,13 @@ fn main() {
         Commands::Install {
             template_name,
             version,
-            output,
+            out,
             registry,
         } => {
             template::install::cmd_install(
                 &template_name,
                 version.as_deref(),
-                &output,
+                &out,
                 registry.as_deref(),
                 cli.output,
                 cli.quiet,
