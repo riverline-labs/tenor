@@ -9,7 +9,7 @@
  * imports it into the contract store, then navigates to the contract overview.
  */
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router";
 import { Layout } from "./components/Layout";
 import { ContractOverview } from "./components/ContractOverview";
 import { EntityEditor } from "./components/editors/EntityEditor";

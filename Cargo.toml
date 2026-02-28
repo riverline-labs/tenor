@@ -27,7 +27,7 @@ clap = { version = "4.5", features = ["derive"] }
 jsonschema = "0.42"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rust_decimal = { version = "1.36", features = ["serde-with-str"] }
+rust_decimal = { version = "1.40", features = ["serde-with-str"] }
 sha2 = "0.10"
 time = { version = "0.3", features = ["parsing", "macros", "formatting"] }
 tokio = { version = "1", features = ["full"] }

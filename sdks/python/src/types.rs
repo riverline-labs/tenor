@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyList, PyString};
 
 /// Convert a serde_json::Value to a Python object.
-pub fn json_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
+pub fn json_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<Py<PyAny>> {
     match value {
         serde_json::Value::Null => Ok(py.None()),
         serde_json::Value::Bool(b) => {
@@ -40,24 +40,24 @@ pub fn json_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObjec
 pub fn py_to_json(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
     if obj.is_none() {
         Ok(serde_json::Value::Null)
-    } else if let Ok(b) = obj.downcast::<PyBool>() {
+    } else if let Ok(b) = obj.cast::<PyBool>() {
         Ok(serde_json::Value::Bool(b.is_true()))
-    } else if let Ok(s) = obj.downcast::<PyString>() {
+    } else if let Ok(s) = obj.cast::<PyString>() {
         Ok(serde_json::Value::String(s.to_string()))
-    } else if let Ok(dict) = obj.downcast::<PyDict>() {
+    } else if let Ok(dict) = obj.cast::<PyDict>() {
         let mut map = serde_json::Map::new();
         for (k, v) in dict.iter() {
             let key: String = k.extract()?;
             map.insert(key, py_to_json(&v)?);
         }
         Ok(serde_json::Value::Object(map))
-    } else if let Ok(list) = obj.downcast::<PyList>() {
+    } else if let Ok(list) = obj.cast::<PyList>() {
         let mut arr = Vec::new();
         for item in list.iter() {
             arr.push(py_to_json(&item)?);
         }
         Ok(serde_json::Value::Array(arr))
-    } else if let Ok(f) = obj.downcast::<PyFloat>() {
+    } else if let Ok(f) = obj.cast::<PyFloat>() {
         Ok(serde_json::json!(f.value()))
     } else if let Ok(i) = obj.extract::<i64>() {
         Ok(serde_json::json!(i))

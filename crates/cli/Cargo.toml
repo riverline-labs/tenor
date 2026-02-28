@@ -35,7 +35,7 @@ tar = "0.4"
 tempfile = "3"
 tokio = { workspace = true }
 tower-http = { workspace = true }
-toml = "0.8"
+toml = "1"
 ureq = { workspace = true }
 
 [dev-dependencies]

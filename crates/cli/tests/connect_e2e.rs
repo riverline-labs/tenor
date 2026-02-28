@@ -146,7 +146,7 @@ fn connect_batch_heuristic_creates_review_file() {
 
     // Parse the TOML and verify it has mapping entries
     let content = fs::read_to_string(&review_path).expect("read review file");
-    let table: toml::Value = content.parse().expect("review file must be valid TOML");
+    let table: toml::Value = toml::from_str(&content).expect("review file must be valid TOML");
     let mappings = table
         .get("mapping")
         .and_then(|v| v.as_array())
@@ -259,9 +259,8 @@ fn connect_full_workflow_batch_then_apply() {
 
     // Step 5: Verify adapter config is valid TOML
     let config_content = fs::read_to_string(&adapter_config).expect("read adapter config");
-    let _: toml::Value = config_content
-        .parse()
-        .expect("tenor-adapters.toml must be valid TOML");
+    let _: toml::Value =
+        toml::from_str(&config_content).expect("tenor-adapters.toml must be valid TOML");
 
     // Verify config references our source
     assert!(

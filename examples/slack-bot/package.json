@@ -9,9 +9,9 @@
     "dev": "node --experimental-strip-types --watch src/app.ts"
   },
   "dependencies": {
-    "@slack/bolt": "^4.1.0"
+    "@slack/bolt": "^4.6.0"
   },
   "devDependencies": {
-    "typescript": "~5.7.0"
+    "typescript": "~5.9.3"
   }
 }

@@ -2,7 +2,7 @@
  * Contract overview dashboard showing construct counts and validation status.
  */
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import {
   useContractStore,
   selectFacts,

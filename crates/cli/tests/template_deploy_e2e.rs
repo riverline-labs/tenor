@@ -8,6 +8,7 @@
 //! The deploy config unit tests (config read, validate, generate) live in
 //! deploy_config.rs as unit tests — see `cargo test -p tenor-cli template`.
 
+use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::Command;
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -15,7 +16,7 @@ use tempfile::NamedTempFile;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn tenor_cmd() -> Command {
-    Command::cargo_bin("tenor").expect("tenor binary")
+    cargo_bin_cmd!("tenor")
 }
 
 // ── Test 1: deploy --help ─────────────────────────────────────────────────────

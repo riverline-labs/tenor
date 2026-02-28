@@ -240,8 +240,7 @@ pub fn read_review_file(path: &Path) -> Result<Vec<ReviewedMapping>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("failed to read review file '{}': {}", path.display(), e))?;
 
-    let table: toml::Value = content
-        .parse()
+    let table: toml::Value = toml::from_str(&content)
         .map_err(|e| format!("invalid TOML in '{}': {}", path.display(), e))?;
 
     let mappings = table
@@ -375,7 +374,7 @@ mod tests {
         let content = std::fs::read_to_string(&path).unwrap();
 
         // Must parse as valid TOML
-        let table: toml::Value = content.parse().expect("output must be valid TOML");
+        let table: toml::Value = toml::from_str(&content).expect("output must be valid TOML");
         let mappings = table["mapping"].as_array().unwrap();
         assert_eq!(mappings.len(), 3);
 

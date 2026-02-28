@@ -41,7 +41,7 @@ impl TenorEvaluator {
 
     /// Evaluate rules against the provided facts.
     /// Returns a dict with "verdicts" list.
-    fn evaluate(&self, py: Python<'_>, facts: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+    fn evaluate(&self, py: Python<'_>, facts: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let facts_json = py_to_json(facts)?;
         let fact_set = tenor_eval::assemble::assemble_facts(&self.contract, &facts_json)
             .map_err(|e| {
@@ -71,7 +71,7 @@ impl TenorEvaluator {
         facts: &Bound<'_, PyAny>,
         entity_states: &Bound<'_, PyAny>,
         persona: &str,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let facts_json = py_to_json(facts)?;
         let states_json = py_to_json(entity_states)?;
 
@@ -115,7 +115,7 @@ impl TenorEvaluator {
         facts: &Bound<'_, PyAny>,
         entity_states: &Bound<'_, PyAny>,
         persona: &str,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let facts_json = py_to_json(facts)?;
         let states_json = py_to_json(entity_states)?;
 

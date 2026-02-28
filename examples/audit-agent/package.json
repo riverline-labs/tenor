@@ -9,6 +9,6 @@
     "audit": "node --experimental-strip-types src/cli.ts"
   },
   "devDependencies": {
-    "typescript": "~5.7.0"
+    "typescript": "~5.9.3"
   }
 }

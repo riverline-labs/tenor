@@ -53,9 +53,7 @@ where
 ///
 /// Per plan-4.md §A9: detect by checking whether values are strings (old) or
 /// objects (new). Convert old format by assigning DEFAULT_INSTANCE_ID.
-fn parse_entity_states(
-    json: &serde_json::Value,
-) -> Result<tenor_eval::EntityStateMap, String> {
+fn parse_entity_states(json: &serde_json::Value) -> Result<tenor_eval::EntityStateMap, String> {
     let obj = match json.as_object() {
         Some(o) => o,
         None => return Err("entity_states must be a JSON object".to_string()),
@@ -67,7 +65,10 @@ fn parse_entity_states(
         if let Some(state_str) = value.as_str() {
             // Old format: entity_id -> state string; convert to single instance
             entity_states.insert(
-                (entity_id.clone(), tenor_eval::DEFAULT_INSTANCE_ID.to_string()),
+                (
+                    entity_id.clone(),
+                    tenor_eval::DEFAULT_INSTANCE_ID.to_string(),
+                ),
                 state_str.to_string(),
             );
         } else if let Some(instance_map) = value.as_object() {
@@ -194,7 +195,14 @@ pub fn simulate_flow(
     facts_json: &str,
     entity_states_json: &str,
 ) -> String {
-    simulate_flow_with_bindings(handle, flow_id, persona_id, facts_json, entity_states_json, "")
+    simulate_flow_with_bindings(
+        handle,
+        flow_id,
+        persona_id,
+        facts_json,
+        entity_states_json,
+        "",
+    )
 }
 
 /// Extended simulate_flow that accepts instance_bindings.
@@ -231,17 +239,15 @@ pub fn simulate_flow_with_bindings(
             Err(e) => return error_json(&format!("invalid entity states: {}", e)),
         };
 
-        let fact_set =
-            match tenor_eval::assemble::assemble_facts(&stored.contract, &facts) {
-                Ok(fs) => fs,
-                Err(e) => return error_json(&format!("fact assembly error: {}", e)),
-            };
+        let fact_set = match tenor_eval::assemble::assemble_facts(&stored.contract, &facts) {
+            Ok(fs) => fs,
+            Err(e) => return error_json(&format!("fact assembly error: {}", e)),
+        };
 
-        let verdict_set =
-            match tenor_eval::rules::eval_strata(&stored.contract, &fact_set) {
-                Ok(vs) => vs,
-                Err(e) => return error_json(&format!("evaluation error: {}", e)),
-            };
+        let verdict_set = match tenor_eval::rules::eval_strata(&stored.contract, &fact_set) {
+            Ok(vs) => vs,
+            Err(e) => return error_json(&format!("evaluation error: {}", e)),
+        };
 
         let snapshot = tenor_eval::Snapshot {
             facts: fact_set,
@@ -249,8 +255,7 @@ pub fn simulate_flow_with_bindings(
         };
 
         // Merge contract defaults with provided states
-        let mut merged_entity_states =
-            tenor_eval::operation::init_entity_states(&stored.contract);
+        let mut merged_entity_states = tenor_eval::operation::init_entity_states(&stored.contract);
         for (key, state) in entity_states {
             merged_entity_states.insert(key, state);
         }

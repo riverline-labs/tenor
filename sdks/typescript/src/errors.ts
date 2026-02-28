@@ -9,7 +9,7 @@ export class TenorError extends Error {
 /** Thrown when the SDK cannot reach the Tenor evaluator server. */
 export class ConnectionError extends TenorError {
   public readonly url: string;
-  public override readonly cause?: Error;
+  public declare readonly cause?: Error;
 
   constructor(url: string, cause?: Error) {
     super(`Failed to connect to Tenor evaluator at ${url}`);
