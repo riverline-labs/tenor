@@ -55,6 +55,50 @@ impl Value {
             }),
         }
     }
+
+    /// Convert this Value to JSON for output.
+    pub fn to_json(&self) -> serde_json::Value {
+        match self {
+            Value::Bool(b) => serde_json::json!({ "kind": "bool_value", "value": b }),
+            Value::Int(i) => serde_json::json!({ "kind": "int_value", "value": i }),
+            Value::Decimal(d) => {
+                serde_json::json!({ "kind": "decimal_value", "value": d.to_string() })
+            }
+            Value::Text(t) => serde_json::json!({ "kind": "text_value", "value": t }),
+            Value::Date(d) => serde_json::json!({ "kind": "date_value", "value": d }),
+            Value::DateTime(dt) => serde_json::json!({ "kind": "datetime_value", "value": dt }),
+            Value::Money { amount, currency } => serde_json::json!({
+                "kind": "money_value",
+                "amount": amount.to_string(),
+                "currency": currency,
+            }),
+            Value::Duration { value, unit } => serde_json::json!({
+                "kind": "duration_value",
+                "value": value,
+                "unit": unit,
+            }),
+            Value::Enum(e) => serde_json::json!({ "kind": "enum_value", "value": e }),
+            Value::Record(fields) => {
+                let mut map = serde_json::Map::new();
+                map.insert("kind".to_string(), serde_json::json!("record_value"));
+                let mut fields_map = serde_json::Map::new();
+                for (k, v) in fields {
+                    fields_map.insert(k.clone(), v.to_json());
+                }
+                map.insert("fields".to_string(), serde_json::Value::Object(fields_map));
+                serde_json::Value::Object(map)
+            }
+            Value::List(items) => {
+                let arr: Vec<serde_json::Value> = items.iter().map(Value::to_json).collect();
+                serde_json::json!({ "kind": "list_value", "elements": arr })
+            }
+            Value::TaggedUnion { tag, payload } => serde_json::json!({
+                "kind": "tagged_union_value",
+                "tag": tag,
+                "payload": payload.to_json(),
+            }),
+        }
+    }
 }
 
 // ──────────────────────────────────────────────
@@ -378,44 +422,7 @@ pub(crate) fn infer_literal(v: &serde_json::Value) -> Result<(Value, TypeSpec), 
     }
 }
 
-/// Convert a runtime Value to JSON for output.
+/// Backward-compatible alias for `Value::to_json`.
 pub fn value_to_json(v: &Value) -> serde_json::Value {
-    match v {
-        Value::Bool(b) => serde_json::json!({ "kind": "bool_value", "value": b }),
-        Value::Int(i) => serde_json::json!({ "kind": "int_value", "value": i }),
-        Value::Decimal(d) => serde_json::json!({ "kind": "decimal_value", "value": d.to_string() }),
-        Value::Text(t) => serde_json::json!({ "kind": "text_value", "value": t }),
-        Value::Date(d) => serde_json::json!({ "kind": "date_value", "value": d }),
-        Value::DateTime(dt) => serde_json::json!({ "kind": "datetime_value", "value": dt }),
-        Value::Money { amount, currency } => serde_json::json!({
-            "kind": "money_value",
-            "amount": amount.to_string(),
-            "currency": currency,
-        }),
-        Value::Duration { value, unit } => serde_json::json!({
-            "kind": "duration_value",
-            "value": value,
-            "unit": unit,
-        }),
-        Value::Enum(e) => serde_json::json!({ "kind": "enum_value", "value": e }),
-        Value::Record(fields) => {
-            let mut map = serde_json::Map::new();
-            map.insert("kind".to_string(), serde_json::json!("record_value"));
-            let mut fields_map = serde_json::Map::new();
-            for (k, v) in fields {
-                fields_map.insert(k.clone(), value_to_json(v));
-            }
-            map.insert("fields".to_string(), serde_json::Value::Object(fields_map));
-            serde_json::Value::Object(map)
-        }
-        Value::List(items) => {
-            let arr: Vec<serde_json::Value> = items.iter().map(value_to_json).collect();
-            serde_json::json!({ "kind": "list_value", "elements": arr })
-        }
-        Value::TaggedUnion { tag, payload } => serde_json::json!({
-            "kind": "tagged_union_value",
-            "tag": tag,
-            "payload": value_to_json(payload),
-        }),
-    }
+    v.to_json()
 }

@@ -20,8 +20,8 @@ use crate::{report_error, OutputFormat};
 /// Run the migration analysis and planning pipeline.
 pub fn cmd_migrate(v1_path: &Path, v2_path: &Path, yes: bool, output: OutputFormat, quiet: bool) {
     // 1. Load both bundles
-    let v1_json = load_bundle(v1_path, output, quiet);
-    let v2_json = load_bundle(v2_path, output, quiet);
+    let v1_json = load_interchange_bundle(v1_path, output, quiet);
+    let v2_json = load_interchange_bundle(v2_path, output, quiet);
 
     // 2. Analyze migration
     let analysis = match analyze_migration(&v1_json, &v2_json) {
@@ -98,7 +98,7 @@ pub fn cmd_migrate(v1_path: &Path, v2_path: &Path, yes: bool, output: OutputForm
 }
 
 /// Load a bundle from a .tenor or .json file.
-fn load_bundle(path: &Path, output: OutputFormat, quiet: bool) -> serde_json::Value {
+fn load_interchange_bundle(path: &Path, output: OutputFormat, quiet: bool) -> serde_json::Value {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
     match ext {

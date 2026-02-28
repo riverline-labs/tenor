@@ -47,7 +47,7 @@ pub(crate) fn cmd_connect(opts: ConnectOptions<'_>) {
     }
 
     // Step 1: Elaborate or load the contract
-    let bundle = load_bundle(opts.contract, opts.output, opts.quiet);
+    let bundle = load_interchange_bundle(opts.contract, opts.output, opts.quiet);
 
     // Step 2: Extract Sources and Facts with structured sources
     let sources = extract_sources(&bundle);
@@ -132,7 +132,7 @@ fn run_apply_mode(
     }
 
     // Load contract for sources/facts
-    let bundle = load_bundle(contract, output, quiet);
+    let bundle = load_interchange_bundle(contract, output, quiet);
     let sources = extract_sources(&bundle);
     let facts = extract_structured_facts(&bundle);
     let schemas: BTreeMap<String, introspect::ExternalSchema> = BTreeMap::new();
@@ -618,7 +618,7 @@ fn print_dry_run(
 }
 
 /// Load a bundle from a .tenor file or interchange JSON.
-fn load_bundle(path: &Path, output: OutputFormat, quiet: bool) -> InterchangeBundle {
+fn load_interchange_bundle(path: &Path, output: OutputFormat, quiet: bool) -> InterchangeBundle {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
     let bundle_json: serde_json::Value = if ext == "json" {

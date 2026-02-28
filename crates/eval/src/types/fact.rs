@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use super::values::{value_to_json, Value};
+use super::values::Value;
 use super::TypeSpec;
 
 /// A declared fact with type and optional default.
@@ -74,7 +74,7 @@ impl VerdictSet {
             .map(|v| {
                 serde_json::json!({
                     "type": v.verdict_type,
-                    "payload": value_to_json(&v.payload),
+                    "payload": v.payload.to_json(),
                     "provenance": {
                         "rule": v.provenance.rule_id,
                         "stratum": v.provenance.stratum,

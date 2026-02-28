@@ -251,7 +251,7 @@ pub fn compute_action_space(
             .filter_map(|vt| {
                 verdict_set.get_verdict(vt).map(|vi| VerdictSummary {
                     verdict_type: vi.verdict_type.clone(),
-                    payload: crate::types::value_to_json(&vi.payload),
+                    payload: vi.payload.to_json(),
                     producing_rule: vi.provenance.rule_id.clone(),
                     stratum: vi.provenance.stratum,
                 })
@@ -331,7 +331,7 @@ fn verdict_set_to_summaries(vs: &VerdictSet) -> Vec<VerdictSummary> {
     vs.0.iter()
         .map(|vi| VerdictSummary {
             verdict_type: vi.verdict_type.clone(),
-            payload: crate::types::value_to_json(&vi.payload),
+            payload: vi.payload.to_json(),
             producing_rule: vi.provenance.rule_id.clone(),
             stratum: vi.provenance.stratum,
         })

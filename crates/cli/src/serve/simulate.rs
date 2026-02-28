@@ -133,7 +133,7 @@ fn simulate_flow_inner(
         .map(|v| {
             serde_json::json!({
                 "type": v.verdict_type,
-                "payload": tenor_eval::types::value_to_json(&v.payload),
+                "payload": v.payload.to_json(),
             })
         })
         .collect();
