@@ -237,26 +237,6 @@ fn test_deploy_config_read_invalid() {
 // Run via: cargo test -p tenor-cli validate
 
 // ── Test 7: deploy config template generation ─────────────────────────────────
-//
-// Verify that deploying a template that has required_sources but no --config
-// generates a deploy-config.toml file (and exits 0).
-// This test runs in a temp directory.
-
-#[test]
-fn test_deploy_config_template_generation_via_cli() {
-    // We can't easily test this without a working registry. The generation
-    // happens after the registry download and unpack, so we can only verify
-    // the behavior via unit tests in deploy_config.rs.
-    //
-    // This test documents the expected CLI behavior: if the template has
-    // required sources/personas and no --config is provided, the CLI should
-    // exit 0 with a message about generating deploy-config.toml.
-    //
-    // Since we can't connect to a registry in tests, we skip the full flow test.
-    // Unit tests in deploy_config.rs cover generate_deploy_config_template directly.
-    let _ = "documented only — see deploy_config.rs unit tests";
-}
-
 // ── Test 8: config roundtrip via CLI ─────────────────────────────────────────
 
 #[test]
