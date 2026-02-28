@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 10 of 11 — Hosted Platform — IN PROGRESS
-**Plan**: 6 of 7 completed in current phase (plans 1, 2, 3, 4, 5 done)
-**Status**: Phase 10 Plan 5 complete
-**Last activity**: 2026-02-28 — Phase 10 Plan 5 complete (usage metering, plan enforcement, billing export, 11 integration tests)
+**Plan**: 7 of 7 completed in current phase (plans 1, 2, 3, 4, 5, 6 done)
+**Status**: Phase 10 Plan 6 complete
+**Last activity**: 2026-02-28 — Phase 10 Plan 6 complete (admin API, React dashboard, system health, usage reports, 8 integration tests)
 
 Progress: ████████████████████░░ 80% (Phases 1-9 complete, Phase 10 in progress)
 
@@ -156,6 +156,14 @@ Progress: ████████████████████░░ 80%
 - [Phase 10-05] Only 2xx responses increment usage counters — failed requests not counted
 - [Phase 10-05] enforce_plan_limits allows on DB error (fail-open) to avoid false 402s on transient failures
 - [Phase 10-05] tokio::sync::Mutex<HashMap<_, i64>> used instead of HashMap<_, AtomicI64> — AtomicI64 can't be stored by value in HashMap (address instability on resize)
+- [Phase 10-06] AdminMetrics uses Vec<(Instant, bool)> with eviction on record_request — simpler than a ring buffer for 1-minute window
+- [Phase 10-06] build_router_with_management extended with admin_state + admin_dashboard_dir (both Option) — backward compat preserved
+- [Phase 10-06] admin_dashboard_dir: Option<PathBuf> in ServerConfig — None skips /admin/ route (no dead routes in single-tenant mode)
+- [Phase 10-06] React BrowserRouter basename=/admin — avoids path prefix issues with client-side routing
+- [Phase 10-06] API key stored in localStorage, injected as Bearer token — simple admin-only tool, no refresh needed
+- [Phase 10-06] erasableSyntaxOnly: ApiError field declared separately (not parameter property) to satisfy TS compiler
+- [Phase 10-06] DataTable generic over T with Column<T>.render — avoids per-page table reimplementation
+- [Phase 10-06] SystemHealth auto-refetches every 30s via refetchInterval in useQuery
 
 ## Blockers/Concerns
 
@@ -208,9 +216,10 @@ Progress: ████████████████████░░ 80%
 | 10 | 04 | 1266 | 7 | 7 |
 | 10 | 03 | ~7200 | 6 | 8 |
 | 10 | 05 | 980 | 7 | 12 |
+| 10 | 06 | 1106 | 7 | 40 |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 10-05-PLAN.md (usage metering, plan enforcement, billing export, 11 integration tests)
-Next action: Phase 10 Plan 6
+Stopped at: Completed 10-06-PLAN.md (admin API, React dashboard, system health, usage reports, 8 integration tests)
+Next action: Phase 10 Plan 7 (final plan)
