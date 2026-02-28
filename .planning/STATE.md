@@ -3,11 +3,11 @@
 ## Current Position
 
 **Phase**: 11 of 11 — Marketplace — IN PROGRESS
-**Plan**: 3 of 5 completed in current phase
-**Status**: Phase 11 Plan 3 complete — Registry API (7 endpoints), PostgreSQL storage, full-text search, archive store, 10 integration tests
-**Last activity**: 2026-02-28 — Phase 11 Plan 3 complete (registry server: 7 endpoints, PostgreSQL RegistryStorage, LocalArchiveStore, 10 integration tests)
+**Plan**: 4 of 5 completed in current phase
+**Status**: Phase 11 Plan 4 complete — Review workflow, marketplace browse/detail/wizard pages, 12 integration tests
+**Last activity**: 2026-02-27 — Phase 11 Plan 4 complete (review workflow, marketplace HTML pages, deploy wizard, 12 integration tests)
 
-Progress: ████████████████████████░ 96% (Phases 1-10 complete, Phase 11 Plan 3/5 done)
+Progress: ████████████████████████░ 97% (Phases 1-10 complete, Phase 11 Plan 4/5 done)
 
 ## Decisions
 
@@ -181,6 +181,9 @@ Progress: ███████████████████████�
 - [Phase 11-03] update_latest_version picks most recent approved-or-pending version by published_at DESC
 - [Phase 11-03] Download counter incremented via tokio::spawn (non-blocking); integration tests verify via storage directly to avoid timing dependency
 - [Phase 11-03] registry_archive_dir defaults to ./data/registry/archives in ServerConfig; None disables registry (503)
+- [Phase 11]: [11-04] Marketplace routes inside authenticated router with is_public_route() bypass — auth injection without blocking
+- [Phase 11]: [11-04] Server-rendered HTML with inline CSS for marketplace — no external framework for v1
+- [Phase 11]: [11-04] rejection_reason + readme_html as nullable columns (migration 20260302000001)
 
 ## Blockers/Concerns
 
@@ -206,6 +209,7 @@ Progress: ███████████████████████�
 | Phase 09 P07 | 754 | 8 tasks | 12 files |
 | Phase 10 P04 | 1266 | 7 tasks | 7 files |
 | Phase 10 P07 | 1137 | 7 tasks | 14 files |
+| Phase 11 P04 | 978 | 7 tasks | 13 files |
 
 ## Performance Metrics (continued)
 
@@ -242,6 +246,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed 11-03-PLAN.md (registry API: 7 endpoints, PostgreSQL RegistryStorage, LocalArchiveStore, 10 integration tests)
-Next action: Phase 11 Plan 04 (registry server wiring / hosted mode)
+Last session: 2026-02-27
+Stopped at: Completed 11-04-PLAN.md (review workflow, marketplace browse/detail/wizard pages, 12 integration tests)
+Next action: Phase 11 Plan 05 (final marketplace plan)
