@@ -3,11 +3,11 @@
 ## Current Position
 
 **Phase**: 11 of 11 — Marketplace — IN PROGRESS
-**Plan**: 1 of 5 completed in current phase
-**Status**: Phase 11 Plan 1 complete — tenor-template.toml manifest + tenor pack command
-**Last activity**: 2026-02-27 — Phase 11 Plan 1 complete (TemplateManifest types, pack_template, tenor pack CLI, 6 e2e tests)
+**Plan**: 2 of 5 completed in current phase
+**Status**: Phase 11 Plan 2 complete — tenor publish/search/install CLI commands + RegistryClient
+**Last activity**: 2026-02-27 — Phase 11 Plan 2 complete (RegistryClient, publish/search/install commands, 7 e2e tests, 96 conformance)
 
-Progress: ██████████████████████░ 92% (Phases 1-10 complete, Phase 11 Plan 1/5 done)
+Progress: ███████████████████████░ 94% (Phases 1-10 complete, Phase 11 Plan 2/5 done)
 
 ## Decisions
 
@@ -171,6 +171,10 @@ Progress: ██████████████████████░ 
 - [Phase 11-01] Semver validation is manual (no semver dep): check MAJOR.MINOR.PATCH prefix, allow pre-release suffix
 - [Phase 11-01] bundle.json placed at archive root (not contract/): clearly separates source from elaborated artifact
 - [Phase 11-01] SHA-256 computed over archive bytes (not manifest): integrity check covers all archive contents
+- [Phase 11-02] install --output renamed to --out (long='out', name='install_out'): clap global arg conflict with OutputFormat --output (same pattern as pack --out)
+- [Phase 11-02] Manual multipart body construction for publish: ureq v3 has no built-in multipart; boundary-based construction used for two-part archive + manifest upload
+- [Phase 11-02] get_template/TemplateInfo marked #[allow(dead_code)]: public API for planned 'tenor info' subcommand, not yet wired to CLI
+- [Phase 11-02] TENOR_REGISTRY_TOKEN env var checked as fallback when --token not supplied (publish command)
 
 ## Blockers/Concerns
 
@@ -227,9 +231,10 @@ Progress: ██████████████████████░ 
 | 10 | 06 | 1106 | 7 | 40 |
 | 10 | 07 | 1137 | 7 | 14 |
 | 11 | 01 | 582 | 5 | 6 |
+| 11 | 02 | 360 | 7 | 7 |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 11-01-PLAN.md (TemplateManifest types, pack_template, tenor pack CLI, 6 e2e tests, 96 conformance)
-Next action: Phase 11 Plan 02 (tenor publish command)
+Stopped at: Completed 11-02-PLAN.md (RegistryClient, publish/search/install CLI commands, 7 e2e tests, 96 conformance)
+Next action: Phase 11 Plan 03 (registry server)
