@@ -3,9 +3,9 @@
 ## Current Position
 
 **Phase**: 10 of 11 — Hosted Platform — IN PROGRESS
-**Plan**: 5 of 7 completed in current phase (plans 1, 2, 3, 4 done; plan 3 completed out of order)
-**Status**: Phase 10 Plan 3 complete
-**Last activity**: 2026-02-28 — Phase 10 Plan 3 complete (contract deployment, dynamic AppState, tenant-scoped routes, 9 provisioning tests)
+**Plan**: 6 of 7 completed in current phase (plans 1, 2, 3, 4, 5 done)
+**Status**: Phase 10 Plan 5 complete
+**Last activity**: 2026-02-28 — Phase 10 Plan 5 complete (usage metering, plan enforcement, billing export, 11 integration tests)
 
 Progress: ████████████████████░░ 80% (Phases 1-9 complete, Phase 10 in progress)
 
@@ -150,6 +150,12 @@ Progress: ████████████████████░░ 80%
 - [Phase 10-03] ContractsMap keyed by (Uuid, String) = (org_id, contract_id) for tenant isolation; nil UUID for static startup contracts
 - [Phase 10-03] deploy_contract re-fetches deployment after status update — returned record has status=active not provisioning
 - [Phase 10-03] Admin keys bypass org_id check in tenant-scoped handlers (super-admin semantics); tests for tenant isolation use execute_only keys
+- [Phase 10-05] UsageMeter uses drain-swap pattern: swap HashMap under Mutex to drain, then write to DB outside lock — minimizes lock contention
+- [Phase 10-05] UsageMeter::increment is non-blocking (tokio Mutex, no DB call on hot path)
+- [Phase 10-05] plan_enforcement_middleware sits inside rate_limit (plan enforcement before rate-limit consumption)
+- [Phase 10-05] Only 2xx responses increment usage counters — failed requests not counted
+- [Phase 10-05] enforce_plan_limits allows on DB error (fail-open) to avoid false 402s on transient failures
+- [Phase 10-05] tokio::sync::Mutex<HashMap<_, i64>> used instead of HashMap<_, AtomicI64> — AtomicI64 can't be stored by value in HashMap (address instability on resize)
 
 ## Blockers/Concerns
 
@@ -201,9 +207,10 @@ Progress: ████████████████████░░ 80%
 | 10 | 02 | 753 | 7 | 13 |
 | 10 | 04 | 1266 | 7 | 7 |
 | 10 | 03 | ~7200 | 6 | 8 |
+| 10 | 05 | 980 | 7 | 12 |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 10-03-PLAN.md (contract deployment, dynamic AppState, tenant-scoped routes, 9 provisioning tests)
-Next action: Phase 10 Plan 5
+Stopped at: Completed 10-05-PLAN.md (usage metering, plan enforcement, billing export, 11 integration tests)
+Next action: Phase 10 Plan 6
