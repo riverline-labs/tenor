@@ -61,7 +61,9 @@ fn test_deploy_help() {
         combined
     );
     assert!(
-        combined.contains("TEMPLATE_NAME") || combined.contains("template-name") || combined.contains("template_name"),
+        combined.contains("TEMPLATE_NAME")
+            || combined.contains("template-name")
+            || combined.contains("template_name"),
         "deploy --help should show TEMPLATE_NAME argument: {}",
         combined
     );
@@ -85,7 +87,9 @@ fn test_deploy_missing_token() {
         stderr
     );
     assert!(
-        stderr.contains("token") || stderr.contains("TENOR_PLATFORM_TOKEN") || stderr.contains("auth"),
+        stderr.contains("token")
+            || stderr.contains("TENOR_PLATFORM_TOKEN")
+            || stderr.contains("auth"),
         "error should mention missing token: {}",
         stderr
     );
@@ -116,7 +120,10 @@ fn test_deploy_connection_refused_registry() {
         stderr
     );
     assert!(
-        stderr.contains("connect") || stderr.contains("refused") || stderr.contains("registry") || stderr.contains("error"),
+        stderr.contains("connect")
+            || stderr.contains("refused")
+            || stderr.contains("registry")
+            || stderr.contains("error"),
         "error should mention registry connection failure: {}",
         stderr
     );
@@ -173,7 +180,10 @@ api_key = "buyer-key-uuid-1"
     );
     // It should fail at the registry stage, not the config stage.
     assert!(
-        stderr.contains("connect") || stderr.contains("refused") || stderr.contains("registry") || stderr.contains("error"),
+        stderr.contains("connect")
+            || stderr.contains("refused")
+            || stderr.contains("registry")
+            || stderr.contains("error"),
         "should fail at network stage: {}",
         stderr
     );
@@ -208,7 +218,10 @@ fn test_deploy_config_read_invalid() {
         stderr
     );
     assert!(
-        stderr.contains("parse") || stderr.contains("TOML") || stderr.contains("could not") || stderr.contains("error"),
+        stderr.contains("parse")
+            || stderr.contains("TOML")
+            || stderr.contains("could not")
+            || stderr.contains("error"),
         "error should mention config parse failure: {}",
         stderr
     );

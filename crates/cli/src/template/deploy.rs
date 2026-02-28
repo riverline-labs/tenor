@@ -61,7 +61,9 @@ pub fn cmd_deploy(
     let token = match token {
         Some(t) => t,
         None => {
-            eprintln!("error: platform auth token required — provide --token or set TENOR_PLATFORM_TOKEN");
+            eprintln!(
+                "error: platform auth token required — provide --token or set TENOR_PLATFORM_TOKEN"
+            );
             std::process::exit(1);
         }
     };
@@ -140,10 +142,7 @@ pub fn cmd_deploy(
     let bundle_json = match std::fs::read_to_string(&bundle_path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!(
-                "error: could not read bundle.json from archive: {}",
-                e
-            );
+            eprintln!("error: could not read bundle.json from archive: {}", e);
             std::process::exit(1);
         }
     };
@@ -175,8 +174,7 @@ pub fn cmd_deploy(
                 || !manifest.metadata.personas.is_empty();
 
             if needs_config {
-                let template_toml =
-                    deploy_config::generate_deploy_config_template(manifest);
+                let template_toml = deploy_config::generate_deploy_config_template(manifest);
 
                 // Write the config template to deploy-config.toml.
                 let out_path = std::path::Path::new("deploy-config.toml");
@@ -209,9 +207,7 @@ pub fn cmd_deploy(
         .unwrap_or_else(|| deploy_config.deploy.org_id.clone());
 
     if effective_org_id.is_empty() {
-        eprintln!(
-            "error: org_id is required — provide --org or set org_id in your deploy config"
-        );
+        eprintln!("error: org_id is required — provide --org or set org_id in your deploy config");
         std::process::exit(1);
     }
 
@@ -237,25 +233,30 @@ pub fn cmd_deploy(
     }
 
     // Build the adapter config from deploy config sources.
-    let adapter_config: serde_json::Value = serde_json::json!(
-        deploy_config.sources.iter().map(|(id, cfg)| {
-            (id.clone(), serde_json::json!({
-                "protocol": cfg.protocol,
-                "base_url": cfg.base_url,
-                "auth_header": cfg.auth_header,
-                "auth_value": cfg.auth_value,
-                "connection_string": cfg.connection_string,
-                "query": cfg.query,
-            }))
-        }).collect::<serde_json::Map<_, _>>()
-    );
+    let adapter_config: serde_json::Value = serde_json::json!(deploy_config
+        .sources
+        .iter()
+        .map(|(id, cfg)| {
+            (
+                id.clone(),
+                serde_json::json!({
+                    "protocol": cfg.protocol,
+                    "base_url": cfg.base_url,
+                    "auth_header": cfg.auth_header,
+                    "auth_value": cfg.auth_value,
+                    "connection_string": cfg.connection_string,
+                    "query": cfg.query,
+                }),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>());
 
     // Build persona mappings from deploy config.
-    let persona_mappings: serde_json::Value = serde_json::json!(
-        deploy_config.personas.iter().map(|(id, cfg)| {
-            (id.clone(), serde_json::json!({ "api_key": cfg.api_key }))
-        }).collect::<serde_json::Map<_, _>>()
-    );
+    let persona_mappings: serde_json::Value = serde_json::json!(deploy_config
+        .personas
+        .iter()
+        .map(|(id, cfg)| { (id.clone(), serde_json::json!({ "api_key": cfg.api_key })) })
+        .collect::<serde_json::Map<_, _>>());
 
     let request_body = serde_json::json!({
         "bundle": bundle,
@@ -282,10 +283,7 @@ pub fn cmd_deploy(
                 || msg.contains("os error 61")
                 || msg.contains("os error 111")
             {
-                eprintln!(
-                    "error: could not reach platform at {}",
-                    platform_url
-                );
+                eprintln!("error: could not reach platform at {}", platform_url);
             } else if msg.contains("401") || msg.contains("Unauthorized") {
                 eprintln!("error: platform returned 401 Unauthorized — check your token");
             } else if msg.contains("403") || msg.contains("Forbidden") {

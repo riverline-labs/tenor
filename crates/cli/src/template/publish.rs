@@ -27,10 +27,9 @@ pub fn cmd_publish(
     quiet: bool,
 ) {
     // Resolve auth token: prefer --token flag, fall back to env var.
-    let resolved_token =
-        token
-            .map(|t| t.to_string())
-            .or_else(|| std::env::var("TENOR_REGISTRY_TOKEN").ok());
+    let resolved_token = token
+        .map(|t| t.to_string())
+        .or_else(|| std::env::var("TENOR_REGISTRY_TOKEN").ok());
 
     if resolved_token.is_none() {
         eprintln!("error: --token or TENOR_REGISTRY_TOKEN required for publishing");
@@ -80,8 +79,7 @@ pub fn cmd_publish(
     };
 
     // Report success.
-    let registry_display = registry_url
-        .unwrap_or(super::registry::DEFAULT_REGISTRY_URL);
+    let registry_display = registry_url.unwrap_or(super::registry::DEFAULT_REGISTRY_URL);
 
     if !quiet {
         match output {

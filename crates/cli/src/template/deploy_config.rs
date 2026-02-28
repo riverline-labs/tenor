@@ -95,8 +95,7 @@ pub fn read_deploy_config(path: &Path) -> Result<DeployConfig, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("could not read '{}': {}", path.display(), e))?;
 
-    toml::from_str(&content)
-        .map_err(|e| format!("could not parse '{}': {}", path.display(), e))
+    toml::from_str(&content).map_err(|e| format!("could not parse '{}': {}", path.display(), e))
 }
 
 /// Validate that a `DeployConfig` satisfies all requirements declared in `manifest`.
@@ -166,7 +165,9 @@ pub fn generate_deploy_config_template(manifest: &TemplateManifest) -> String {
             out.push_str("base_url = \"https://api.example.com\"\n");
             out.push_str("auth_header = \"Authorization\"\n");
             out.push_str("auth_value = \"Bearer <token>\"\n");
-            out.push_str("# Database source fields (comment out REST fields and uncomment these):\n");
+            out.push_str(
+                "# Database source fields (comment out REST fields and uncomment these):\n",
+            );
             out.push_str("# connection_string = \"postgres://user:pass@host/db\"\n");
             out.push_str("# query = \"SELECT * FROM ...\"\n");
             out.push('\n');

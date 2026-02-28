@@ -62,10 +62,7 @@ pub fn cmd_install(
     let tmp_archive = tmp_dir.path().join(&archive_filename);
 
     if let Err(e) = std::fs::write(&tmp_archive, &archive_bytes) {
-        eprintln!(
-            "error: could not write archive to temp file: {}",
-            e
-        );
+        eprintln!("error: could not write archive to temp file: {}", e);
         std::process::exit(1);
     }
 
