@@ -1,0 +1,9 @@
+{
+  "construct_id": null,
+  "construct_kind": null,
+  "field": null,
+  "file": "system_file_has_non_system.tenor",
+  "line": 11,
+  "message": "System files may not contain contract constructs",
+  "pass": 0
+}

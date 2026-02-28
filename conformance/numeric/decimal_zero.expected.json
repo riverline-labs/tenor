@@ -1,0 +1,32 @@
+{
+  "constructs": [
+    {
+      "default": {
+        "kind": "decimal_value",
+        "precision": 10,
+        "scale": 2,
+        "value": "0.00"
+      },
+      "id": "zero_balance",
+      "kind": "Fact",
+      "provenance": {
+        "file": "decimal_zero.tenor",
+        "line": 5
+      },
+      "source": {
+        "field": "zero_balance",
+        "system": "account"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Decimal",
+        "precision": 10,
+        "scale": 2
+      }
+    }
+  ],
+  "id": "decimal_zero",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

@@ -599,6 +599,51 @@ impl<'a> Parser<'a> {
             let c = self.parse_construct()?;
             constructs.push(c);
         }
+
+        // C-SYS-05: at most one system declaration per file
+        let systems: Vec<_> = constructs
+            .iter()
+            .filter_map(|c| match c {
+                RawConstruct::System { id, prov, .. } => Some((id, prov)),
+                _ => None,
+            })
+            .collect();
+        if systems.len() > 1 {
+            let (_, prov) = &systems[1];
+            return Err(ElabError::parse(
+                &prov.file,
+                prov.line,
+                "multiple System declarations in a single file",
+            ));
+        }
+
+        // C-SYS-04: a file with a system declaration may not contain contract constructs
+        if let Some((_, sys_prov)) = systems.first() {
+            for c in &constructs {
+                match c {
+                    RawConstruct::System { .. } | RawConstruct::Import { .. } => {}
+                    other => {
+                        let prov = match other {
+                            RawConstruct::Fact { prov, .. }
+                            | RawConstruct::Entity { prov, .. }
+                            | RawConstruct::Rule { prov, .. }
+                            | RawConstruct::Operation { prov, .. }
+                            | RawConstruct::Flow { prov, .. }
+                            | RawConstruct::Persona { prov, .. }
+                            | RawConstruct::Source { prov, .. }
+                            | RawConstruct::TypeDecl { prov, .. } => prov,
+                            _ => sys_prov,
+                        };
+                        return Err(ElabError::parse(
+                            &prov.file,
+                            prov.line,
+                            "System files may not contain contract constructs",
+                        ));
+                    }
+                }
+            }
+        }
+
         Ok(constructs)
     }
 

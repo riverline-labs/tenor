@@ -1,0 +1,29 @@
+// Positive test: Not expression (negation)
+// Covers: standalone use of the ¬ (not) operator in a rule predicate
+// Expected: elaborates without error, Not serializes as {"op": "not", "operand": {...}}
+
+fact account_frozen {
+  type:   Bool
+  source: "account.frozen"
+}
+
+entity Account {
+  states:  [active, suspended]
+  initial: active
+  transitions: [
+    (active, suspended)
+  ]
+}
+
+rule account_operable {
+  stratum: 0
+  when:    ¬(account_frozen = true)
+  produce: verdict account_operable { payload: Bool = true }
+}
+
+operation suspend_account {
+  allowed_personas: [admin]
+  precondition:     ¬verdict_present(account_operable)
+  effects:          [(Account, active, suspended)]
+  error_contract:   [precondition_failed, persona_rejected]
+}

@@ -1,0 +1,14 @@
+// Negative test: C-SYS-04 — system file may not contain contract constructs
+// A file with a system declaration also contains a fact declaration.
+// Expected: error at pass 0
+
+system my_system {
+  members: [
+    contract_a: "member_a.tenor"
+  ]
+}
+
+fact extra_fact {
+  type:   Bool
+  source: "test.value"
+}

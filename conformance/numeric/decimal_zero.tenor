@@ -1,0 +1,9 @@
+// Numeric precision test — decimal_zero
+// A zero Decimal value must serialize as a string, not native JSON 0.
+// The declared type's precision/scale (10, 2) are used in the interchange output.
+
+fact zero_balance {
+  type:    Decimal(precision: 10, scale: 2)
+  source:  "account.zero_balance"
+  default: "0.00"
+}
