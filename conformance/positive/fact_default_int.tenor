@@ -1,0 +1,8 @@
+// Positive test: Fact with Int type and integer default value
+// Exercises int_literal serialization in fact defaults.
+
+fact retry_count {
+  type:    Int(min: 0, max: 10)
+  source:  "config_service.retry_count"
+  default: 3
+}
