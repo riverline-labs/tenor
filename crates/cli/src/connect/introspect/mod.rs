@@ -19,7 +19,8 @@ use sql::introspect_sql_ddl;
 #[derive(Debug, Clone)]
 pub struct ExternalSchema {
     /// The format of the schema document.
-    #[allow(dead_code)] // Structural metadata; used by Debug output and future format-aware logic
+    #[allow(dead_code)]
+    // Structural metadata; used by Debug output and future format-aware logic
     pub format: SchemaFormat,
     /// Endpoints / entry points extracted from the schema.
     pub endpoints: Vec<Endpoint>,
