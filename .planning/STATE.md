@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 11 of 11 — Marketplace — IN PROGRESS
-**Plan**: 4 of 5 completed in current phase
-**Status**: Phase 11 Plan 4 complete — Review workflow, marketplace browse/detail/wizard pages, 12 integration tests
-**Last activity**: 2026-02-27 — Phase 11 Plan 4 complete (review workflow, marketplace HTML pages, deploy wizard, 12 integration tests)
+**Phase**: 11 of 11 — Marketplace — COMPLETE
+**Plan**: 5 of 5 completed in current phase
+**Status**: Phase 11 complete — Full marketplace lifecycle: publish, review, search, deploy (CLI + web wizard)
+**Last activity**: 2026-02-27 — Phase 11 Plan 5 complete (tenor deploy CLI, DeployConfig TOML, deploy-bundle endpoint, web wizard integration, 14 integration tests)
 
-Progress: ████████████████████████░ 97% (Phases 1-10 complete, Phase 11 Plan 4/5 done)
+Progress: █████████████████████████ 100% (All 11 phases complete)
 
 ## Decisions
 
@@ -184,6 +184,11 @@ Progress: ███████████████████████�
 - [Phase 11]: [11-04] Marketplace routes inside authenticated router with is_public_route() bypass — auth injection without blocking
 - [Phase 11]: [11-04] Server-rendered HTML with inline CSS for marketplace — no external framework for v1
 - [Phase 11]: [11-04] rejection_reason + readme_html as nullable columns (migration 20260302000001)
+- [Phase 11]: [11-05] POST /api/v1/contracts/deploy-bundle accepts pre-built interchange bundles, skips elaboration; derives contract_id from bundle["id"]
+- [Phase 11]: [11-05] Web wizard calls provisioning_deploy() directly (same process, no HTTP round-trip) via MarketplaceState.management
+- [Phase 11]: [11-05] MarketplaceState gains archive_store + management optional fields; management_state cloned before match block in routes.rs
+- [Phase 11]: [11-05] DeployConfig TOML: [deploy] org_id + [sources.*] + [personas.*]; validate_deploy_config() cross-checks TemplateManifest.required_sources
+- [Phase 11]: [11-05] CLI e2e tests use assert_cmd process invocation only (no lib.rs); deploy_config unit tests in module #[cfg(test)] block
 
 ## Blockers/Concerns
 
@@ -210,6 +215,7 @@ Progress: ███████████████████████�
 | Phase 10 P04 | 1266 | 7 tasks | 7 files |
 | Phase 10 P07 | 1137 | 7 tasks | 14 files |
 | Phase 11 P04 | 978 | 7 tasks | 13 files |
+| Phase 11 P05 | ~7200 | 7 tasks | 12 files |
 
 ## Performance Metrics (continued)
 
@@ -247,5 +253,5 @@ Progress: ███████████████████████�
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 11-04-PLAN.md (review workflow, marketplace browse/detail/wizard pages, 12 integration tests)
-Next action: Phase 11 Plan 05 (final marketplace plan)
+Stopped at: Completed 11-05-PLAN.md (tenor deploy CLI, DeployConfig TOML, deploy-bundle endpoint, web wizard integration, 14 integration tests)
+Next action: All 11 phases complete — project finished

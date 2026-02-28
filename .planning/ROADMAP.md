@@ -184,11 +184,11 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 5. Community contributions with review workflow
    **Plans**: 5 (11-01 through 11-05)
 
-- [ ] 11-01: Template format + packaging CLI
-- [ ] 11-02: Publishing, search, install CLI
-- [ ] 11-03: Registry API + storage
-- [ ] 11-04: Review workflow + marketplace UI
-- [ ] 11-05: One-click deploy
+- [x] 11-01: Template format + packaging CLI
+- [x] 11-02: Publishing, search, install CLI
+- [x] 11-03: Registry API + storage
+- [x] 11-04: Review workflow + marketplace UI
+- [x] 11-05: One-click deploy
 
 ## Progress
 
@@ -204,6 +204,6 @@ Tenor's remaining roadmap spans 8 phases: completing the core runtime (multi-ins
 | 8. Automatic UI            | 4/4 | Complete    | 2026-02-27 |
 | 9. Builder                 | 7/7 | Complete   | 2026-02-27 |
 | 10. Hosted Platform        | 7/7 | Complete    | 2026-02-28 |
-| 11. Marketplace            | 4/5 | In Progress|  |
+| 11. Marketplace            | 5/5 | Complete   | 2026-02-27 |
 
 **Total**: 42 plans across 8 remaining phases
