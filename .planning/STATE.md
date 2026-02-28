@@ -2,12 +2,12 @@
 
 ## Current Position
 
-**Phase**: 10 of 11 — Hosted Platform — IN PROGRESS
-**Plan**: 7 of 7 completed in current phase (plans 1, 2, 3, 4, 5, 6 done)
-**Status**: Phase 10 Plan 6 complete
-**Last activity**: 2026-02-28 — Phase 10 Plan 6 complete (admin API, React dashboard, system health, usage reports, 8 integration tests)
+**Phase**: 10 of 11 — Hosted Platform — COMPLETE
+**Plan**: 7 of 7 completed in current phase (all plans done)
+**Status**: Phase 10 Plan 7 complete — Phase 10 COMPLETE
+**Last activity**: 2026-02-28 — Phase 10 Plan 7 complete (integration test suite: full lifecycle, tenant isolation, auth flow, rate limiting, deployment lifecycle, 238 total tests)
 
-Progress: ████████████████████░░ 80% (Phases 1-9 complete, Phase 10 in progress)
+Progress: ██████████████████████░ 90% (Phases 1-10 complete, Phase 11 pending)
 
 ## Decisions
 
@@ -164,6 +164,8 @@ Progress: ████████████████████░░ 80%
 - [Phase 10-06] erasableSyntaxOnly: ApiError field declared separately (not parameter property) to satisfy TS compiler
 - [Phase 10-06] DataTable generic over T with Column<T>.render — avoids per-page table reimplementation
 - [Phase 10-06] SystemHealth auto-refetches every 30s via refetchInterval in useQuery
+- [Phase 10]: [Phase 10-07] Execute-only keys used for cross-org isolation tests — admin keys bypass org_id check by design (super-admin semantics)
+- [Phase 10]: [Phase 10-07] .well-known/tenor manifest returns 'etag' field (not 'bundle_etag'); evaluate calls require all declared facts
 
 ## Blockers/Concerns
 
@@ -188,6 +190,7 @@ Progress: ████████████████████░░ 80%
 | Phase 09 P03 | 408 | 6 tasks | 6 files |
 | Phase 09 P07 | 754 | 8 tasks | 12 files |
 | Phase 10 P04 | 1266 | 7 tasks | 7 files |
+| Phase 10 P07 | 1137 | 7 tasks | 14 files |
 
 ## Performance Metrics (continued)
 
@@ -217,9 +220,10 @@ Progress: ████████████████████░░ 80%
 | 10 | 03 | ~7200 | 6 | 8 |
 | 10 | 05 | 980 | 7 | 12 |
 | 10 | 06 | 1106 | 7 | 40 |
+| 10 | 07 | 1137 | 7 | 14 |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 10-06-PLAN.md (admin API, React dashboard, system health, usage reports, 8 integration tests)
-Next action: Phase 10 Plan 7 (final plan)
+Stopped at: Completed 10-07-PLAN.md (integration test suite: full lifecycle, tenant isolation, auth flow, rate limiting, deployment lifecycle, 238 total tests)
+Next action: Phase 11 (if applicable)
