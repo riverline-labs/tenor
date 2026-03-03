@@ -1,0 +1,12 @@
+// Evaluator test: int fact with comparison rule
+
+fact item_count {
+  type:   Int(min: 0, max: 1000)
+  source: "inventory.count"
+}
+
+rule has_items {
+  stratum: 0
+  when:    item_count > 0
+  produce: verdict has_inventory { payload: Bool = true }
+}

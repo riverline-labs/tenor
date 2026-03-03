@@ -1,0 +1,27 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_active"
+        ],
+        "rule": "check_active",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "active"
+    }
+  ],
+  "flow_outcome": "reviewed",
+  "steps_executed": [
+    {
+      "step_id": "step_review",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

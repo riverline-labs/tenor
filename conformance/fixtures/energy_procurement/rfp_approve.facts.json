@@ -1,0 +1,51 @@
+{
+  "rfp_amount": {"amount": "35000.00", "currency": "USD"},
+  "bid_total": {"amount": "32500.00", "currency": "USD"},
+  "rfp_deadline": "2026-06-30",
+  "current_date": "2026-03-15",
+  "procurement_stage": "draft",
+  "supplier_bids": [
+    {
+      "supplier_id": "ACME-ENERGY",
+      "bid_amount": {"amount": "32500.00", "currency": "USD"},
+      "scores": {
+        "technical_score": 88,
+        "price_score": 92,
+        "reliability_score": 85,
+        "total_score": 265
+      },
+      "cost_detail": {
+        "commodity_cost": {"amount": "28000.00", "currency": "USD"},
+        "delivery_cost": {"amount": "3000.00", "currency": "USD"},
+        "risk_premium": {"amount": "1500.00", "currency": "USD"}
+      },
+      "compliant": true
+    },
+    {
+      "supplier_id": "GLOBAL-POWER",
+      "bid_amount": {"amount": "37200.00", "currency": "USD"},
+      "scores": {
+        "technical_score": 82,
+        "price_score": 78,
+        "reliability_score": 90,
+        "total_score": 250
+      },
+      "cost_detail": {
+        "commodity_cost": {"amount": "31000.00", "currency": "USD"},
+        "delivery_cost": {"amount": "4200.00", "currency": "USD"},
+        "risk_premium": {"amount": "2000.00", "currency": "USD"}
+      },
+      "compliant": true
+    }
+  ],
+  "winning_bid": {
+    "technical_score": 88,
+    "price_score": 92,
+    "reliability_score": 85,
+    "total_score": 265
+  },
+  "budget_approved": true,
+  "compliance_checked": true,
+  "minimum_score_threshold": 180,
+  "bid_count": 2
+}

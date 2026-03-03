@@ -1,0 +1,71 @@
+// Sub-flow snapshot inheritance test: sub-flow inherits parent snapshot
+//
+// Scenario:
+// - Parent flow creates snapshot with verdict "parent_active"
+// - Step 1: OperationStep in parent changes entity from active -> processed
+// - Step 2: SubFlowStep calls sub-flow
+// - Sub-flow BranchStep checks verdict_present(parent_active) from inherited snapshot
+//   MUST see the parent's frozen verdict (true)
+
+entity Item {
+  states:  [active, processed]
+  initial: active
+  transitions: [
+    (active, processed)
+  ]
+}
+
+fact is_active {
+  type:   Bool
+  source: "system.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict parent_active { payload: Bool = true }
+}
+
+operation process_item {
+  allowed_personas: [admin]
+  precondition:     verdict_present(parent_active)
+  effects:          [(Item, active, processed)]
+  error_contract:   [precondition_failed]
+}
+
+flow sub_check_flow {
+  snapshot: at_initiation
+  entry:    sub_branch
+
+  steps: {
+    sub_branch: BranchStep {
+      condition: verdict_present(parent_active)
+      persona:   admin
+      if_true:   Terminal(sub_success)
+      if_false:  Terminal(sub_failure)
+    }
+  }
+}
+
+flow parent_flow {
+  snapshot: at_initiation
+  entry:    step_process
+
+  steps: {
+    step_process: OperationStep {
+      op:      process_item
+      persona: admin
+      outcomes: {
+        success: step_sub
+      }
+      on_failure: Terminate(outcome: parent_error)
+    }
+
+    step_sub: SubFlowStep {
+      flow:       sub_check_flow
+      persona:    admin
+      on_success: Terminal(parent_success)
+      on_failure: Terminate(outcome: parent_error)
+    }
+  }
+}

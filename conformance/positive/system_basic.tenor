@@ -1,0 +1,12 @@
+// Positive test: basic System with 2 member contracts.
+// No shared personas, triggers, or shared entities.
+
+system enrollment_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: []
+  shared_entities: []
+}

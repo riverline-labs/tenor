@@ -1,0 +1,76 @@
+// Evaluator test: compensate failure handler
+// Main operation transitions entity to active, then a second operation fails
+// (entity not in expected state), triggering compensation that rolls back.
+
+entity Account {
+  states:  [pending, active, rolled_back]
+  initial: pending
+  transitions: [
+    (pending, active),
+    (active, rolled_back)
+  ]
+}
+
+fact is_active {
+  type:   Bool
+  source: "system.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict system_active { payload: Bool = true }
+}
+
+operation activate_account {
+  allowed_personas: [admin]
+  precondition:     verdict_present(system_active)
+  effects:          [(Account, pending, active)]
+  error_contract:   [precondition_failed]
+}
+
+operation finalize_account {
+  allowed_personas: [admin]
+  precondition:     verdict_present(system_active)
+  effects:          [(Account, pending, active)]
+  error_contract:   [precondition_failed]
+}
+
+operation rollback_account {
+  allowed_personas: [admin]
+  precondition:     verdict_present(system_active)
+  effects:          [(Account, active, rolled_back)]
+  error_contract:   [precondition_failed]
+}
+
+flow compensate_flow {
+  snapshot: at_initiation
+  entry:    step_activate
+
+  steps: {
+    step_activate: OperationStep {
+      op:      activate_account
+      persona: admin
+      outcomes: {
+        success: step_finalize
+      }
+      on_failure: Terminate(outcome: activation_failed)
+    }
+
+    step_finalize: OperationStep {
+      op:      finalize_account
+      persona: admin
+      outcomes: {
+        success: Terminal(completed)
+      }
+      on_failure: Compensate(
+        steps: [{
+          op:         rollback_account
+          persona:    admin
+          on_failure: Terminal(rollback_failed)
+        }]
+        then: Terminal(rolled_back)
+      )
+    }
+  }
+}

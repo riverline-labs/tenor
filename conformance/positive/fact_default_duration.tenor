@@ -1,0 +1,8 @@
+// Positive test: Fact with Duration type and integer default value
+// Exercises Duration IntLiteral default serialization in fact defaults.
+
+fact timeout_seconds {
+  type:    Duration(unit: "seconds", min: 0, max: 86400)
+  source:  "config_service.timeout"
+  default: 3600
+}

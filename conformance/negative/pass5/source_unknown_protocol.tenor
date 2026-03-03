@@ -1,0 +1,3 @@
+source bad_proto {
+  protocol: ftp
+}

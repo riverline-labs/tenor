@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Entity",
+  "construct_id": "Beta",
+  "field": "parent",
+  "file": "entity_hierarchy_cycle.tenor",
+  "line": 14,
+  "message": "entity hierarchy cycle detected: Beta → Alpha → Beta"
+}

@@ -1,0 +1,14 @@
+// Negative test — Pass 2
+// Two Facts with the same id in one file. Must be rejected.
+// Note: same id across different construct kinds (e.g., Fact "foo" and Entity "foo")
+// is explicitly permitted by the spec — only same-kind duplicates are errors.
+
+fact foo {
+  type:   Bool
+  source: "x.foo"
+}
+
+fact foo {
+  type:   Int(min: 0, max: 100)
+  source: "x.foo_int"
+}

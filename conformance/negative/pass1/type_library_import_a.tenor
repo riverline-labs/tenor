@@ -1,0 +1,10 @@
+// Negative test: Type library file contains import declaration
+// The imported file (type_library_import_b.tenor) is a type library
+// (only TypeDecl) but also has an import — which violates §4.6.
+
+import "type_library_import_b.tenor"
+
+fact addr {
+  type: Bool
+  source: "sys.addr"
+}

@@ -1,0 +1,32 @@
+{
+  "constructs": [
+    {
+      "default": {
+        "kind": "decimal_value",
+        "precision": 10,
+        "scale": 2,
+        "value": "2.36"
+      },
+      "id": "rounded_up",
+      "kind": "Fact",
+      "provenance": {
+        "file": "decimal_default_rounding_up.tenor",
+        "line": 5
+      },
+      "source": {
+        "field": "rounded_up",
+        "system": "finance"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Decimal",
+        "precision": 10,
+        "scale": 2
+      }
+    }
+  ],
+  "id": "decimal_default_rounding_up",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

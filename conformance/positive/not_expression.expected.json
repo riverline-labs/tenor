@@ -1,0 +1,109 @@
+{
+  "constructs": [
+    {
+      "id": "account_frozen",
+      "kind": "Fact",
+      "provenance": {
+        "file": "not_expression.tenor",
+        "line": 5
+      },
+      "source": {
+        "field": "frozen",
+        "system": "account"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "id": "Account",
+      "initial": "active",
+      "kind": "Entity",
+      "provenance": {
+        "file": "not_expression.tenor",
+        "line": 10
+      },
+      "states": [
+        "active",
+        "suspended"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "active",
+          "to": "suspended"
+        }
+      ]
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "account_operable"
+        },
+        "when": {
+          "op": "not",
+          "operand": {
+            "left": {
+              "fact_ref": "account_frozen"
+            },
+            "op": "=",
+            "right": {
+              "literal": true,
+              "type": {
+                "base": "Bool"
+              }
+            }
+          }
+        }
+      },
+      "id": "account_operable",
+      "kind": "Rule",
+      "provenance": {
+        "file": "not_expression.tenor",
+        "line": 18
+      },
+      "stratum": 0,
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "admin"
+      ],
+      "effects": [
+        {
+          "entity_id": "Account",
+          "from": "active",
+          "to": "suspended"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "suspend_account",
+      "kind": "Operation",
+      "precondition": {
+        "op": "not",
+        "operand": {
+          "verdict_present": "account_operable"
+        }
+      },
+      "provenance": {
+        "file": "not_expression.tenor",
+        "line": 24
+      },
+      "tenor": "1.0"
+    }
+  ],
+  "id": "not_expression",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

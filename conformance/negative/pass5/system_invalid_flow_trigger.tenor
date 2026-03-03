@@ -1,0 +1,19 @@
+// Negative test -- Pass 5
+// Flow trigger references a contract not in the members list.
+
+system bad_trigger_system {
+  members: [
+    contract_a: "member_a.tenor",
+    contract_b: "member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: [
+    {
+      source: contract_a.application_flow,
+      on: success,
+      target: contract_x.review_flow,
+      persona: applicant
+    }
+  ]
+  shared_entities: []
+}

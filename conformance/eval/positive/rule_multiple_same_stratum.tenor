@@ -1,0 +1,23 @@
+// Evaluator test: multiple rules at same stratum (independent)
+
+fact a_flag {
+  type:   Bool
+  source: "system.a"
+}
+
+fact b_flag {
+  type:   Bool
+  source: "system.b"
+}
+
+rule check_a {
+  stratum: 0
+  when:    a_flag = true
+  produce: verdict verdict_a { payload: Bool = true }
+}
+
+rule check_b {
+  stratum: 0
+  when:    b_flag = true
+  produce: verdict verdict_b { payload: Bool = true }
+}

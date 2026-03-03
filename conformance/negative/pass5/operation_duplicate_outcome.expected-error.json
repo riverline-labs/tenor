@@ -1,0 +1,9 @@
+{
+  "construct_id": "dup_op",
+  "construct_kind": "Operation",
+  "field": "outcomes",
+  "file": "operation_duplicate_outcome.tenor",
+  "line": 17,
+  "message": "duplicate outcome 'success'; outcome labels must be unique within an Operation",
+  "pass": 5
+}

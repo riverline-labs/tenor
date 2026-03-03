@@ -1,0 +1,13 @@
+// Evaluator test: fact with default value -- fact omitted from facts.json
+
+fact is_premium {
+  type:    Bool
+  source:  "account.premium"
+  default: false
+}
+
+rule check_premium {
+  stratum: 0
+  when:    is_premium = false
+  produce: verdict standard_account { payload: Bool = true }
+}

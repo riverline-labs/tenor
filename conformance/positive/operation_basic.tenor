@@ -1,0 +1,45 @@
+// Positive test: Operation declarations
+// Covers: allowed_personas, precondition, effects, error_contract
+// Expected: elaborates without error, produces operation_basic.expected.json
+
+entity Order {
+  states:  [draft, submitted, approved, rejected]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (submitted, approved),
+    (submitted, rejected)
+  ]
+}
+
+fact is_active {
+  type:   Bool
+  source: "account_service.active"
+}
+
+rule account_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict account_active { payload: Bool = true }
+}
+
+operation submit_order {
+  allowed_personas: [buyer]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation approve_order {
+  allowed_personas: [reviewer, admin]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, submitted, approved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation reject_order {
+  allowed_personas: [reviewer, admin]
+  precondition:     verdict_present(account_active)
+  effects:          [(Order, submitted, rejected)]
+  error_contract:   [precondition_failed, persona_rejected]
+}

@@ -1,0 +1,89 @@
+{
+  "Entity": {
+    "prefix": "entity",
+    "body": [
+      "entity ${1:EntityName} {",
+      "  states: [${2:initial}, ${3:final}]",
+      "  initial_state: ${2:initial}",
+      "}"
+    ],
+    "description": "Scaffold a new entity with states and initial state"
+  },
+  "Fact": {
+    "prefix": "fact",
+    "body": [
+      "fact ${1:fact_name} : ${2|Int,Decimal,Money,Bool,String,Date,DateTime,Duration,Enum,Record,List|} ${3:= ${4:default}}"
+    ],
+    "description": "Declare a typed fact with optional default value"
+  },
+  "Rule": {
+    "prefix": "rule",
+    "body": [
+      "rule ${1:rule_name} {",
+      "  when ${2:condition}",
+      "  then ${3:VerdictType}(${4:payload})",
+      "}"
+    ],
+    "description": "Scaffold a new rule with when/then"
+  },
+  "Operation": {
+    "prefix": "operation",
+    "body": [
+      "operation ${1:op_name} {",
+      "  allowed_personas: [${2:persona}]",
+      "  precondition: ${3:condition}",
+      "  effects: {",
+      "    ${4:Entity}: ${5:from_state} -> ${6:to_state}",
+      "  }",
+      "}"
+    ],
+    "description": "Scaffold a new operation with personas, precondition, and effects"
+  },
+  "Flow": {
+    "prefix": "flow",
+    "body": [
+      "flow ${1:flow_name} {",
+      "  entry_point: ${2:step1}",
+      "  steps: {",
+      "    ${2:step1}: OperationStep {",
+      "      operation: ${3:op_name}",
+      "      on_success: Terminate",
+      "    }",
+      "  }",
+      "}"
+    ],
+    "description": "Scaffold a new flow with entry point and steps"
+  },
+  "Persona": {
+    "prefix": "persona",
+    "body": [
+      "persona ${1:persona_name}"
+    ],
+    "description": "Declare a new persona"
+  },
+  "Type": {
+    "prefix": "type",
+    "body": [
+      "type ${1:TypeName} = ${2|Record,Enum,TaggedUnion|} { ${3:fields} }"
+    ],
+    "description": "Declare a custom named type"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": [
+      "import \"${1:path/to/file.tenor}\""
+    ],
+    "description": "Import another Tenor file"
+  },
+  "System": {
+    "prefix": "system",
+    "body": [
+      "system ${1:system_name} {",
+      "  members: {",
+      "    ${2:contract_id}: \"${3:path/to/contract.tenor}\"",
+      "  }",
+      "}"
+    ],
+    "description": "Scaffold a new system with member contracts"
+  }
+}

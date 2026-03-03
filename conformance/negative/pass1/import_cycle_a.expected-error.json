@@ -1,0 +1,9 @@
+{
+  "pass": 1,
+  "construct_kind": null,
+  "construct_id": null,
+  "field": "import",
+  "file": "import_cycle_b.tenor",
+  "line": 4,
+  "message": "import cycle detected: import_cycle_a.tenor → import_cycle_b.tenor → import_cycle_a.tenor"
+}

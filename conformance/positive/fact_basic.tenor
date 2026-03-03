@@ -1,0 +1,48 @@
+// Positive test: basic Fact declarations covering all scalar BaseTypes
+// Expected: elaborates without error, produces fact_basic.expected.json
+
+fact is_active {
+  type:   Bool
+  source: "account_service.active"
+}
+
+fact item_count {
+  type:   Int(min: 0, max: 1000)
+  source: "inventory_service.item_count"
+}
+
+fact unit_price {
+  type:   Decimal(precision: 10, scale: 2)
+  source: "pricing_service.unit_price"
+}
+
+fact description {
+  type:   Text(max_length: 512)
+  source: "catalog_service.description"
+}
+
+fact status {
+  type:   Enum(values: ["pending", "active", "closed"])
+  source: "account_service.status"
+}
+
+fact created_date {
+  type:   Date
+  source: "account_service.created_date"
+}
+
+fact last_updated {
+  type:   DateTime
+  source: "account_service.last_updated"
+}
+
+fact balance {
+  type:    Money(currency: "USD")
+  source:  "account_service.balance"
+  default: Money { amount: "0.00", currency: "USD" }
+}
+
+fact processing_time {
+  type:   Duration(unit: "seconds", min: 0, max: 86400)
+  source: "processing_service.elapsed"
+}

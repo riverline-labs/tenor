@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Rule",
+  "construct_id": "base_rule",
+  "field": "body.when",
+  "file": "rule_forward_stratum_ref.tenor",
+  "line": 17,
+  "message": "stratum violation: rule 'base_rule' at stratum 0 references verdict 'high_verdict' produced by rule 'higher_rule' at stratum 1; verdict_refs must reference strata strictly less than the referencing rule's stratum"
+}

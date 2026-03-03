@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_trigger_system",
+  "construct_kind": "System",
+  "field": "triggers",
+  "file": "system_invalid_flow_trigger.tenor",
+  "line": 4,
+  "message": "trigger target contract 'contract_x' is not a System member",
+  "pass": 5
+}

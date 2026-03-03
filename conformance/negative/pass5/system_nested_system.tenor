@@ -1,0 +1,12 @@
+// Negative test -- Pass 5
+// C-SYS-03: A member file must not be a System file. Nested Systems
+// are not permitted.
+
+system outer_system {
+  members: [
+    inner: "system_nested_system.tenor"
+  ]
+  shared_personas: []
+  triggers: []
+  shared_entities: []
+}

@@ -1,0 +1,9 @@
+{
+  "construct_id": "dup_member_system",
+  "construct_kind": "System",
+  "field": "members",
+  "file": "system_duplicate_member.tenor",
+  "line": 4,
+  "message": "duplicate member id 'contract_a' in System 'dup_member_system'",
+  "pass": 5
+}

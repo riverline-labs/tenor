@@ -1,0 +1,8 @@
+// Positive test: Fact with Enum type and string default value
+// Exercises Enum default serialization in fact defaults.
+
+fact payment_status {
+  type:    Enum(values: ["pending", "approved", "rejected"])
+  source:  "payment_service.status"
+  default: "pending"
+}

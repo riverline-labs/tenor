@@ -1,0 +1,235 @@
+{
+  "constructs": [
+    {
+      "id": "doc_ready",
+      "kind": "Fact",
+      "provenance": {
+        "file": "flow_join_all_complete.tenor",
+        "line": 22
+      },
+      "source": {
+        "field": "ready",
+        "system": "doc_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "id": "Document",
+      "initial": "draft",
+      "kind": "Entity",
+      "provenance": {
+        "file": "flow_join_all_complete.tenor",
+        "line": 6
+      },
+      "states": [
+        "draft",
+        "reviewed"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "draft",
+          "to": "reviewed"
+        }
+      ]
+    },
+    {
+      "id": "Index",
+      "initial": "pending",
+      "kind": "Entity",
+      "provenance": {
+        "file": "flow_join_all_complete.tenor",
+        "line": 14
+      },
+      "states": [
+        "pending",
+        "indexed"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "pending",
+          "to": "indexed"
+        }
+      ]
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "doc_ready_confirmed"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "doc_ready"
+          },
+          "op": "=",
+          "right": {
+            "literal": true,
+            "type": {
+              "base": "Bool"
+            }
+          }
+        }
+      },
+      "id": "doc_ready_check",
+      "kind": "Rule",
+      "provenance": {
+        "file": "flow_join_all_complete.tenor",
+        "line": 27
+      },
+      "stratum": 0,
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "editor"
+      ],
+      "effects": [
+        {
+          "entity_id": "Index",
+          "from": "pending",
+          "to": "indexed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "index_content",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "doc_ready_confirmed"
+      },
+      "provenance": {
+        "file": "flow_join_all_complete.tenor",
+        "line": 40
+      },
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "editor"
+      ],
+      "effects": [
+        {
+          "entity_id": "Document",
+          "from": "draft",
+          "to": "reviewed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "review_content",
+      "kind": "Operation",
+      "precondition": {
+        "left": {
+          "fact_ref": "doc_ready"
+        },
+        "op": "=",
+        "right": {
+          "literal": true,
+          "type": {
+            "base": "Bool"
+          }
+        }
+      },
+      "provenance": {
+        "file": "flow_join_all_complete.tenor",
+        "line": 33
+      },
+      "tenor": "1.0"
+    },
+    {
+      "entry": "step_parallel",
+      "id": "publish_flow",
+      "kind": "Flow",
+      "provenance": {
+        "file": "flow_join_all_complete.tenor",
+        "line": 47
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "branches": [
+            {
+              "entry": "branch_review_step",
+              "id": "review_branch",
+              "steps": [
+                {
+                  "id": "branch_review_step",
+                  "kind": "OperationStep",
+                  "on_failure": {
+                    "kind": "Terminate",
+                    "outcome": "review_failed"
+                  },
+                  "op": "review_content",
+                  "outcomes": {
+                    "success": {
+                      "kind": "Terminal",
+                      "outcome": "done"
+                    }
+                  },
+                  "persona": "editor"
+                }
+              ]
+            },
+            {
+              "entry": "branch_index_step",
+              "id": "index_branch",
+              "steps": [
+                {
+                  "id": "branch_index_step",
+                  "kind": "OperationStep",
+                  "on_failure": {
+                    "kind": "Terminate",
+                    "outcome": "index_failed"
+                  },
+                  "op": "index_content",
+                  "outcomes": {
+                    "success": {
+                      "kind": "Terminal",
+                      "outcome": "done"
+                    }
+                  },
+                  "persona": "editor"
+                }
+              ]
+            }
+          ],
+          "id": "step_parallel",
+          "join": {
+            "on_all_complete": {
+              "kind": "Terminal",
+              "outcome": "finished"
+            },
+            "on_all_success": {
+              "kind": "Terminal",
+              "outcome": "all_done"
+            },
+            "on_any_failure": {
+              "kind": "Terminate",
+              "outcome": "partial_failure"
+            }
+          },
+          "kind": "ParallelStep"
+        }
+      ],
+      "tenor": "1.0"
+    }
+  ],
+  "id": "flow_join_all_complete",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

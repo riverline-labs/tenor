@@ -1,0 +1,32 @@
+{
+  "constructs": [
+    {
+      "default": {
+        "kind": "decimal_value",
+        "precision": 8,
+        "scale": 2,
+        "value": "-123.45"
+      },
+      "id": "loss_amount",
+      "kind": "Fact",
+      "provenance": {
+        "file": "decimal_negative.tenor",
+        "line": 5
+      },
+      "source": {
+        "field": "loss_amount",
+        "system": "finance"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Decimal",
+        "precision": 8,
+        "scale": 2
+      }
+    }
+  ],
+  "id": "decimal_negative",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

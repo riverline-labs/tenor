@@ -1,0 +1,85 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "line_items"
+        ],
+        "rule": "all_line_items_valid",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "line_items_validated"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "escrow_amount",
+          "compliance_threshold"
+        ],
+        "rule": "amount_within_threshold",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "within_threshold"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "delivery_status"
+        ],
+        "rule": "delivery_confirmed",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "delivery_confirmed"
+    },
+    {
+      "payload": {
+        "kind": "text_value",
+        "value": "auto"
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "can_release_without_compliance",
+        "stratum": 1,
+        "verdicts_used": [
+          "line_items_validated",
+          "delivery_confirmed",
+          "within_threshold"
+        ]
+      },
+      "type": "release_approved"
+    }
+  ],
+  "flow_outcome": "success",
+  "steps_executed": [
+    {
+      "step_id": "step_confirm",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_check_threshold",
+      "step_type": "branch",
+      "result": "true"
+    },
+    {
+      "step_id": "step_auto_release",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+// Numeric precision test — decimal_trailing_zero
+// The value 0.10 has a trailing zero that encodes scale information.
+// The interchange must preserve it as "0.10", not collapse it to "0.1".
+// §12.2 Pass 6: "No JSON native floats for Decimal or Money values."
+// §11.4: Rounding mode is round-half-to-even. Scale is declared, not inferred.
+
+fact rate {
+  type:    Decimal(precision: 5, scale: 2)
+  source:  "pricing.tax_rate"
+  default: "0.10"
+}

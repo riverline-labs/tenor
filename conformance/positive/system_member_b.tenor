@@ -1,0 +1,64 @@
+// Member contract B for System conformance tests.
+// Shares persona id "applicant" and entity id "application" with member_a.
+
+persona applicant
+
+fact score {
+  type: Int(min: 0, max: 100)
+  source: "scoring_service.score"
+}
+
+entity application {
+  states: [draft, submitted, approved, rejected]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (submitted, approved),
+    (submitted, rejected)
+  ]
+}
+
+rule check_score {
+  stratum: 1
+  when: score >= 50
+  produce: verdict qualified {
+    payload: Bool = true
+  }
+}
+
+operation start_review {
+  allowed_personas: [applicant]
+  precondition: score >= 50
+  effects: [(application, draft, submitted)]
+  error_contract: []
+}
+
+operation finalize_review {
+  allowed_personas: [applicant]
+  precondition: score >= 50
+  effects: [(application, submitted, approved)]
+  error_contract: []
+}
+
+flow review_flow {
+  snapshot: at_initiation
+  entry: step_start
+  steps: {
+    step_start: OperationStep {
+      op: start_review
+      persona: applicant
+      outcomes: {
+        success: step_finalize
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+    step_finalize: OperationStep {
+      op: finalize_review
+      persona: applicant
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

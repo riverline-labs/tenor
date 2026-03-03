@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_persona_system",
+  "construct_kind": "System",
+  "field": "shared_personas",
+  "file": "system_invalid_persona_ref.tenor",
+  "line": 4,
+  "message": "contract 'contract_c' in shared_persona 'applicant' is not a System member",
+  "pass": 5
+}

@@ -1,0 +1,256 @@
+{
+  "constructs": [
+    {
+      "id": "is_priority",
+      "kind": "Fact",
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 15
+      },
+      "source": {
+        "field": "priority",
+        "system": "ticket_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "id": "Ticket",
+      "initial": "open",
+      "kind": "Entity",
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 5
+      },
+      "states": [
+        "open",
+        "triaged",
+        "resolved",
+        "closed"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "open",
+          "to": "triaged"
+        },
+        {
+          "from": "triaged",
+          "to": "resolved"
+        },
+        {
+          "from": "resolved",
+          "to": "closed"
+        }
+      ]
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "priority_confirmed"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "is_priority"
+          },
+          "op": "=",
+          "right": {
+            "literal": true,
+            "type": {
+              "base": "Bool"
+            }
+          }
+        }
+      },
+      "id": "priority_check",
+      "kind": "Rule",
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 20
+      },
+      "stratum": 0,
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "agent"
+      ],
+      "effects": [
+        {
+          "entity_id": "Ticket",
+          "from": "resolved",
+          "to": "closed"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "close_ticket",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "priority_confirmed"
+      },
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 40
+      },
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "agent"
+      ],
+      "effects": [
+        {
+          "entity_id": "Ticket",
+          "from": "triaged",
+          "to": "resolved"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "resolve_ticket",
+      "kind": "Operation",
+      "precondition": {
+        "verdict_present": "priority_confirmed"
+      },
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 33
+      },
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "agent"
+      ],
+      "effects": [
+        {
+          "entity_id": "Ticket",
+          "from": "open",
+          "to": "triaged"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed",
+        "persona_rejected"
+      ],
+      "id": "triage_ticket",
+      "kind": "Operation",
+      "precondition": {
+        "left": {
+          "fact_ref": "is_priority"
+        },
+        "op": "=",
+        "right": {
+          "literal": true,
+          "type": {
+            "base": "Bool"
+          }
+        }
+      },
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 26
+      },
+      "tenor": "1.0"
+    },
+    {
+      "entry": "step_triage",
+      "id": "main_flow",
+      "kind": "Flow",
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 63
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_triage",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "triage_failed"
+          },
+          "op": "triage_ticket",
+          "outcomes": {
+            "success": "step_invoke_resolve"
+          },
+          "persona": "agent"
+        },
+        {
+          "flow": "resolve_flow",
+          "id": "step_invoke_resolve",
+          "kind": "SubFlowStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "subflow_failed"
+          },
+          "on_success": "step_close",
+          "persona": "agent"
+        },
+        {
+          "id": "step_close",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "close_failed"
+          },
+          "op": "close_ticket",
+          "outcomes": {
+            "success": {
+              "kind": "Terminal",
+              "outcome": "completed"
+            }
+          },
+          "persona": "agent"
+        }
+      ],
+      "tenor": "1.0"
+    },
+    {
+      "entry": "step_resolve",
+      "id": "resolve_flow",
+      "kind": "Flow",
+      "provenance": {
+        "file": "flow_subflow_step.tenor",
+        "line": 47
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_resolve",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "resolve_failed"
+          },
+          "op": "resolve_ticket",
+          "outcomes": {
+            "success": {
+              "kind": "Terminal",
+              "outcome": "done"
+            }
+          },
+          "persona": "agent"
+        }
+      ],
+      "tenor": "1.0"
+    }
+  ],
+  "id": "flow_subflow_step",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

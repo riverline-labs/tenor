@@ -1,0 +1,9 @@
+{
+  "construct_id": "close_order",
+  "construct_kind": "Operation",
+  "field": "id",
+  "file": "duplicate_operation.tenor",
+  "line": 22,
+  "message": "duplicate Operation id 'close_order': first declared at line 15",
+  "pass": 2
+}

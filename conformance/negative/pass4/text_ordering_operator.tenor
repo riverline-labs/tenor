@@ -1,0 +1,14 @@
+// Negative test — Pass 4
+// A Text fact is compared using <, which is not defined for Text.
+// Text supports only = and !=. Must be rejected with a type error.
+
+fact label {
+  type:   Text(max_length: 100)
+  source: "x.label"
+}
+
+rule bad_text_compare {
+  stratum: 0
+  when:    label < "foo"
+  produce: verdict bad { payload: Bool = true }
+}

@@ -1,0 +1,10 @@
+// Negative test -- Pass 1
+// Attempts to import a file outside the contract root directory via ../
+// Must be rejected with a sandbox escape error.
+
+import "../escape.tenor"
+
+fact foo {
+  type:   Bool
+  source: "x.y"
+}

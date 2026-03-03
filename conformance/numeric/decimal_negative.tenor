@@ -1,0 +1,9 @@
+// Numeric precision test — decimal_negative
+// A negative Decimal value must serialize as an exact string.
+// The declared type's precision/scale (8, 2) are used in the interchange output.
+
+fact loss_amount {
+  type:    Decimal(precision: 8, scale: 2)
+  source:  "finance.loss_amount"
+  default: "-123.45"
+}

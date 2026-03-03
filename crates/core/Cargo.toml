@@ -1,0 +1,13 @@
+[package]
+name = "tenor-core"
+version.workspace = true
+edition.workspace = true
+description = "Tenor elaborator core library"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+jsonschema = { workspace = true }
+serde_json = { workspace = true }

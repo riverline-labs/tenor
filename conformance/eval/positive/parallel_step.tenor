@@ -1,0 +1,84 @@
+// Evaluator test: parallel step with two branches affecting different entities
+// Each branch operates on a separate entity (non-overlapping effect sets per spec 11.5)
+
+entity OrderFulfillment {
+  states:  [pending, fulfilled]
+  initial: pending
+  transitions: [
+    (pending, fulfilled)
+  ]
+}
+
+entity PaymentProcessing {
+  states:  [pending, captured]
+  initial: pending
+  transitions: [
+    (pending, captured)
+  ]
+}
+
+fact is_ready {
+  type:   Bool
+  source: "system.ready"
+}
+
+rule check_ready {
+  stratum: 0
+  when:    is_ready = true
+  produce: verdict system_ready { payload: Bool = true }
+}
+
+operation fulfill_order {
+  allowed_personas: [system]
+  precondition:     verdict_present(system_ready)
+  effects:          [(OrderFulfillment, pending, fulfilled)]
+  error_contract:   [precondition_failed]
+}
+
+operation capture_payment {
+  allowed_personas: [system]
+  precondition:     verdict_present(system_ready)
+  effects:          [(PaymentProcessing, pending, captured)]
+  error_contract:   [precondition_failed]
+}
+
+flow parallel_process {
+  snapshot: at_initiation
+  entry:    par_step
+
+  steps: {
+    par_step: ParallelStep {
+      branches: [
+        Branch {
+          id:    branch_fulfill
+          entry: step_fulfill
+          steps: {
+            step_fulfill: OperationStep {
+              op:      fulfill_order
+              persona: system
+              outcomes: { success: Terminal(fulfilled) }
+              on_failure: Terminate(outcome: failure)
+            }
+          }
+        },
+        Branch {
+          id:    branch_payment
+          entry: step_payment
+          steps: {
+            step_payment: OperationStep {
+              op:      capture_payment
+              persona: system
+              outcomes: { success: Terminal(captured) }
+              on_failure: Terminate(outcome: failure)
+            }
+          }
+        }
+      ]
+      join: JoinPolicy {
+        on_all_success:  Terminal(completed)
+        on_any_failure:  Terminate(outcome: partial_failure)
+        on_all_complete: null
+      }
+    }
+  }
+}

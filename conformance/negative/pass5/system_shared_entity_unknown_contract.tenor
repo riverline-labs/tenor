@@ -1,0 +1,14 @@
+// Negative test -- Pass 5
+// Shared entity references a contract not in the members list.
+
+system bad_entity_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: []
+  shared_entities: [
+    { entity: application, contracts: [contract_a, contract_z] }
+  ]
+}

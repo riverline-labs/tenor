@@ -1,0 +1,73 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "line_items"
+        ],
+        "rule": "all_line_items_valid",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "line_items_validated"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "escrow_amount",
+          "compliance_threshold"
+        ],
+        "rule": "amount_within_threshold",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "within_threshold"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "delivery_status"
+        ],
+        "rule": "delivery_confirmed",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "delivery_confirmed"
+    }
+  ],
+  "flow_outcome": "failure",
+  "steps_executed": [
+    {
+      "step_id": "step_confirm",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_check_threshold",
+      "step_type": "branch",
+      "result": "true"
+    },
+    {
+      "step_id": "step_auto_release",
+      "step_type": "operation",
+      "result": "error: precondition failed for operation 'release_escrow': precondition evaluated to false"
+    },
+    {
+      "step_id": "comp:revert_delivery_confirmation",
+      "step_type": "compensation",
+      "result": "success"
+    }
+  ]
+}

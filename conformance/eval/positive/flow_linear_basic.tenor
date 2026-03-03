@@ -1,0 +1,43 @@
+// Evaluator test: simple flow: entry -> operation -> terminal
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [
+    (draft, submitted)
+  ]
+}
+
+fact is_active {
+  type:   Bool
+  source: "account.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict active { payload: Bool = true }
+}
+
+operation submit_order {
+  allowed_personas: [buyer]
+  precondition:     verdict_present(active)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed]
+}
+
+flow submit_flow {
+  snapshot: at_initiation
+  entry:    step_submit
+
+  steps: {
+    step_submit: OperationStep {
+      op:      submit_order
+      persona: buyer
+      outcomes: {
+        success: Terminal(order_submitted)
+      }
+      on_failure: Terminate(outcome: submit_failed)
+    }
+  }
+}

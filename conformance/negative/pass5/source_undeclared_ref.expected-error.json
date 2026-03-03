@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_fact",
+  "construct_kind": "Fact",
+  "field": "source",
+  "file": "source_undeclared_ref.tenor",
+  "line": 1,
+  "message": "fact 'bad_fact' references undeclared source 'nonexistent'",
+  "pass": 5
+}

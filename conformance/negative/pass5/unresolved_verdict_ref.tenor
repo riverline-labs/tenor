@@ -1,0 +1,17 @@
+// Negative test — Pass 5 (Rule)
+// A Rule uses verdict_present() with a VerdictType that is not produced
+// by any rule in the contract. Per SC-5 resolution (§12.2 Pass 5), referencing
+// an undeclared VerdictType in verdict_present() is a Pass 5 error.
+//
+// 'undeclared_verdict' is not produced by any Rule.produce clause in this contract.
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule bad_verdict_ref {
+  stratum: 1
+  when:    verdict_present(undeclared_verdict)
+  produce: verdict result { payload: Bool = true }
+}

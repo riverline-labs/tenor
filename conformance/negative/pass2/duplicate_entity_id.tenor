@@ -1,0 +1,14 @@
+// Negative test — Pass 2
+// Two Entities with the same id in one file. Must be rejected.
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [(draft, submitted)]
+}
+
+entity Order {
+  states:  [open, closed]
+  initial: open
+  transitions: [(open, closed)]
+}

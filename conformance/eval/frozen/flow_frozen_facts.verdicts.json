@@ -1,0 +1,33 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "balance",
+          "limit"
+        ],
+        "rule": "check_amount",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "within_limit"
+    }
+  ],
+  "flow_outcome": "facts_frozen_confirmed",
+  "steps_executed": [
+    {
+      "step_id": "step_close",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_verify",
+      "step_type": "branch",
+      "result": "true"
+    }
+  ]
+}

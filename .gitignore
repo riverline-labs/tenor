@@ -1,0 +1,27 @@
+# Rust build artifacts
+target/
+elaborator/target/
+
+# Editor/IDE
+.DS_Store
+*.swp
+*.swo
+
+# Node.js
+node_modules/
+dist/
+
+# Local protocol/process artifacts
+cffp.cue
+
+# Template packaging artifacts
+*.tenor-template.tar.gz
+
+# GSD planning (local-only)
+.planning/
+
+# Phase plans (local-only)
+docs/plans/
+
+# Audit reports (local-only)
+docs/audits/

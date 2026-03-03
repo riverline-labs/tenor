@@ -1,0 +1,70 @@
+// Positive test: Escalate failure handler
+// Covers: Escalate with to_persona and next step reference
+// Expected: elaborates without error, produces operation_escalate.expected.json
+
+entity Claim {
+  states:  [open, under_review, approved, denied]
+  initial: open
+  transitions: [
+    (open, under_review),
+    (under_review, approved),
+    (under_review, denied)
+  ]
+}
+
+fact claim_valid {
+  type:   Bool
+  source: "claims_service.valid"
+}
+
+rule claim_validity {
+  stratum: 0
+  when:    claim_valid = true
+  produce: verdict claim_validated { payload: Bool = true }
+}
+
+operation process_claim {
+  allowed_personas: [agent]
+  precondition:     claim_valid = true
+  effects:          [(Claim, open, under_review)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation approve_claim {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(claim_validated)
+  effects:          [(Claim, under_review, approved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation deny_claim {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(claim_validated)
+  effects:          [(Claim, under_review, denied)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow claims_flow {
+  snapshot: at_initiation
+  entry:    step_process
+
+  steps: {
+    step_process: OperationStep {
+      op:      process_claim
+      persona: agent
+      outcomes: {
+        success: step_review
+      }
+      on_failure: Escalate(to_persona: reviewer next: step_review)
+    }
+
+    step_review: OperationStep {
+      op:      approve_claim
+      persona: reviewer
+      outcomes: {
+        success: Terminal(approved)
+      }
+      on_failure: Terminate(outcome: denied)
+    }
+  }
+}

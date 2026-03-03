@@ -1,0 +1,12 @@
+// Evaluator test: fact omitted with no default -- should produce error
+
+fact required_fact {
+  type:   Bool
+  source: "system.required"
+}
+
+rule check {
+  stratum: 0
+  when:    required_fact = true
+  produce: verdict checked { payload: Bool = true }
+}

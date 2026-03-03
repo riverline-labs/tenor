@@ -1,0 +1,9 @@
+{
+  "construct_id": "admin",
+  "construct_kind": "Persona",
+  "field": "id",
+  "file": "duplicate_persona.tenor",
+  "line": 5,
+  "message": "duplicate Persona id 'admin': first declared at line 4",
+  "pass": 2
+}

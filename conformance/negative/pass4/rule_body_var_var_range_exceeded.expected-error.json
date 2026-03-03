@@ -1,0 +1,9 @@
+{
+  "pass": 4,
+  "construct_kind": "Rule",
+  "construct_id": "product_overflow",
+  "field": "body.produce.payload",
+  "file": "rule_body_var_var_range_exceeded.tenor",
+  "line": 26,
+  "message": "type error: product range Int(min: 0, max: 10000) is not contained in declared verdict payload type Int(min: 0, max: 100)"
+}

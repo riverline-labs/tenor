@@ -1,0 +1,56 @@
+// Frozen verdict test: entity state change MUST NOT affect verdict evaluation
+//
+// Scenario:
+// - Rule produces verdict "order_eligible" based on is_eligible fact
+// - Step 1: OperationStep changes entity Order from pending -> rejected
+// - Step 2: BranchStep checks verdict_present(order_eligible)
+//   MUST see the FROZEN verdict (true), not a recomputed value
+
+entity Order {
+  states:  [pending, rejected]
+  initial: pending
+  transitions: [
+    (pending, rejected)
+  ]
+}
+
+fact is_eligible {
+  type:   Bool
+  source: "system.eligible"
+}
+
+rule check_eligibility {
+  stratum: 0
+  when:    is_eligible = true
+  produce: verdict order_eligible { payload: Bool = true }
+}
+
+operation reject_order {
+  allowed_personas: [admin]
+  precondition:     verdict_present(order_eligible)
+  effects:          [(Order, pending, rejected)]
+  error_contract:   [precondition_failed]
+}
+
+flow frozen_test_flow {
+  snapshot: at_initiation
+  entry:    step_reject
+
+  steps: {
+    step_reject: OperationStep {
+      op:      reject_order
+      persona: admin
+      outcomes: {
+        success: step_check
+      }
+      on_failure: Terminate(outcome: reject_failed)
+    }
+
+    step_check: BranchStep {
+      condition: verdict_present(order_eligible)
+      persona:   admin
+      if_true:   Terminal(frozen_verdict_confirmed)
+      if_false:  Terminal(frozen_verdict_violated)
+    }
+  }
+}

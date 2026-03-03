@@ -1,0 +1,12 @@
+// Negative test — Pass 1 (multi-file, root file)
+// import_cycle_a.tenor imports import_cycle_b.tenor
+// import_cycle_b.tenor imports import_cycle_a.tenor
+// The elaborator must detect the cycle and reject both files.
+// See README.md for multi-file test convention.
+
+import "import_cycle_b.tenor"
+
+fact foo {
+  type:   Bool
+  source: "a.foo"
+}

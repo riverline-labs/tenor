@@ -1,0 +1,60 @@
+{
+  "constructs": [
+    {
+      "description": "Order management API",
+      "fields": {
+        "base_url": "https://api.orders.com/v1"
+      },
+      "id": "Order",
+      "kind": "Source",
+      "protocol": "http",
+      "provenance": {
+        "file": "source_entity_same_name.tenor",
+        "line": 5
+      },
+      "tenor": "1.0"
+    },
+    {
+      "id": "order_total",
+      "kind": "Fact",
+      "provenance": {
+        "file": "source_entity_same_name.tenor",
+        "line": 19
+      },
+      "source": {
+        "path": "orders.total",
+        "source_id": "Order"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Int",
+        "max": 100000,
+        "min": 0
+      }
+    },
+    {
+      "id": "Order",
+      "initial": "draft",
+      "kind": "Entity",
+      "provenance": {
+        "file": "source_entity_same_name.tenor",
+        "line": 11
+      },
+      "states": [
+        "draft",
+        "submitted"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "draft",
+          "to": "submitted"
+        }
+      ]
+    }
+  ],
+  "id": "source_entity_same_name",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

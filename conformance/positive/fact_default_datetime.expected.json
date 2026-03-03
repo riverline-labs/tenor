@@ -1,0 +1,1 @@
+{"constructs":[{"default":"2024-01-15T09:30:00Z","id":"created_at","kind":"Fact","provenance":{"file":"fact_default_datetime.tenor","line":4},"source":{"field":"created_at","system":"audit_service"},"tenor":"1.0","type":{"base":"DateTime"}}],"id":"fact_default_datetime","kind":"Bundle","tenor":"1.0","tenor_version":"1.0.0"}

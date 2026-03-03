@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Operation",
+  "construct_id": "bad_effect",
+  "field": "effects",
+  "file": "operation_effect_unknown_entity.tenor",
+  "line": 19,
+  "message": "effect references undeclared entity 'NonexistentEntity'"
+}

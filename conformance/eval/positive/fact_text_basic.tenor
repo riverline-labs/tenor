@@ -1,0 +1,12 @@
+// Evaluator test: text fact with equality check
+
+fact region {
+  type:   Text(max_length: 50)
+  source: "geo.region"
+}
+
+rule is_domestic {
+  stratum: 0
+  when:    region = "US"
+  produce: verdict domestic_order { payload: Bool = true }
+}

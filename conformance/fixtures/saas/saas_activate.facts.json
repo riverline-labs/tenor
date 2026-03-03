@@ -1,0 +1,12 @@
+{
+  "current_seat_count": 15,
+  "subscription_plan": "professional",
+  "plan_features": {
+    "max_seats": 50,
+    "api_access": true,
+    "sso_enabled": true,
+    "custom_branding": false
+  },
+  "payment_ok": true,
+  "account_age_days": 14
+}

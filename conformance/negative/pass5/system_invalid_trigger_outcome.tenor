@@ -1,0 +1,19 @@
+// Negative test -- Pass 5
+// Trigger references an invalid outcome (not success/failure/escalation).
+
+system bad_outcome_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: [
+    {
+      source: contract_a.application_flow,
+      on: completed,
+      target: contract_b.review_flow,
+      persona: applicant
+    }
+  ]
+  shared_entities: []
+}

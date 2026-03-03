@@ -1,0 +1,14 @@
+// Negative test — Pass 4
+// An Enum fact is compared using >, which is not defined for Enum.
+// Enum supports only = and !=. Must be rejected with a type error.
+
+fact status {
+  type:   Enum(values: ["active", "inactive"])
+  source: "x.status"
+}
+
+rule bad_enum_compare {
+  stratum: 0
+  when:    status > "active"
+  produce: verdict bad { payload: Bool = true }
+}

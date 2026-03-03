@@ -1,0 +1,48 @@
+{
+  "actions": [
+    {
+      "affected_entities": [
+        {
+          "current_state": "pending",
+          "entity_id": "Order",
+          "possible_transitions": [
+            "approved"
+          ]
+        }
+      ],
+      "description": "Execute approval_flow: approve_order transitions Order from pending to approved",
+      "enabling_verdicts": [
+        {
+          "payload": {
+            "kind": "bool_value",
+            "value": true
+          },
+          "producing_rule": "check_active",
+          "stratum": 0,
+          "verdict_type": "account_active"
+        }
+      ],
+      "entry_operation_id": "approve_order",
+      "flow_id": "approval_flow",
+      "instance_bindings": {
+        "Order": [
+          "_default"
+        ]
+      },
+      "persona_id": "admin"
+    }
+  ],
+  "blocked_actions": [],
+  "current_verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "producing_rule": "check_active",
+      "stratum": 0,
+      "verdict_type": "account_active"
+    }
+  ],
+  "persona_id": "admin"
+}

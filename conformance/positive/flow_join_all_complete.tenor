@@ -1,0 +1,86 @@
+// Positive test: JoinPolicy on_all_complete
+// Covers: ParallelStep with on_all_complete in JoinPolicy
+// The on_all_complete handler fires when all branches finish regardless of individual success/failure.
+// Expected: elaborates without error, produces flow_join_all_complete.expected.json
+
+entity Document {
+  states:  [draft, reviewed]
+  initial: draft
+  transitions: [
+    (draft, reviewed)
+  ]
+}
+
+entity Index {
+  states:  [pending, indexed]
+  initial: pending
+  transitions: [
+    (pending, indexed)
+  ]
+}
+
+fact doc_ready {
+  type:   Bool
+  source: "doc_service.ready"
+}
+
+rule doc_ready_check {
+  stratum: 0
+  when:    doc_ready = true
+  produce: verdict doc_ready_confirmed { payload: Bool = true }
+}
+
+operation review_content {
+  allowed_personas: [editor]
+  precondition:     doc_ready = true
+  effects:          [(Document, draft, reviewed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation index_content {
+  allowed_personas: [editor]
+  precondition:     verdict_present(doc_ready_confirmed)
+  effects:          [(Index, pending, indexed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow publish_flow {
+  snapshot: at_initiation
+  entry:    step_parallel
+
+  steps: {
+    step_parallel: ParallelStep {
+      branches: [
+        Branch {
+          id: review_branch
+          entry: branch_review_step
+          steps: {
+            branch_review_step: OperationStep {
+              op: review_content
+              persona: editor
+              outcomes: { success: Terminal(done) }
+              on_failure: Terminate(outcome: review_failed)
+            }
+          }
+        },
+        Branch {
+          id: index_branch
+          entry: branch_index_step
+          steps: {
+            branch_index_step: OperationStep {
+              op: index_content
+              persona: editor
+              outcomes: { success: Terminal(done) }
+              on_failure: Terminate(outcome: index_failed)
+            }
+          }
+        }
+      ]
+      join: JoinPolicy {
+        on_all_success: Terminal(all_done)
+        on_any_failure: Terminate(outcome: partial_failure)
+        on_all_complete: Terminal(finished)
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Flow",
+  "construct_id": "flow_b",
+  "field": "steps.call_a.flow",
+  "file": "flow_reference_cycle_b.tenor",
+  "line": 10,
+  "message": "flow reference cycle detected: flow_a → flow_b → flow_a"
+}

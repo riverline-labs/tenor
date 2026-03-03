@@ -1,0 +1,14 @@
+// Negative test — Pass 5
+// A transition references a state not declared in the entity's states set.
+// §12.2 Pass 5 Entity: "transition endpoints ∈ states"
+// (draft, cancelled) is declared as a transition but "cancelled" is not in states.
+
+entity Order {
+  states:  [draft, submitted, approved]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (submitted, approved),
+    (draft, cancelled)
+  ]
+}

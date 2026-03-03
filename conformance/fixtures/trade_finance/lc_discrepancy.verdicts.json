@@ -1,0 +1,98 @@
+{
+  "flow_outcome": "discrepant",
+  "steps_executed": [
+    {
+      "result": "success",
+      "step_id": "step_present",
+      "step_type": "operation"
+    },
+    {
+      "result": "handoff",
+      "step_id": "step_handoff_advising",
+      "step_type": "handoff"
+    },
+    {
+      "result": "success",
+      "step_id": "step_examine",
+      "step_type": "operation"
+    },
+    {
+      "result": "handoff",
+      "step_id": "step_handoff_issuing",
+      "step_type": "handoff"
+    },
+    {
+      "result": "false",
+      "step_id": "step_check_compliance",
+      "step_type": "branch"
+    },
+    {
+      "result": "success",
+      "step_id": "step_raise_discrepancy",
+      "step_type": "operation"
+    }
+  ],
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "invoice_submitted"
+        ],
+        "rule": "invoice_present",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "invoice_verified"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "presentation_date",
+          "expiry_date"
+        ],
+        "rule": "presentation_before_expiry",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "within_deadline"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "transport_doc_submitted"
+        ],
+        "rule": "transport_document_present",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "transport_doc_verified"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "discrepancy_detected",
+        "stratum": 1,
+        "verdicts_used": [
+          "documents_complete"
+        ]
+      },
+      "type": "has_discrepancy"
+    }
+  ]
+}

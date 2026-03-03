@@ -1,0 +1,64 @@
+// Member contract A for System conformance tests.
+// Standalone contract with fact, entity, persona, operation, and flow.
+
+persona applicant
+
+fact age {
+  type: Int(min: 0, max: 150)
+  source: "identity_service.age"
+}
+
+entity application {
+  states: [draft, submitted, approved, rejected]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (submitted, approved),
+    (submitted, rejected)
+  ]
+}
+
+rule check_age {
+  stratum: 1
+  when: age >= 18
+  produce: verdict eligible {
+    payload: Bool = true
+  }
+}
+
+operation submit_application {
+  allowed_personas: [applicant]
+  precondition: age >= 18
+  effects: [(application, draft, submitted)]
+  error_contract: []
+}
+
+operation approve_application {
+  allowed_personas: [applicant]
+  precondition: age >= 18
+  effects: [(application, submitted, approved)]
+  error_contract: []
+}
+
+flow application_flow {
+  snapshot: at_initiation
+  entry: step_submit
+  steps: {
+    step_submit: OperationStep {
+      op: submit_application
+      persona: applicant
+      outcomes: {
+        success: step_approve
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+    step_approve: OperationStep {
+      op: approve_application
+      persona: applicant
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

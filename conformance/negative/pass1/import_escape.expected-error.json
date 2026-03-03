@@ -1,0 +1,9 @@
+{
+  "construct_id": null,
+  "construct_kind": null,
+  "field": "import",
+  "file": "import_escape.tenor",
+  "line": 5,
+  "message": "import resolution failed: cannot resolve path '../escape.tenor'",
+  "pass": 1
+}

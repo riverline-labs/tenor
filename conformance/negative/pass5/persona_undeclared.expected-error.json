@@ -1,0 +1,9 @@
+{
+  "construct_id": "op",
+  "construct_kind": "Operation",
+  "field": "allowed_personas",
+  "file": "persona_undeclared.tenor",
+  "line": 18,
+  "message": "undeclared persona 'nonexistent' in allowed_personas",
+  "pass": 5
+}

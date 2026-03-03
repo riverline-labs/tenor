@@ -1,0 +1,21 @@
+// Negative test — Pass 4
+// Variable × variable multiplication in a PredicateExpression (the `when:` clause).
+// §9.4: "Variable × variable multiplication is not permitted" in PredicateExpression.
+// §9.2 ArithExpr grammar only allows: ArithExpr * literal_numeric
+// Must be rejected with a type error.
+
+fact x {
+  type:   Int(min: 0, max: 10)
+  source: "a.x"
+}
+
+fact y {
+  type:   Int(min: 0, max: 10)
+  source: "a.y"
+}
+
+rule bad_var_var {
+  stratum: 0
+  when:    x * y > 50
+  produce: verdict bad { payload: Bool = true }
+}

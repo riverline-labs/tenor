@@ -1,0 +1,4 @@
+{
+  "balance": { "amount": "500.00", "currency": "USD" },
+  "limit": { "amount": "1000.00", "currency": "USD" }
+}

@@ -1,0 +1,4 @@
+source bad_http {
+  protocol: http
+  auth: bearer_token
+}

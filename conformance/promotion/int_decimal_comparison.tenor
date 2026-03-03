@@ -1,0 +1,24 @@
+// Type promotion test — int_decimal_comparison
+// An Int fact is compared to a Decimal fact using >=.
+// §11.2: "Int op Decimal(p,s) → promote Int to Decimal(ceil(log10(max(|min|,|max|)))+1, 0)
+//          then apply Decimal rules"
+// The elaborator must materialize the promoted comparison_type on the AST node.
+// Int(min: 0, max: 999) → ceil(log10(999))+1 = ceil(2.999)+1 = 3+1 = 4 digits → Decimal(4, 0)
+// Decimal(4, 0) >= Decimal(8, 2) → Decimal(max(4,8)+1, max(0,2)) = Decimal(9, 2)
+// comparison_type in interchange must be Decimal(precision: 9, scale: 2)
+
+fact quantity {
+  type:   Int(min: 0, max: 999)
+  source: "inventory.quantity"
+}
+
+fact min_threshold {
+  type:   Decimal(precision: 8, scale: 2)
+  source: "policy.min_threshold"
+}
+
+rule above_threshold {
+  stratum: 0
+  when:    quantity >= min_threshold
+  produce: verdict above_threshold { payload: Bool = true }
+}

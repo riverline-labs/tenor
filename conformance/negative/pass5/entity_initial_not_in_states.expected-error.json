@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Entity",
+  "construct_id": "Order",
+  "field": "initial",
+  "file": "entity_initial_not_in_states.tenor",
+  "line": 7,
+  "message": "initial state 'draft' is not declared in states: [submitted, approved, rejected]"
+}

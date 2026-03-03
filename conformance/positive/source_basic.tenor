@@ -1,0 +1,38 @@
+source order_service {
+  protocol: http
+  base_url: "https://api.orders.com/v2"
+  auth: bearer_token
+  schema_ref: "https://api.orders.com/v2/openapi.json"
+  description: "Order management REST API"
+}
+
+source compliance_db {
+  protocol: database
+  dialect: postgres
+  description: "Compliance reporting database"
+}
+
+source config_store {
+  protocol: static
+  description: "Static configuration values"
+}
+
+source buyer_portal {
+  protocol: manual
+  description: "Human-provided input from buyer self-service portal"
+}
+
+fact escrow_amount {
+  type: Int(min: 0, max: 1000000)
+  source: order_service { path: "orders.balance" }
+}
+
+fact compliance_flag {
+  type: Bool
+  source: compliance_db { path: "compliance.flag" }
+}
+
+fact manual_input {
+  type: Bool
+  source: "buyer_portal.refund_requested"
+}

@@ -1,0 +1,68 @@
+{
+  "constructs": [
+    {
+      "description": "GraphQL API",
+      "fields": {
+        "endpoint": "https://api.example.com/graphql"
+      },
+      "id": "gql_api",
+      "kind": "Source",
+      "protocol": "graphql",
+      "provenance": {
+        "file": "source_graphql_grpc.tenor",
+        "line": 1
+      },
+      "tenor": "1.0"
+    },
+    {
+      "description": "gRPC service",
+      "fields": {
+        "endpoint": "grpc://services.internal:50051"
+      },
+      "id": "grpc_svc",
+      "kind": "Source",
+      "protocol": "grpc",
+      "provenance": {
+        "file": "source_graphql_grpc.tenor",
+        "line": 7
+      },
+      "tenor": "1.0"
+    },
+    {
+      "id": "gql_data",
+      "kind": "Fact",
+      "provenance": {
+        "file": "source_graphql_grpc.tenor",
+        "line": 13
+      },
+      "source": {
+        "path": "query.result",
+        "source_id": "gql_api"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "id": "grpc_data",
+      "kind": "Fact",
+      "provenance": {
+        "file": "source_graphql_grpc.tenor",
+        "line": 18
+      },
+      "source": {
+        "path": "service.method",
+        "source_id": "grpc_svc"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    }
+  ],
+  "id": "source_graphql_grpc",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

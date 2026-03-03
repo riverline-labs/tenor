@@ -1,0 +1,43 @@
+// Evaluator test: operation with persona authorization
+
+entity Document {
+  states:  [draft, reviewed]
+  initial: draft
+  transitions: [
+    (draft, reviewed)
+  ]
+}
+
+fact is_active {
+  type:   Bool
+  source: "system.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict active { payload: Bool = true }
+}
+
+operation review_doc {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(active)
+  effects:          [(Document, draft, reviewed)]
+  error_contract:   [persona_rejected]
+}
+
+flow review_flow {
+  snapshot: at_initiation
+  entry:    step_review
+
+  steps: {
+    step_review: OperationStep {
+      op:      review_doc
+      persona: reviewer
+      outcomes: {
+        success: Terminal(reviewed)
+      }
+      on_failure: Terminate(outcome: review_failed)
+    }
+  }
+}

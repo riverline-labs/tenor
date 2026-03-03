@@ -1,0 +1,12 @@
+// Manifest test: basic contract for manifest envelope validation
+// Covers: manifest generation with etag, bundle inlining, tenor version
+// Expected: elaborate --manifest produces manifest_basic.expected-manifest.json
+
+entity Order {
+  states:  [draft, submitted, approved]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (submitted, approved)
+  ]
+}

@@ -1,0 +1,43 @@
+// Negative test — Pass 5
+// A step outcome targets a step id that is not declared in the steps map.
+// §12.2 Pass 5 Flow: "all step refs resolve"
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [(draft, submitted)]
+}
+
+operation submit {
+  allowed_personas: [user]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow bad_ref_flow {
+  snapshot: at_initiation
+  entry:    step_one
+
+  steps: {
+    step_one: OperationStep {
+      op:      submit
+      persona: user
+      outcomes: {
+        success: step_two_does_not_exist
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

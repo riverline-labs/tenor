@@ -1,0 +1,79 @@
+{
+  "flow_outcome": "activated",
+  "steps_executed": [
+    {
+      "result": "success",
+      "step_id": "step_activate",
+      "step_type": "operation"
+    },
+    {
+      "result": "true",
+      "step_id": "step_check_payment",
+      "step_type": "branch"
+    }
+  ],
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "payment_ok"
+        ],
+        "rule": "payment_current",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "payment_current"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "current_seat_count",
+          "plan_features"
+        ],
+        "rule": "seats_within_limit",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "seats_ok"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "account_age_days"
+        ],
+        "rule": "trial_eligible",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "within_trial_period"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "can_activate",
+        "stratum": 1,
+        "verdicts_used": [
+          "seats_ok",
+          "payment_current"
+        ]
+      },
+      "type": "activation_approved"
+    }
+  ]
+}

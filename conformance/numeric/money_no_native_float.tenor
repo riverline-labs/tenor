@@ -1,0 +1,11 @@
+// Numeric precision test — money_no_native_float
+// A Money fact with a default value. The amount must appear as a structured
+// { "decimal_value": "...", "precision": N, "scale": N } object in interchange —
+// never as a native JSON float (which would lose precision for financial values).
+// §12.2 Pass 6: "No JSON native floats for Decimal or Money values."
+
+fact threshold {
+  type:    Money(currency: "USD")
+  source:  "compliance.release_threshold"
+  default: Money { amount: "10000.00", currency: "USD" }
+}

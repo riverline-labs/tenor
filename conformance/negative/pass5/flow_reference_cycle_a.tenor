@@ -1,0 +1,48 @@
+// Negative test — Pass 5 (multi-file, root file)
+// flow_reference_cycle_a.tenor contains a Flow with a SubFlowStep that invokes
+// flow_reference_cycle_b.tenor's Flow, which in turn invokes this Flow back.
+// §12.2 Pass 5 Flow: "flow reference graph acyclic"
+// §10.5: "Flow reference graph (SubFlowStep references) must be acyclic."
+//
+// See negative/pass5/README.md for multi-file test convention.
+// Both files must be elaborated together as a bundle.
+
+import "flow_reference_cycle_b.tenor"
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [(draft, submitted)]
+}
+
+operation submit {
+  allowed_personas: [user]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow flow_a {
+  snapshot: at_initiation
+  entry:    call_b
+
+  steps: {
+    call_b: SubFlowStep {
+      flow:       flow_b
+      persona:    user
+      on_success: Terminal(success)
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

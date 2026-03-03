@@ -1,0 +1,18 @@
+// Evaluator test: two rules at different strata, stratum 1 references stratum 0 verdict
+
+fact is_active {
+  type:   Bool
+  source: "account.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict account_active { payload: Bool = true }
+}
+
+rule can_process {
+  stratum: 1
+  when:    verdict_present(account_active)
+  produce: verdict order_processable { payload: Bool = true }
+}

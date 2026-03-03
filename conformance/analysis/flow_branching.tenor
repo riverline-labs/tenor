@@ -1,0 +1,96 @@
+// Analysis test: flow path enumeration (S6)
+// Flow with OperationStep outcomes and BranchStep
+
+entity request {
+  states:  [open, reviewed, approved, denied]
+  initial: open
+  transitions: [
+    (open, reviewed),
+    (reviewed, approved),
+    (reviewed, denied)
+  ]
+}
+
+fact amount {
+  type:   Int
+  source: "request_service.amount"
+}
+
+fact auto_approve {
+  type:   Bool
+  source: "policy_service.auto_approve"
+}
+
+rule amount_check {
+  stratum: 0
+  when:    amount > 0
+  produce: verdict valid_amount { payload: Bool = true }
+}
+
+rule auto_approve_check {
+  stratum: 0
+  when:    auto_approve = true
+  produce: verdict auto_approved { payload: Bool = true }
+}
+
+operation review_request {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(valid_amount)
+  effects:          [(request, open, reviewed)]
+  error_contract:   [precondition_failed]
+}
+
+operation approve_request {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(valid_amount)
+  effects:          [(request, reviewed, approved)]
+  error_contract:   [precondition_failed]
+}
+
+operation deny_request {
+  allowed_personas: [reviewer]
+  precondition:     verdict_present(valid_amount)
+  effects:          [(request, reviewed, denied)]
+  error_contract:   [precondition_failed]
+}
+
+flow request_processing {
+  snapshot: at_initiation
+  entry:    step_review
+
+  steps: {
+    step_review: OperationStep {
+      op:      review_request
+      persona: reviewer
+      outcomes: {
+        success: step_check_auto
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_check_auto: BranchStep {
+      condition: verdict_present(auto_approved)
+      persona:   reviewer
+      if_true:   step_approve
+      if_false:  step_deny
+    }
+
+    step_approve: OperationStep {
+      op:      approve_request
+      persona: reviewer
+      outcomes: {
+        success: Terminal(approved)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_deny: OperationStep {
+      op:      deny_request
+      persona: reviewer
+      outcomes: {
+        success: Terminal(denied)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

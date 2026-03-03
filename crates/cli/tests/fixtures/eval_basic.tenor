@@ -1,0 +1,12 @@
+// Minimal contract for eval testing: 1 fact, 1 rule
+
+fact is_active {
+  type:   Bool
+  source: "test.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict active_confirmed { payload: Bool = true }
+}

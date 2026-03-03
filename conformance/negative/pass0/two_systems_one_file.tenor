@@ -1,0 +1,15 @@
+// Negative test: C-SYS-05 — only one system declaration per file
+// Two system declarations in the same file.
+// Expected: error at pass 0
+
+system first_system {
+  members: [
+    contract_a: "member_a.tenor"
+  ]
+}
+
+system second_system {
+  members: [
+    contract_b: "member_b.tenor"
+  ]
+}

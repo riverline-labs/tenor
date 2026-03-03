@@ -1,0 +1,21 @@
+source gql_api {
+  protocol: graphql
+  endpoint: "https://api.example.com/graphql"
+  description: "GraphQL API"
+}
+
+source grpc_svc {
+  protocol: grpc
+  endpoint: "grpc://services.internal:50051"
+  description: "gRPC service"
+}
+
+fact gql_data {
+  type: Bool
+  source: gql_api { path: "query.result" }
+}
+
+fact grpc_data {
+  type: Bool
+  source: grpc_svc { path: "service.method" }
+}

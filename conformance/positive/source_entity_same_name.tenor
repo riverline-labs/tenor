@@ -1,0 +1,22 @@
+// Positive test: C-SRC-02 namespace separation
+// Covers: a Source and an Entity may share the same name without conflict
+// Sources and Entities occupy separate namespaces.
+
+source Order {
+  protocol: http
+  base_url: "https://api.orders.com/v1"
+  description: "Order management API"
+}
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [
+    (draft, submitted)
+  ]
+}
+
+fact order_total {
+  type:   Int(min: 0, max: 100000)
+  source: Order { path: "orders.total" }
+}

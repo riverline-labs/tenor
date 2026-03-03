@@ -1,0 +1,21 @@
+// Negative test — Pass 4
+// A comparison between Money(USD) and Money(EUR).
+// §4.2: "Money arithmetic is same-currency only."
+// §4.4: "Cross-currency operations require explicit Rule-level conversion."
+// Must be rejected with a type error.
+
+fact usd_amount {
+  type:   Money(currency: "USD")
+  source: "account.usd_balance"
+}
+
+fact eur_limit {
+  type:   Money(currency: "EUR")
+  source: "compliance.eur_limit"
+}
+
+rule cross_currency {
+  stratum: 0
+  when:    usd_amount > eur_limit
+  produce: verdict bad { payload: Bool = true }
+}

@@ -1,0 +1,61 @@
+// Frozen facts test: facts remain frozen during flow execution
+//
+// Scenario:
+// - Fact-dependent verdict check_amount evaluates balance <= limit
+// - Step 1: OperationStep changes entity Account from active -> closed
+// - Step 2: BranchStep checks verdict_present(within_limit)
+//   Facts are frozen at initiation, so verdict MUST be present
+
+entity Account {
+  states:  [active, closed]
+  initial: active
+  transitions: [
+    (active, closed)
+  ]
+}
+
+fact balance {
+  type:   Money(currency: "USD")
+  source: "account.balance"
+}
+
+fact limit {
+  type:   Money(currency: "USD")
+  source: "account.limit"
+}
+
+rule check_amount {
+  stratum: 0
+  when:    balance <= limit
+  produce: verdict within_limit { payload: Bool = true }
+}
+
+operation close_account {
+  allowed_personas: [admin]
+  precondition:     verdict_present(within_limit)
+  effects:          [(Account, active, closed)]
+  error_contract:   [precondition_failed]
+}
+
+flow frozen_facts_flow {
+  snapshot: at_initiation
+  entry:    step_close
+
+  steps: {
+    step_close: OperationStep {
+      op:      close_account
+      persona: admin
+      outcomes: {
+        success: step_verify
+      }
+      on_failure: Terminate(outcome: close_failed)
+    }
+
+    step_verify: BranchStep {
+      condition: verdict_present(within_limit)
+      persona:   admin
+      if_true:   Terminal(facts_frozen_confirmed)
+      if_false:  Terminal(facts_frozen_violated)
+    }
+  }
+}

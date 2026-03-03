@@ -1,0 +1,12 @@
+// Evaluator test: rule condition evaluates to false, no verdict produced
+
+fact is_active {
+  type:   Bool
+  source: "account.active"
+}
+
+rule check_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict account_active { payload: Bool = true }
+}

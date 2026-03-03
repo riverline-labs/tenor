@@ -1,0 +1,27 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_valid"
+        ],
+        "rule": "check_valid",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "task_valid"
+    }
+  ],
+  "flow_outcome": "task_completed",
+  "steps_executed": [
+    {
+      "step_id": "step_complete",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

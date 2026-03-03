@@ -1,0 +1,15 @@
+// Positive test: TaggedUnion variant referencing a TypeDecl
+
+type Address {
+  city: Text(100)
+  street: Text(200)
+}
+
+fact contact_info {
+  type: TaggedUnion {
+    Email: Text(254)
+    Mail: Address
+    Phone: Text(15)
+  }
+  source: "contact_service.info"
+}

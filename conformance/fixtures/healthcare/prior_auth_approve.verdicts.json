@@ -1,0 +1,183 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "medical_records"
+        ],
+        "rule": "all_records_complete",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "records_complete"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "medical_records"
+        ],
+        "rule": "all_records_relevant",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "records_relevant"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "clinical_criteria_met"
+        ],
+        "rule": "clinical_criteria_check",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "clinical_criteria_passed"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "policy_criteria"
+        ],
+        "rule": "diagnosis_covered",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "diagnosis_is_covered"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "policy_criteria"
+        ],
+        "rule": "provider_network_check",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "provider_in_network"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "policy_criteria"
+        ],
+        "rule": "step_therapy_check",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "step_therapy_done"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "policy_criteria"
+        ],
+        "rule": "treatment_in_formulary",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "treatment_is_formulary"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "documentation_sufficient",
+        "stratum": 1,
+        "verdicts_used": [
+          "records_complete",
+          "records_relevant"
+        ]
+      },
+      "type": "documentation_ok"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "policy_criteria_satisfied",
+        "stratum": 1,
+        "verdicts_used": [
+          "diagnosis_is_covered",
+          "treatment_is_formulary",
+          "provider_in_network",
+          "step_therapy_done"
+        ]
+      },
+      "type": "policy_satisfied"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "can_approve",
+        "stratum": 2,
+        "verdicts_used": [
+          "documentation_ok",
+          "policy_satisfied",
+          "clinical_criteria_passed"
+        ]
+      },
+      "type": "authorization_approved"
+    }
+  ],
+  "flow_outcome": "approved",
+  "steps_executed": [
+    {
+      "step_id": "step_submit",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_urgency_triage",
+      "step_type": "branch",
+      "result": "false"
+    },
+    {
+      "step_id": "step_clinical_review",
+      "step_type": "branch",
+      "result": "true"
+    },
+    {
+      "step_id": "step_approve",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

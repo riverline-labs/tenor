@@ -1,0 +1,26 @@
+// Negative test — Pass 5
+// A rule at stratum 0 uses verdict_present() referencing a verdict produced
+// at stratum 1. The stratum 0 rule would be evaluated before stratum 1 rules,
+// so the referenced verdict cannot exist at evaluation time.
+// §12.2 Pass 5 Rule: "verdict_refs reference strata < this rule's stratum"
+// §7.3: "A rule in stratum N may only reference outputs from rules in strata
+//        strictly below N."
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+// Stratum 0 rule that references a stratum 1 verdict — violation
+rule base_rule {
+  stratum: 0
+  when:    verdict_present(high_verdict)
+  produce: verdict base_result { payload: Bool = true }
+}
+
+// Stratum 1 rule that produces the verdict referenced above
+rule higher_rule {
+  stratum: 1
+  when:    flag = true
+  produce: verdict high_verdict { payload: Bool = true }
+}

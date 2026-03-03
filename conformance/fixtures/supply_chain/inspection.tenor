@@ -1,0 +1,279 @@
+// Supply Chain Inspection Contract (MEDIUM)
+// Models cargo inspection at a port: concurrent quality and compliance
+// inspections, hold/release decisions, and compensation for failed inspections.
+//
+// Key spec features exercised:
+//   - ParallelStep (concurrent quality + compliance inspections)
+//   - Compensate handler (rollback inspection on hold)
+//   - Multi-entity effects (Shipment + QualityLot + ComplianceLot)
+//   - Entity hierarchy (Shipment > QualityLot, Shipment > ComplianceLot)
+//   - Bounded universal quantification (forall item in inspection_items)
+//   - Multi-file import (types.tenor)
+//   - Int fact with default value
+
+import "types.tenor"
+
+// ── Personas ─────────────────────────────────────────────────────────────────
+
+persona customs_officer
+persona quality_inspector
+persona port_authority
+persona shipping_agent
+
+// ── Facts ────────────────────────────────────────────────────────────────────
+
+fact inspection_type {
+  type:   Enum(values: ["standard", "enhanced", "expedited"])
+  source: "customs_service.inspection_type"
+}
+
+fact defect_count {
+  type:   Int(min: 0, max: 999)
+  source: "inspection_service.defect_count"
+}
+
+fact inspection_items {
+  type:   List(element_type: InspectionItem, max: 200)
+  source: "cargo_service.inspection_items"
+}
+
+fact defect_threshold {
+  type:    Int(min: 0, max: 100)
+  source:  "policy_service.defect_threshold"
+  default: 3
+}
+
+fact quality_report {
+  type:   InspectionReport
+  source: "inspection_service.quality_report"
+}
+
+fact compliance_report {
+  type:   InspectionReport
+  source: "inspection_service.compliance_report"
+}
+
+fact cargo_weight_kg {
+  type:   Int(min: 0, max: 1000000)
+  source: "cargo_service.total_weight_kg"
+}
+
+// ── Entities ─────────────────────────────────────────────────────────────────
+
+entity Shipment {
+  states:  [arrived, inspecting, cleared, held, released, rejected]
+  initial: arrived
+  transitions: [
+    (arrived, inspecting),
+    (inspecting, cleared),
+    (inspecting, held),
+    (inspecting, rejected),
+    (held, released),
+    (held, rejected)
+  ]
+}
+
+entity QualityLot {
+  states:  [pending, in_progress, passed, failed]
+  initial: pending
+  transitions: [
+    (pending, in_progress),
+    (in_progress, passed),
+    (in_progress, failed)
+  ]
+}
+
+entity ComplianceLot {
+  states:  [pending, in_progress, passed, failed]
+  initial: pending
+  transitions: [
+    (pending, in_progress),
+    (in_progress, passed),
+    (in_progress, failed)
+  ]
+}
+
+// ── Rules — Stratum 0 ────────────────────────────────────────────────────────
+
+rule all_items_compliant {
+  stratum: 0
+  when:    ∀ item ∈ inspection_items . item.compliant = true
+  produce: verdict items_compliant { payload: Bool = true }
+}
+
+rule defects_below_threshold {
+  stratum: 0
+  when:    defect_count < defect_threshold
+  produce: verdict defects_acceptable { payload: Bool = true }
+}
+
+rule quality_passed {
+  stratum: 0
+  when:    quality_report.pass = true
+  produce: verdict quality_ok { payload: Bool = true }
+}
+
+rule compliance_passed {
+  stratum: 0
+  when:    compliance_report.pass = true
+  produce: verdict compliance_ok { payload: Bool = true }
+}
+
+rule defects_exceed_threshold {
+  stratum: 0
+  when:    defect_count >= defect_threshold
+  produce: verdict defects_exceeded { payload: Bool = true }
+}
+
+// ── Rules — Stratum 1 ────────────────────────────────────────────────────────
+
+rule shipment_can_clear {
+  stratum: 1
+  when:    verdict_present(quality_ok)
+         ∧ verdict_present(compliance_ok)
+         ∧ verdict_present(defects_acceptable)
+         ∧ verdict_present(items_compliant)
+  produce: verdict clearance_approved { payload: Bool = true }
+}
+
+rule shipment_must_hold {
+  stratum: 1
+  when:    verdict_present(defects_exceeded)
+         ∨ ¬verdict_present(quality_ok)
+         ∨ ¬verdict_present(compliance_ok)
+  produce: verdict hold_required { payload: Bool = true }
+}
+
+// ── Operations ───────────────────────────────────────────────────────────────
+
+operation begin_inspection {
+  allowed_personas: [customs_officer]
+  precondition:     inspection_type = "standard"
+                  ∨ inspection_type = "enhanced"
+                  ∨ inspection_type = "expedited"
+  effects: [
+    (Shipment, arrived, inspecting),
+    (QualityLot, pending, in_progress),
+    (ComplianceLot, pending, in_progress)
+  ]
+  error_contract: [precondition_failed, persona_rejected]
+}
+
+operation record_quality_pass {
+  allowed_personas: [quality_inspector]
+  precondition:     verdict_present(quality_ok)
+  effects:          [(QualityLot, in_progress, passed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation record_compliance_pass {
+  allowed_personas: [customs_officer]
+  precondition:     verdict_present(compliance_ok)
+  effects:          [(ComplianceLot, in_progress, passed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation release_shipment {
+  allowed_personas: [port_authority]
+  precondition:     verdict_present(clearance_approved)
+  effects:          [(Shipment, inspecting, cleared)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation hold_shipment {
+  allowed_personas: [customs_officer]
+  precondition:     verdict_present(hold_required)
+  effects:          [(Shipment, inspecting, held)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation revert_quality {
+  allowed_personas: [customs_officer]
+  precondition:     verdict_present(hold_required)
+  effects:          [(QualityLot, in_progress, failed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+// ── Flows ────────────────────────────────────────────────────────────────────
+
+flow inspection_flow {
+  snapshot: at_initiation
+  entry:    step_begin
+
+  steps: {
+    step_begin: OperationStep {
+      op:      begin_inspection
+      persona: customs_officer
+      outcomes: {
+        success: step_parallel_inspect
+      }
+      on_failure: Terminate(outcome: inspection_blocked)
+    }
+
+    step_parallel_inspect: ParallelStep {
+      branches: [
+        Branch {
+          id:    branch_quality
+          entry: step_quality
+          steps: {
+            step_quality: OperationStep {
+              op:      record_quality_pass
+              persona: quality_inspector
+              outcomes: { success: Terminal(quality_cleared) }
+              on_failure: Terminate(outcome: quality_failed)
+            }
+          }
+        },
+        Branch {
+          id:    branch_compliance
+          entry: step_compliance
+          steps: {
+            step_compliance: OperationStep {
+              op:      record_compliance_pass
+              persona: customs_officer
+              outcomes: { success: Terminal(compliance_cleared) }
+              on_failure: Terminate(outcome: compliance_failed)
+            }
+          }
+        }
+      ]
+      join: JoinPolicy {
+        on_all_success:  step_release_decision
+        on_any_failure:  Terminate(outcome: inspection_failed)
+        on_all_complete: null
+      }
+    }
+
+    step_release_decision: BranchStep {
+      condition: verdict_present(clearance_approved)
+      persona:   port_authority
+      if_true:   step_release
+      if_false:  step_hold
+    }
+
+    step_release: OperationStep {
+      op:      release_shipment
+      persona: port_authority
+      outcomes: {
+        success: Terminal(shipment_cleared)
+      }
+      on_failure: Terminate(outcome: release_failed)
+    }
+
+    step_hold: OperationStep {
+      op:      hold_shipment
+      persona: customs_officer
+      outcomes: {
+        success: Terminal(shipment_held)
+      }
+      on_failure: Compensate(
+        steps: [{
+          op:         revert_quality
+          persona:    customs_officer
+          on_failure: Terminal(revert_failed)
+        }]
+        then: Terminal(inspection_reverted)
+      )
+    }
+  }
+}

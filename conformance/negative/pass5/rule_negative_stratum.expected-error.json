@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Rule",
+  "construct_id": "bad_stratum",
+  "field": "stratum",
+  "file": "rule_negative_stratum.tenor",
+  "line": 11,
+  "message": "stratum must be a non-negative integer; got -1"
+}

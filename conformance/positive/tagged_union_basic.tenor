@@ -1,0 +1,10 @@
+// Positive test: Fact with TaggedUnion type using Record and scalar variants
+
+fact payment_method {
+  type: TaggedUnion {
+    BankTransfer: Record({ routing: Text(9), account: Text(17) })
+    Cash: Bool
+    CreditCard: Record({ last4: Text(4), expiry: Date })
+  }
+  source: "payment_service.method"
+}

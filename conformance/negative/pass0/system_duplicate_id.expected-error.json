@@ -1,0 +1,9 @@
+{
+  "construct_id": null,
+  "construct_kind": null,
+  "field": null,
+  "file": "system_duplicate_id.tenor",
+  "line": 13,
+  "message": "multiple System declarations in a single file",
+  "pass": 0
+}

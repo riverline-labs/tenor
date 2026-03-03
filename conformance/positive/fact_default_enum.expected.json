@@ -1,0 +1,1 @@
+{"constructs":[{"default":"pending","id":"payment_status","kind":"Fact","provenance":{"file":"fact_default_enum.tenor","line":4},"source":{"field":"status","system":"payment_service"},"tenor":"1.0","type":{"base":"Enum","values":["pending","approved","rejected"]}}],"id":"fact_default_enum","kind":"Bundle","tenor":"1.0","tenor_version":"1.0.0"}

@@ -1,0 +1,33 @@
+// Positive test: Multi-outcome operation with effect-to-outcome mapping
+// Covers: (Entity, from, to, outcome_label) syntax, outcome field in interchange JSON
+// Expected: elaborates without error, produces multi_outcome_operation.expected.json
+
+persona adjudicator
+
+entity Claim {
+  states: [review, approved, rejected]
+  initial: review
+  transitions: [(review, approved), (review, rejected)]
+}
+
+fact claim_eligible {
+  type: Bool
+  source: "claims.eligible"
+}
+
+rule check_eligible {
+  stratum: 0
+  when: claim_eligible = true
+  produce: verdict claim_eligible_v { payload: Bool = true }
+}
+
+operation decide_claim {
+  allowed_personas: [adjudicator]
+  precondition: claim_eligible = true
+  outcomes: [approved, rejected]
+  effects: [
+    (Claim, review, approved, approved),
+    (Claim, review, rejected, rejected)
+  ]
+  error_contract: [precondition_failed]
+}

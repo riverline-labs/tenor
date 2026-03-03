@@ -1,0 +1,12 @@
+// Evaluator test: enum fact matching rule condition
+
+fact status {
+  type:   Enum(values: ["pending", "active", "closed"])
+  source: "account.status"
+}
+
+rule is_active {
+  stratum: 0
+  when:    status = "active"
+  produce: verdict account_active { payload: Bool = true }
+}

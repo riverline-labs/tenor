@@ -1,0 +1,269 @@
+// Integration test: Escrow Release Contract — Path 3 (Compensation)
+// Variant of escrow_release with an additional release_clearance gate.
+// release_clearance defaults to false, so release_escrow's precondition fails
+// at step_auto_release, triggering the Compensate handler.
+// Exercises: compensation handler, entity state rollback, Terminal(failure).
+// Expected: step_auto_release fails → comp:revert_delivery_confirmation → Terminal(failure).
+
+// ── Named Types ──────────────────────────────────────────────────────────────
+
+type LineItemRecord {
+  id:          Text(max_length: 64)
+  description: Text(max_length: 256)
+  amount:      Money(currency: "USD")
+  valid:       Bool
+}
+
+// ── Facts ─────────────────────────────────────────────────────────────────────
+
+fact escrow_amount {
+  type:   Money(currency: "USD")
+  source: "escrow_service.current_balance"
+}
+
+fact delivery_status {
+  type:   Enum(values: ["pending", "confirmed", "failed"])
+  source: "delivery_service.status"
+}
+
+fact line_items {
+  type:   List(element_type: LineItemRecord, max: 100)
+  source: "order_service.line_items"
+}
+
+fact compliance_threshold {
+  type:    Money(currency: "USD")
+  source:  "compliance_service.release_threshold"
+  default: Money { amount: "10000.00", currency: "USD" }
+}
+
+fact buyer_requested_refund {
+  type:    Bool
+  source:  "buyer_portal.refund_requested"
+  default: false
+}
+
+fact release_clearance {
+  type:    Bool
+  source:  "escrow_service.release_clearance"
+  default: false
+}
+
+// ── Entities ──────────────────────────────────────────────────────────────────
+
+entity EscrowAccount {
+  states:  [held, released, refunded, disputed]
+  initial: held
+  transitions: [
+    (held, released),
+    (held, refunded),
+    (held, disputed),
+    (disputed, released),
+    (disputed, refunded)
+  ]
+}
+
+entity DeliveryRecord {
+  states:  [pending, confirmed, failed]
+  initial: pending
+  transitions: [
+    (pending, confirmed),
+    (pending, failed),
+    (confirmed, pending)
+  ]
+}
+
+// ── Rules — Stratum 0 ────────────────────────────────────────────────────────
+
+rule all_line_items_valid {
+  stratum: 0
+  when:    ∀ item ∈ line_items . item.valid = true
+  produce: verdict line_items_validated { payload: Bool = true }
+}
+
+rule delivery_confirmed {
+  stratum: 0
+  when:    delivery_status = "confirmed"
+  produce: verdict delivery_confirmed { payload: Bool = true }
+}
+
+rule delivery_failed {
+  stratum: 0
+  when:    delivery_status = "failed"
+  produce: verdict delivery_failed { payload: Bool = true }
+}
+
+rule amount_within_threshold {
+  stratum: 0
+  when:    escrow_amount <= compliance_threshold
+  produce: verdict within_threshold { payload: Bool = true }
+}
+
+rule refund_requested {
+  stratum: 0
+  when:    buyer_requested_refund = true
+  produce: verdict refund_requested { payload: Bool = true }
+}
+
+rule release_is_cleared {
+  stratum: 0
+  when:    release_clearance = true
+  produce: verdict release_cleared { payload: Bool = true }
+}
+
+// ── Rules — Stratum 1 ────────────────────────────────────────────────────────
+
+rule can_release_without_compliance {
+  stratum: 1
+  when:    verdict_present(line_items_validated)
+         ∧ verdict_present(delivery_confirmed)
+         ∧ verdict_present(within_threshold)
+         ∧ verdict_present(release_cleared)
+  produce: verdict release_approved { payload: Text = "auto" }
+}
+
+rule requires_compliance_review {
+  stratum: 1
+  when:    verdict_present(line_items_validated)
+         ∧ verdict_present(delivery_confirmed)
+         ∧ ¬verdict_present(within_threshold)
+  produce: verdict compliance_review_required { payload: Bool = true }
+}
+
+rule can_refund {
+  stratum: 1
+  when:    verdict_present(delivery_failed)
+         ∧ verdict_present(refund_requested)
+  produce: verdict refund_approved { payload: Bool = true }
+}
+
+// ── Operations ────────────────────────────────────────────────────────────────
+
+operation release_escrow {
+  allowed_personas: [escrow_agent]
+  precondition:     verdict_present(release_approved)
+  effects:          [(EscrowAccount, held, released)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation release_escrow_with_compliance {
+  allowed_personas: [compliance_officer]
+  precondition:     verdict_present(compliance_review_required)
+  effects:          [(EscrowAccount, held, released)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation refund_escrow {
+  allowed_personas: [escrow_agent]
+  precondition:     verdict_present(refund_approved)
+  effects:          [(EscrowAccount, held, refunded)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation flag_dispute {
+  allowed_personas: [buyer, seller]
+  precondition:     verdict_present(delivery_confirmed)
+                  ∨ verdict_present(delivery_failed)
+  effects:          [(EscrowAccount, held, disputed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation confirm_delivery {
+  allowed_personas: [seller]
+  precondition:     ∀ item ∈ line_items . item.valid = true
+  effects:          [(DeliveryRecord, pending, confirmed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation record_delivery_failure {
+  allowed_personas: [escrow_agent]
+  precondition:     verdict_present(delivery_failed)
+  effects:          [(DeliveryRecord, pending, failed)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+operation revert_delivery_confirmation {
+  allowed_personas: [escrow_agent]
+  precondition:     verdict_present(delivery_confirmed)
+  effects:          [(DeliveryRecord, confirmed, pending)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+// ── Flows ─────────────────────────────────────────────────────────────────────
+
+flow standard_release {
+  snapshot: at_initiation
+  entry:    step_confirm
+
+  steps: {
+    step_confirm: OperationStep {
+      op:      confirm_delivery
+      persona: seller
+      outcomes: {
+        success: step_check_threshold
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+
+    step_check_threshold: BranchStep {
+      condition: verdict_present(within_threshold)
+      persona:   escrow_agent
+      if_true:   step_auto_release
+      if_false:  step_handoff_compliance
+    }
+
+    step_auto_release: OperationStep {
+      op:      release_escrow
+      persona: escrow_agent
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Compensate(
+        steps: [{
+          op:         revert_delivery_confirmation
+          persona:    escrow_agent
+          on_failure: Terminal(failure)
+        }]
+        then: Terminal(failure)
+      )
+    }
+
+    step_handoff_compliance: HandoffStep {
+      from_persona: escrow_agent
+      to_persona:   compliance_officer
+      next:         step_compliance_release
+    }
+
+    step_compliance_release: OperationStep {
+      op:      release_escrow_with_compliance
+      persona: compliance_officer
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Compensate(
+        steps: [{
+          op:         revert_delivery_confirmation
+          persona:    escrow_agent
+          on_failure: Terminal(failure)
+        }]
+        then: Terminal(failure)
+      )
+    }
+  }
+}
+
+flow refund_flow {
+  snapshot: at_initiation
+  entry:    step_refund
+
+  steps: {
+    step_refund: OperationStep {
+      op:      refund_escrow
+      persona: escrow_agent
+      outcomes: {
+        success: Terminal(success)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

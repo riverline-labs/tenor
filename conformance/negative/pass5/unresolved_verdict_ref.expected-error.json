@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Rule",
+  "construct_id": "bad_verdict_ref",
+  "field": "body.when",
+  "file": "unresolved_verdict_ref.tenor",
+  "line": 15,
+  "message": "unresolved VerdictType reference: 'undeclared_verdict' is not produced by any rule in this contract"
+}

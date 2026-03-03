@@ -1,0 +1,19 @@
+// Negative test -- Pass 5
+// Trigger where source and target are the same contract and same flow.
+
+system self_trigger_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: [
+    {
+      source: contract_a.application_flow,
+      on: success,
+      target: contract_a.application_flow,
+      persona: applicant
+    }
+  ]
+  shared_entities: []
+}

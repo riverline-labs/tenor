@@ -1,0 +1,8 @@
+// Positive test: Fact with Date type and date string default value
+// Exercises Date default serialization in fact defaults.
+
+fact start_date {
+  type:    Date
+  source:  "contract_service.start_date"
+  default: "2024-01-15"
+}

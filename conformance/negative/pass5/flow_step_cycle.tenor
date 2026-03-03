@@ -1,0 +1,39 @@
+// Negative test — Pass 5
+// The flow step graph contains a cycle: step_a leads to step_b, step_b leads back to step_a.
+// §12.2 Pass 5 Flow: "step graph acyclic"
+// §10.5: "Step graph must be acyclic. Verified at load time via topological sort."
+//
+// Note: BranchStep is used here because it has two exits. A cycle requires at least
+// one path to a Terminal (otherwise there is no valid exit at all) alongside the cycle.
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+flow cyclic_flow {
+  snapshot: at_initiation
+  entry:    step_a
+
+  steps: {
+    step_a: BranchStep {
+      condition: verdict_present(flag_true)
+      persona:   user
+      if_true:   step_b
+      if_false:  Terminal(failure)
+    }
+
+    step_b: BranchStep {
+      condition: verdict_present(flag_true)
+      persona:   user
+      if_true:   step_a
+      if_false:  Terminal(success)
+    }
+  }
+}

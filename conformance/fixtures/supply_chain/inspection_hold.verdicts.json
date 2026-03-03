@@ -1,0 +1,113 @@
+{
+  "flow_outcome": "shipment_held",
+  "steps_executed": [
+    {
+      "result": "success",
+      "step_id": "step_begin",
+      "step_type": "operation"
+    },
+    {
+      "result": "branch_quality:quality_cleared, branch_compliance:compliance_cleared",
+      "step_id": "step_parallel_inspect",
+      "step_type": "parallel"
+    },
+    {
+      "result": "success",
+      "step_id": "step_quality",
+      "step_type": "operation"
+    },
+    {
+      "result": "success",
+      "step_id": "step_compliance",
+      "step_type": "operation"
+    },
+    {
+      "result": "false",
+      "step_id": "step_release_decision",
+      "step_type": "branch"
+    },
+    {
+      "result": "success",
+      "step_id": "step_hold",
+      "step_type": "operation"
+    }
+  ],
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "inspection_items"
+        ],
+        "rule": "all_items_compliant",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "items_compliant"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "compliance_report"
+        ],
+        "rule": "compliance_passed",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "compliance_ok"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "defect_count",
+          "defect_threshold"
+        ],
+        "rule": "defects_exceed_threshold",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "defects_exceeded"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "quality_report"
+        ],
+        "rule": "quality_passed",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "quality_ok"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "shipment_must_hold",
+        "stratum": 1,
+        "verdicts_used": [
+          "defects_exceeded"
+        ]
+      },
+      "type": "hold_required"
+    }
+  ]
+}

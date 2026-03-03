@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "tenor-wasm-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Tenor WASM bridge for the Go SDK — exports C-ABI functions callable via wazero via WASI"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+tenor-eval = { path = "../../../crates/eval", default-features = false }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+slab = "0.4"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

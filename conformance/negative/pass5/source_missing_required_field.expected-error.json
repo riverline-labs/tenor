@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_http",
+  "construct_kind": "Source",
+  "field": "protocol",
+  "file": "source_missing_required_field.tenor",
+  "line": 1,
+  "message": "source 'bad_http' with protocol 'http' is missing required field 'base_url'",
+  "pass": 5
+}

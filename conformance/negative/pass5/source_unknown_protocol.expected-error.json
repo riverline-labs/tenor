@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_proto",
+  "construct_kind": "Source",
+  "field": "protocol",
+  "file": "source_unknown_protocol.tenor",
+  "line": 1,
+  "message": "unknown protocol tag 'ftp'",
+  "pass": 5
+}

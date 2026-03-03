@@ -1,0 +1,16 @@
+{
+  "name": "tenor-eval-wasm",
+  "type": "module",
+  "description": "Tenor contract evaluator compiled to WebAssembly",
+  "version": "0.1.0",
+  "files": [
+    "tenor_eval_wasm_bg.wasm",
+    "tenor_eval_wasm.js",
+    "tenor_eval_wasm.d.ts"
+  ],
+  "main": "tenor_eval_wasm.js",
+  "types": "tenor_eval_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

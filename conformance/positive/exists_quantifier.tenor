@@ -1,0 +1,21 @@
+// Positive test: Exists quantifier (bounded existential quantification)
+// Covers: U+2203 lexer token, RawExpr::Exists, quantifier: "exists" in interchange JSON
+// Expected: elaborates without error, produces exists_quantifier.expected.json
+
+persona inspector
+
+type InspectionItem {
+  item_id: Text(50)
+  compliant: Bool
+}
+
+fact inspection_items {
+  type: List(element_type: InspectionItem, max: 100)
+  source: "inspection.items"
+}
+
+rule has_defect {
+  stratum: 0
+  when: ∃ item ∈ inspection_items . item.compliant = false
+  produce: verdict defect_found { payload: Bool = true }
+}

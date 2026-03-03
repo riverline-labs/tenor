@@ -1,0 +1,33 @@
+// Negative test — Pass 5
+// Operation effect references a transition (b, c) that is not declared in the
+// entity's transition relation, even though both states b and c exist.
+// §12.2 Pass 5 Operation: "effects ⊆ entity.transitions"
+// §8.4: "the transition (from_state, to_state) must exist in that entity's
+//        declared transition relation"
+
+entity Order {
+  states:  [draft, submitted, approved]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (submitted, approved)
+  ]
+}
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+operation skip_to_approved {
+  allowed_personas: [admin]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, approved)]
+  error_contract:   [precondition_failed, persona_rejected]
+}

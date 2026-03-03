@@ -1,0 +1,9 @@
+// Negative test -- Pass 5
+// System declares no member contracts. Must be rejected.
+
+system empty_system {
+  members: []
+  shared_personas: []
+  triggers: []
+  shared_entities: []
+}

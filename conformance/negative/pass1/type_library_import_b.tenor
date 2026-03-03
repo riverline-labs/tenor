@@ -1,0 +1,8 @@
+// Type library file that illegally contains an import declaration.
+
+import "type_library_import_c.tenor"
+
+type Address {
+  street: Text(max_length: 200)
+  city:   Text(max_length: 100)
+}

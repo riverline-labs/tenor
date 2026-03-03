@@ -1,0 +1,14 @@
+// Negative test -- Pass 5
+// Shared persona binding references a contract not in the members list.
+
+system bad_persona_system {
+  members: [
+    contract_a: "member_a.tenor",
+    contract_b: "member_b.tenor"
+  ]
+  shared_personas: [
+    { persona: applicant, contracts: [contract_a, contract_c] }
+  ]
+  triggers: []
+  shared_entities: []
+}

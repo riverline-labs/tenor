@@ -1,0 +1,9 @@
+{
+  "construct_id": "single_entity_system",
+  "construct_kind": "System",
+  "field": "shared_entities",
+  "file": "system_shared_entity_single_contract.tenor",
+  "line": 4,
+  "message": "shared_entity 'application' must reference at least 2 member contracts; got 1",
+  "pass": 5
+}

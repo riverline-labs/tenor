@@ -1,0 +1,16 @@
+// Negative test — Pass 4
+// A quantifier's domain is a Bool fact, not a List-typed fact.
+// §9.4: "Quantification domains must be List-typed Facts or List-typed fields
+// of Record Facts with declared max bounds."
+// Must be rejected with a type error on the quantifier domain.
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule bad_quantifier {
+  stratum: 0
+  when:    ∀ x ∈ flag . x = true
+  produce: verdict bad { payload: Bool = true }
+}

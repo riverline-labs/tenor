@@ -1,0 +1,9 @@
+{
+  "pass": 2,
+  "construct_kind": "Entity",
+  "construct_id": "Order",
+  "field": "id",
+  "file": "duplicate_entity_id.tenor",
+  "line": 10,
+  "message": "duplicate Entity id 'Order': first declared at line 4"
+}

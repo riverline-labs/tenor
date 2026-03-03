@@ -1,0 +1,26 @@
+{
+  "constructs": [
+    {
+      "default": "hello",
+      "id": "greeting",
+      "kind": "Fact",
+      "provenance": {
+        "file": "fact_default_text.tenor",
+        "line": 4
+      },
+      "source": {
+        "field": "greeting",
+        "system": "config_service"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Text",
+        "max_length": 200
+      }
+    }
+  ],
+  "id": "fact_default_text",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

@@ -1,0 +1,11 @@
+[package]
+name = "tenor-analyze"
+version.workspace = true
+edition.workspace = true
+description = "Tenor static analyzer"
+
+[dependencies]
+tenor-core = { path = "../core" }
+tenor-interchange = { path = "../interchange" }
+serde = { workspace = true }
+serde_json = { workspace = true }

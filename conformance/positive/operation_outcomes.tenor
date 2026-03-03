@@ -1,0 +1,24 @@
+// Positive test: Operation with explicit outcomes field
+// Covers: outcomes declaration on Operation, outcomes disjoint from error_contract
+// Expected: elaborates without error, produces operation_outcomes.expected.json
+
+persona agent
+
+fact claim_amount {
+  type:   Money(currency: "USD")
+  source: "claim.amount"
+}
+
+entity Claim {
+  states:  [open, approved, denied]
+  initial: open
+  transitions: [(open, approved), (open, denied)]
+}
+
+operation decide_claim {
+  allowed_personas: [agent]
+  precondition:     claim_amount > Money { amount: "0.00", currency: "USD" }
+  outcomes:         [approved, denied]
+  effects:          [(Claim, open, approved, approved), (Claim, open, denied, denied)]
+  error_contract:   [precondition_failed]
+}

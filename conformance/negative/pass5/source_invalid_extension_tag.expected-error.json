@@ -1,0 +1,9 @@
+{
+  "construct_id": "bad_ext",
+  "construct_kind": "Source",
+  "field": "protocol",
+  "file": "source_invalid_extension_tag.tenor",
+  "line": 1,
+  "message": "invalid extension protocol tag 'x_'",
+  "pass": 5
+}

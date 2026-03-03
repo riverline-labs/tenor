@@ -1,0 +1,75 @@
+// Evaluator conformance: flow error escalation path.
+// An operation fails because the entity is not in the expected state,
+// triggering FailureHandler::Escalate to a supervisor persona.
+// The supervisor then performs a corrective operation.
+
+entity Document {
+  states:  [draft, review, approved]
+  initial: draft
+  transitions: [
+    (draft, review),
+    (review, approved)
+  ]
+}
+
+fact doc_ready {
+  type:   Bool
+  source: "workflow.doc_ready"
+}
+
+rule check_ready {
+  stratum: 0
+  when:    doc_ready = true
+  produce: verdict ready_for_review { payload: Bool = true }
+}
+
+operation approve_document {
+  allowed_personas: [reviewer, manager]
+  precondition:     verdict_present(ready_for_review)
+  effects:          [(Document, review, approved)]
+  error_contract:   [precondition_failed]
+}
+
+operation begin_review {
+  allowed_personas: [reviewer, manager]
+  precondition:     verdict_present(ready_for_review)
+  effects:          [(Document, draft, review)]
+  error_contract:   [precondition_failed]
+}
+
+flow escalation_flow {
+  snapshot: at_initiation
+  entry:    try_approve
+
+  steps: {
+    try_approve: OperationStep {
+      op:      approve_document
+      persona: reviewer
+      outcomes: {
+        success: Terminal(approved)
+      }
+      on_failure: Escalate(
+        to: manager
+        next: fix_state
+      )
+    }
+
+    fix_state: OperationStep {
+      op:      begin_review
+      persona: manager
+      outcomes: {
+        success: then_approve
+      }
+      on_failure: Terminate(outcome: escalation_failed)
+    }
+
+    then_approve: OperationStep {
+      op:      approve_document
+      persona: manager
+      outcomes: {
+        success: Terminal(approved_by_manager)
+      }
+      on_failure: Terminate(outcome: final_failure)
+    }
+  }
+}

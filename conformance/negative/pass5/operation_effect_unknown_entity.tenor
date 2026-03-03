@@ -1,0 +1,21 @@
+// Negative test — Pass 5
+// Operation effect references an entity id not declared in the contract.
+// §12.2 Pass 5 Operation: "effect entity_ids resolve"
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+operation bad_effect {
+  allowed_personas: [user]
+  precondition:     verdict_present(flag_true)
+  effects:          [(NonexistentEntity, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}

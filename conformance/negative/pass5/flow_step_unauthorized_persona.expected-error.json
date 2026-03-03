@@ -1,0 +1,9 @@
+{
+  "construct_id": "submit_flow",
+  "construct_kind": "Flow",
+  "field": "steps.step_submit.persona",
+  "file": "flow_step_unauthorized_persona.tenor",
+  "line": 37,
+  "message": "flow 'submit_flow' step 'step_submit': persona 'reviewer' is not in allowed_personas of operation 'submit'",
+  "pass": 5
+}

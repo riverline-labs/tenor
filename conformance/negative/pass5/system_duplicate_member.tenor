@@ -1,0 +1,12 @@
+// Negative test -- Pass 5
+// System declares the same member id twice. Must be rejected.
+
+system dup_member_system {
+  members: [
+    contract_a: "member_a.tenor",
+    contract_a: "member_b.tenor"
+  ]
+  shared_personas: []
+  triggers: []
+  shared_entities: []
+}

@@ -1,0 +1,9 @@
+{
+  "construct_id": "submit_flow",
+  "construct_kind": "Flow",
+  "field": "steps.step_submit.persona",
+  "file": "flow_step_undeclared_persona.tenor",
+  "line": 36,
+  "message": "flow 'submit_flow' step 'step_submit': persona 'ghost' is not declared",
+  "pass": 5
+}

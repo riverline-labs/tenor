@@ -1,0 +1,9 @@
+// Negative test — Pass 4
+// A PredicateExpression references a fact id that is not declared in the contract.
+// Must be rejected with an unresolved reference error.
+
+rule bad_ref {
+  stratum: 0
+  when:    nonexistent_fact = true
+  produce: verdict bad { payload: Bool = true }
+}

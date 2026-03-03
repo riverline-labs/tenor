@@ -1,0 +1,12 @@
+// Negative test — Pass 2
+// Two TypeDecls with the same name in one file. Must be rejected.
+
+type Amount {
+  value:    Int(min: 0, max: 999999)
+  currency: Text(max_length: 3)
+}
+
+type Amount {
+  value:    Int(min: 0, max: 100)
+  unit:     Text(max_length: 10)
+}

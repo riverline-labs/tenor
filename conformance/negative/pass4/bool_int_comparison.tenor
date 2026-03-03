@@ -1,0 +1,14 @@
+// Negative test — Pass 4
+// A Bool fact is compared to an Int literal using >.
+// Bool does not support the > operator. Must be rejected with a type error.
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule bad_comparison {
+  stratum: 0
+  when:    flag > 0
+  produce: verdict bad { payload: Bool = true }
+}

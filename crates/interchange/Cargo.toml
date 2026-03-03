@@ -1,0 +1,12 @@
+[package]
+name = "tenor-interchange"
+version.workspace = true
+edition.workspace = true
+description = "Shared interchange JSON types and deserialization for Tenor"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

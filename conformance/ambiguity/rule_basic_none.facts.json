@@ -1,0 +1,8 @@
+{
+  "is_active": false,
+  "balance": { "amount": "2000.00", "currency": "USD" },
+  "credit_limit": { "amount": "1000.00", "currency": "USD" },
+  "line_items": [
+    { "amount": { "amount": "100.00", "currency": "USD" }, "approved": false }
+  ]
+}

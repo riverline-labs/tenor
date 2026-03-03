@@ -1,0 +1,38 @@
+{
+  "constructs": [
+    {
+      "description": "Internal Kafka-backed risk engine",
+      "fields": {},
+      "id": "risk_engine",
+      "kind": "Source",
+      "protocol": "x_internal.event_bus",
+      "provenance": {
+        "file": "source_extension_protocol.tenor",
+        "line": 1
+      },
+      "tenor": "1.0"
+    },
+    {
+      "id": "risk_score",
+      "kind": "Fact",
+      "provenance": {
+        "file": "source_extension_protocol.tenor",
+        "line": 6
+      },
+      "source": {
+        "path": "scores.current",
+        "source_id": "risk_engine"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Int",
+        "max": 100,
+        "min": 0
+      }
+    }
+  ],
+  "id": "source_extension_protocol",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

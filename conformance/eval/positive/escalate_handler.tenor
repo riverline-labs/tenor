@@ -1,0 +1,75 @@
+// Evaluator test: escalate failure handler
+// Step 1 (as agent) fails because entity is in wrong state,
+// triggering escalation to supervisor. Step 2 (as supervisor)
+// succeeds on the correct entity state.
+
+entity Ticket {
+  states:  [open, reviewing, resolved]
+  initial: open
+  transitions: [
+    (open, reviewing),
+    (reviewing, resolved)
+  ]
+}
+
+fact is_urgent {
+  type:   Bool
+  source: "ticket.urgent"
+}
+
+rule check_urgent {
+  stratum: 0
+  when:    is_urgent = true
+  produce: verdict urgent_ticket { payload: Bool = true }
+}
+
+operation review_ticket {
+  allowed_personas: [agent, supervisor]
+  precondition:     verdict_present(urgent_ticket)
+  effects:          [(Ticket, reviewing, resolved)]
+  error_contract:   [precondition_failed]
+}
+
+operation start_review {
+  allowed_personas: [agent, supervisor]
+  precondition:     verdict_present(urgent_ticket)
+  effects:          [(Ticket, open, reviewing)]
+  error_contract:   [precondition_failed]
+}
+
+flow escalate_flow {
+  snapshot: at_initiation
+  entry:    step_review
+
+  steps: {
+    step_review: OperationStep {
+      op:      review_ticket
+      persona: agent
+      outcomes: {
+        success: Terminal(resolved)
+      }
+      on_failure: Escalate(
+        to: supervisor
+        next: step_start_review
+      )
+    }
+
+    step_start_review: OperationStep {
+      op:      start_review
+      persona: supervisor
+      outcomes: {
+        success: step_resolve
+      }
+      on_failure: Terminate(outcome: escalation_failed)
+    }
+
+    step_resolve: OperationStep {
+      op:      review_ticket
+      persona: supervisor
+      outcomes: {
+        success: Terminal(resolved_by_supervisor)
+      }
+      on_failure: Terminate(outcome: resolution_failed)
+    }
+  }
+}

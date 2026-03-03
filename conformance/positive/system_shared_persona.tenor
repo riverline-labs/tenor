@@ -1,0 +1,14 @@
+// Positive test: System with shared persona bindings.
+// The "applicant" persona exists in both member_a and member_b.
+
+system shared_persona_system {
+  members: [
+    contract_a: "system_member_a.tenor",
+    contract_b: "system_member_b.tenor"
+  ]
+  shared_personas: [
+    { persona: applicant, contracts: [contract_a, contract_b] }
+  ]
+  triggers: []
+  shared_entities: []
+}

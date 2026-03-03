@@ -1,0 +1,11 @@
+// Negative test — Pass 1 (multi-file, root file)
+// dup_across_files_a.tenor and dup_across_files_b.tenor both declare
+// a Fact named "shared_id". Same-kind duplicate ids across files are a Pass 1 error.
+// See README.md for multi-file test convention.
+
+import "dup_across_files_b.tenor"
+
+fact shared_id {
+  type:   Bool
+  source: "a.shared"
+}

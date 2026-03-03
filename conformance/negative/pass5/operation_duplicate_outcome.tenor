@@ -1,0 +1,26 @@
+// Negative test: Operation with duplicate outcome labels
+// Expected: pass 5 error on outcomes field
+
+persona agent
+
+entity E {
+  states: [a, b, c]
+  initial: a
+  transitions: [(a, b), (a, c)]
+}
+
+fact x {
+  type: Bool
+  source: "sys.x"
+}
+
+operation dup_op {
+  allowed_personas: [agent]
+  precondition: x = true
+  outcomes: [success, failure, success]
+  effects: [
+    (E, a, b, success),
+    (E, a, c, failure)
+  ]
+  error_contract: [precondition_failed]
+}

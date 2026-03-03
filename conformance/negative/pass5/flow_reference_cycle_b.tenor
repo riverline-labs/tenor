@@ -1,0 +1,16 @@
+// Negative test — Pass 5 (multi-file, secondary file)
+// Part of the flow_reference_cycle test. See flow_reference_cycle_a.tenor.
+
+flow flow_b {
+  snapshot: at_initiation
+  entry:    call_a
+
+  steps: {
+    call_a: SubFlowStep {
+      flow:       flow_a
+      persona:    user
+      on_success: Terminal(success)
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_premium"
+        ],
+        "rule": "check_premium",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "standard_account"
+    }
+  ]
+}

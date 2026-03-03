@@ -1,0 +1,32 @@
+{
+  "constructs": [
+    {
+      "default": {
+        "kind": "decimal_value",
+        "precision": 10,
+        "scale": 2,
+        "value": "2.30"
+      },
+      "id": "exact_value",
+      "kind": "Fact",
+      "provenance": {
+        "file": "decimal_default_exact.tenor",
+        "line": 4
+      },
+      "source": {
+        "field": "exact_value",
+        "system": "finance"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Decimal",
+        "precision": 10,
+        "scale": 2
+      }
+    }
+  ],
+  "id": "decimal_default_exact",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

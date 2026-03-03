@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Flow",
+  "construct_id": "bad_ref_flow",
+  "field": "steps.step_one.outcomes.success",
+  "file": "flow_unresolved_step_ref.tenor",
+  "line": 38,
+  "message": "step reference 'step_two_does_not_exist' is not declared in steps"
+}

@@ -1,0 +1,32 @@
+{
+  "constructs": [
+    {
+      "default": {
+        "kind": "decimal_value",
+        "precision": 38,
+        "scale": 18,
+        "value": "12345678901234567890.123456789012345678"
+      },
+      "id": "precise_rate",
+      "kind": "Fact",
+      "provenance": {
+        "file": "decimal_max_precision.tenor",
+        "line": 5
+      },
+      "source": {
+        "field": "precise_rate",
+        "system": "pricing"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Decimal",
+        "precision": 38,
+        "scale": 18
+      }
+    }
+  ],
+  "id": "decimal_max_precision",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

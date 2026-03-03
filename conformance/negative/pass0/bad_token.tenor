@@ -1,0 +1,8 @@
+// Negative test — Pass 0
+// An unrecognized character '@' appears in the source. The lexer must reject it.
+// Expected error: pass 0, unexpected character
+
+fact foo @ {
+  type:   Bool
+  source: "x.y"
+}

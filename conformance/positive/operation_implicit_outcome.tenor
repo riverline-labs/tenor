@@ -1,0 +1,21 @@
+// Positive test: Operation without explicit outcomes field
+// Verifies implicit single-outcome behavior (§9).
+// When outcomes is omitted, the operation has an implicit single outcome.
+
+entity Task {
+  states:      [open, closed]
+  initial:     open
+  transitions: [(open, closed)]
+}
+
+fact is_ready {
+  type:   Bool
+  source: "task_service.ready"
+}
+
+operation close_task {
+  allowed_personas: [agent]
+  precondition:     is_ready = true
+  effects:          [(Task, open, closed)]
+  error_contract:   [precondition_failed]
+}

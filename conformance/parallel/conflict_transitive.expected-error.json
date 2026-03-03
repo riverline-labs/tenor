@@ -1,0 +1,9 @@
+{
+  "pass": 5,
+  "construct_kind": "Flow",
+  "construct_id": "transitive_conflict",
+  "field": "steps.par_step.branches",
+  "file": "conflict_transitive.tenor",
+  "line": 67,
+  "message": "parallel branches 'branch_a' and 'branch_b' both affect entity 'Order' (branch_a transitively through SubFlowStep → sub_flow_a → submit_order); parallel branch entity effect sets must be disjoint"
+}

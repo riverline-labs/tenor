@@ -1,0 +1,1 @@
+{"constructs":[{"default":{"kind":"int_literal","value":3600},"id":"timeout_seconds","kind":"Fact","provenance":{"file":"fact_default_duration.tenor","line":4},"source":{"field":"timeout","system":"config_service"},"tenor":"1.0","type":{"base":"Duration","max":86400,"min":0,"unit":"seconds"}}],"id":"fact_default_duration","kind":"Bundle","tenor":"1.0","tenor_version":"1.0.0"}

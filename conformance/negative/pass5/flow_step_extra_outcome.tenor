@@ -1,0 +1,44 @@
+// Negative test — Pass 5
+// An OperationStep routes an outcome not declared by the operation.
+// KL-3: Flow outcome exhaustiveness validation
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [(draft, submitted)]
+}
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+operation submit {
+  allowed_personas: [user]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed]
+}
+
+flow submit_flow {
+  snapshot: at_initiation
+  entry:    step_submit
+
+  steps: {
+    step_submit: OperationStep {
+      op:      submit
+      persona: user
+      outcomes: {
+        success:  Terminal(done)
+        approved: Terminal(done)
+      }
+      on_failure: Terminate(outcome: failure)
+    }
+  }
+}

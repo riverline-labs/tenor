@@ -1,0 +1,9 @@
+// Numeric precision test — decimal_max_precision
+// A Decimal at high precision boundary (38, 18) — the maximum common precision.
+// Verifies no precision loss on large-scale values.
+
+fact precise_rate {
+  type:    Decimal(precision: 38, scale: 18)
+  source:  "pricing.precise_rate"
+  default: "12345678901234567890.123456789012345678"
+}

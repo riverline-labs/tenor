@@ -1,0 +1,74 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "line_items"
+        ],
+        "rule": "all_line_items_valid",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "line_items_validated"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "delivery_status"
+        ],
+        "rule": "delivery_confirmed",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "delivery_confirmed"
+    },
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [],
+        "rule": "requires_compliance_review",
+        "stratum": 1,
+        "verdicts_used": [
+          "line_items_validated",
+          "delivery_confirmed",
+          "within_threshold"
+        ]
+      },
+      "type": "compliance_review_required"
+    }
+  ],
+  "flow_outcome": "success",
+  "steps_executed": [
+    {
+      "step_id": "step_confirm",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_check_threshold",
+      "step_type": "branch",
+      "result": "false"
+    },
+    {
+      "step_id": "step_handoff_compliance",
+      "step_type": "handoff",
+      "result": "handoff"
+    },
+    {
+      "step_id": "step_compliance_release",
+      "step_type": "operation",
+      "result": "success"
+    }
+  ]
+}

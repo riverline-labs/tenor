@@ -1,0 +1,9 @@
+// Negative test — Pass 4
+// TaggedUnion variant references an unknown type that is not declared.
+
+fact payment_method {
+  type: TaggedUnion {
+    CreditCard: CardDetails
+  }
+  source: "payment_service.method"
+}

@@ -1,0 +1,22 @@
+// Negative test: Operation referencing undeclared persona
+// Expected: pass 5 error for undeclared persona in allowed_personas
+
+persona admin
+
+fact x {
+  type:   Bool
+  source: "sys.x"
+}
+
+entity E {
+  states:  [a, b]
+  initial: a
+  transitions: [(a, b)]
+}
+
+operation op {
+  allowed_personas: [nonexistent]
+  precondition:     x = true
+  effects:          [(E, a, b)]
+  error_contract:   [precondition_failed]
+}

@@ -1,0 +1,283 @@
+/* Agent Capabilities Panel Styles
+ * Uses VS Code CSS variables for theme integration.
+ */
+
+body {
+  padding: 12px 16px;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 1.3em;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
+}
+
+h2 {
+  font-size: 1.1em;
+  margin: 16px 0 8px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+h2 .toggle {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+
+h2.collapsed .toggle {
+  transform: rotate(-90deg);
+}
+
+/* Section content that can be collapsed */
+.section-content {
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+}
+
+.section-content.collapsed {
+  max-height: 0 !important;
+  overflow: hidden;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.toolbar .contract-id {
+  font-weight: bold;
+  color: var(--vscode-textLink-foreground);
+}
+
+.refresh-btn {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.refresh-btn:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+/* Persona section */
+.persona-group {
+  margin: 8px 0;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.persona-header {
+  padding: 6px 12px;
+  background: var(--vscode-sideBarSectionHeader-background);
+  font-weight: bold;
+  font-size: 0.95em;
+}
+
+/* Operation cards */
+.operation-card {
+  padding: 8px 12px;
+  border-top: 1px solid var(--vscode-editorWidget-border);
+}
+
+.operation-card .op-name {
+  font-weight: 600;
+  color: var(--vscode-symbolIcon-functionForeground, var(--vscode-foreground));
+}
+
+.operation-card table {
+  border-collapse: collapse;
+  margin: 4px 0;
+  font-size: 0.9em;
+  width: 100%;
+}
+
+.operation-card th {
+  text-align: left;
+  padding: 2px 8px 2px 0;
+  color: var(--vscode-descriptionForeground);
+  font-weight: normal;
+}
+
+.operation-card td {
+  padding: 2px 8px 2px 0;
+}
+
+.operation-card .precondition {
+  margin: 2px 0;
+  padding: 3px 8px;
+  background: var(--vscode-textBlockQuote-background);
+  border-left: 3px solid var(--vscode-textBlockQuote-border);
+  border-radius: 2px;
+  font-size: 0.9em;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.operation-card .effects-list {
+  list-style: none;
+  padding: 0;
+  margin: 2px 0;
+}
+
+.operation-card .effects-list li {
+  padding: 1px 0;
+  font-size: 0.9em;
+}
+
+.operation-card .effects-list li::before {
+  content: "-> ";
+  color: var(--vscode-descriptionForeground);
+}
+
+.outcome-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  margin: 2px 4px 2px 0;
+  border-radius: 10px;
+  font-size: 0.85em;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+/* Entity section */
+.entity-card {
+  margin: 8px 0;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.entity-card .entity-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.entity-card svg {
+  display: block;
+  margin: 4px auto;
+}
+
+/* Flow section */
+.flow-card {
+  margin: 8px 0;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.flow-card .flow-name {
+  font-weight: 600;
+}
+
+.flow-card .flow-meta {
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+  margin: 2px 0;
+}
+
+.flow-card .step-list {
+  list-style: decimal;
+  padding-left: 20px;
+  margin: 4px 0;
+  font-size: 0.9em;
+}
+
+.flow-card .step-list li {
+  padding: 1px 0;
+}
+
+/* Findings section */
+.finding {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.finding .severity-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: 600;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.finding .severity-badge.warning {
+  background: var(--vscode-editorWarning-foreground, #cca700);
+  color: var(--vscode-editor-background, #1e1e1e);
+}
+
+.finding .severity-badge.info {
+  background: var(--vscode-editorInfo-foreground, #3794ff);
+  color: var(--vscode-editor-background, #1e1e1e);
+}
+
+.finding .finding-text {
+  font-size: 0.9em;
+}
+
+.finding .analysis-tag {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+}
+
+/* Loading state */
+.loading {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--vscode-descriptionForeground);
+}
+
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--vscode-editorWidget-border);
+  border-top-color: var(--vscode-progressBar-background, #0078d4);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error state */
+.error-message {
+  padding: 12px;
+  border: 1px solid var(--vscode-editorError-foreground, #f44747);
+  border-radius: 4px;
+  background: var(--vscode-inputValidation-errorBackground, rgba(244, 71, 71, 0.1));
+  color: var(--vscode-editorError-foreground, #f44747);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--vscode-descriptionForeground);
+}

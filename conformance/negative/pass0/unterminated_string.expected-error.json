@@ -1,0 +1,9 @@
+{
+  "pass": 0,
+  "construct_kind": null,
+  "construct_id": null,
+  "field": null,
+  "file": "unterminated_string.tenor",
+  "line": 7,
+  "message": "unterminated string literal"
+}

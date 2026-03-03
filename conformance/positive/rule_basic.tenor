@@ -1,0 +1,53 @@
+// Positive test: Rule declarations covering stratum 0 and stratum 1,
+// scalar comparison, verdict_present, logical connectives, and bounded quantification
+// Expected: elaborates without error, produces rule_basic.expected.json
+
+fact is_active {
+  type:   Bool
+  source: "account_service.active"
+}
+
+fact balance {
+  type:   Money(currency: "USD")
+  source: "account_service.balance"
+}
+
+fact credit_limit {
+  type:   Money(currency: "USD")
+  source: "account_service.credit_limit"
+}
+
+fact line_items {
+  type:   List(element_type: Record(fields: { amount: Money(currency: "USD"), approved: Bool }), max: 50)
+  source: "order_service.line_items"
+}
+
+// Stratum 0 — base fact verdicts
+
+rule account_active {
+  stratum: 0
+  when:    is_active = true
+  produce: verdict account_active { payload: Bool = true }
+}
+
+rule within_credit_limit {
+  stratum: 0
+  when:    balance <= credit_limit
+  produce: verdict within_credit_limit { payload: Bool = true }
+}
+
+rule all_items_approved {
+  stratum: 0
+  when:    ∀ item ∈ line_items . item.approved = true
+  produce: verdict all_items_approved { payload: Bool = true }
+}
+
+// Stratum 1 — composite verdict
+
+rule can_process_order {
+  stratum: 1
+  when:    verdict_present(account_active)
+         ∧ verdict_present(within_credit_limit)
+         ∧ verdict_present(all_items_approved)
+  produce: verdict order_processable { payload: Bool = true }
+}

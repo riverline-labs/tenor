@@ -1,0 +1,9 @@
+{
+  "pass": 1,
+  "construct_kind": null,
+  "construct_id": null,
+  "field": "import",
+  "file": "missing_import.tenor",
+  "line": 4,
+  "message": "import resolution failed: cannot resolve path 'nonexistent_module.tenor'"
+}

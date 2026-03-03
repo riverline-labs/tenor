@@ -1,0 +1,9 @@
+source dup_source {
+  protocol: http
+  base_url: "https://api1.com"
+}
+
+source dup_source {
+  protocol: database
+  dialect: postgres
+}

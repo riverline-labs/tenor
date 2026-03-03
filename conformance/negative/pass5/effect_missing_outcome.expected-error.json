@@ -1,0 +1,9 @@
+{
+  "construct_id": "multi_op",
+  "construct_kind": "Operation",
+  "field": "effects",
+  "file": "effect_missing_outcome.tenor",
+  "line": 23,
+  "message": "effect (E, a, c) is missing an outcome label; multi-outcome operations require every effect to specify which outcome it belongs to",
+  "pass": 5
+}

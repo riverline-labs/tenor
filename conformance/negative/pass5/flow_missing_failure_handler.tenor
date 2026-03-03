@@ -1,0 +1,44 @@
+// Negative test — Pass 5
+// An OperationStep does not declare an on_failure handler.
+// §12.2 Pass 5 Flow: "all OperationSteps and SubFlowSteps declare FailureHandlers"
+// §10.3: "Every OperationStep and SubFlowStep must declare a FailureHandler."
+
+entity Order {
+  states:  [draft, submitted]
+  initial: draft
+  transitions: [(draft, submitted)]
+}
+
+fact flag {
+  type:   Bool
+  source: "x.flag"
+}
+
+rule flag_true {
+  stratum: 0
+  when:    flag = true
+  produce: verdict flag_true { payload: Bool = true }
+}
+
+operation submit {
+  allowed_personas: [user]
+  precondition:     verdict_present(flag_true)
+  effects:          [(Order, draft, submitted)]
+  error_contract:   [precondition_failed, persona_rejected]
+}
+
+flow no_handler_flow {
+  snapshot: at_initiation
+  entry:    step_one
+
+  steps: {
+    step_one: OperationStep {
+      op:      submit
+      persona: user
+      outcomes: {
+        success: Terminal(success)
+      }
+      // on_failure is omitted — this is the error
+    }
+  }
+}

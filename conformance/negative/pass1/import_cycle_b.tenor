@@ -1,0 +1,9 @@
+// Negative test — Pass 1 (multi-file, secondary file)
+// Part of the import_cycle test. See import_cycle_a.tenor.
+
+import "import_cycle_a.tenor"
+
+fact bar {
+  type:   Bool
+  source: "b.bar"
+}

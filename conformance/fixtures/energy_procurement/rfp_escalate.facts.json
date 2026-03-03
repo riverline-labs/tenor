@@ -1,0 +1,67 @@
+{
+  "rfp_amount": {"amount": "750000.00", "currency": "USD"},
+  "bid_total": {"amount": "720000.00", "currency": "USD"},
+  "rfp_deadline": "2026-09-30",
+  "current_date": "2026-03-15",
+  "procurement_stage": "draft",
+  "supplier_bids": [
+    {
+      "supplier_id": "MEGAWATT-SOLUTIONS",
+      "bid_amount": {"amount": "720000.00", "currency": "USD"},
+      "scores": {
+        "technical_score": 91,
+        "price_score": 88,
+        "reliability_score": 95,
+        "total_score": 274
+      },
+      "cost_detail": {
+        "commodity_cost": {"amount": "600000.00", "currency": "USD"},
+        "delivery_cost": {"amount": "80000.00", "currency": "USD"},
+        "risk_premium": {"amount": "40000.00", "currency": "USD"}
+      },
+      "compliant": true
+    },
+    {
+      "supplier_id": "POWERGEN-INTL",
+      "bid_amount": {"amount": "780000.00", "currency": "USD"},
+      "scores": {
+        "technical_score": 85,
+        "price_score": 82,
+        "reliability_score": 88,
+        "total_score": 255
+      },
+      "cost_detail": {
+        "commodity_cost": {"amount": "650000.00", "currency": "USD"},
+        "delivery_cost": {"amount": "90000.00", "currency": "USD"},
+        "risk_premium": {"amount": "40000.00", "currency": "USD"}
+      },
+      "compliant": true
+    },
+    {
+      "supplier_id": "GRIDLINK-ENERGY",
+      "bid_amount": {"amount": "810000.00", "currency": "USD"},
+      "scores": {
+        "technical_score": 78,
+        "price_score": 75,
+        "reliability_score": 82,
+        "total_score": 235
+      },
+      "cost_detail": {
+        "commodity_cost": {"amount": "680000.00", "currency": "USD"},
+        "delivery_cost": {"amount": "85000.00", "currency": "USD"},
+        "risk_premium": {"amount": "45000.00", "currency": "USD"}
+      },
+      "compliant": true
+    }
+  ],
+  "winning_bid": {
+    "technical_score": 91,
+    "price_score": 88,
+    "reliability_score": 95,
+    "total_score": 274
+  },
+  "budget_approved": true,
+  "compliance_checked": true,
+  "minimum_score_threshold": 180,
+  "bid_count": 3
+}

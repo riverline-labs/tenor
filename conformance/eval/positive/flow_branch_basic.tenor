@@ -1,0 +1,26 @@
+// Evaluator test: flow with branch step based on verdict
+
+fact is_premium {
+  type:   Bool
+  source: "account.premium"
+}
+
+rule check_premium {
+  stratum: 0
+  when:    is_premium = true
+  produce: verdict premium_account { payload: Bool = true }
+}
+
+flow check_flow {
+  snapshot: at_initiation
+  entry:    step_check
+
+  steps: {
+    step_check: BranchStep {
+      condition: verdict_present(premium_account)
+      persona:   system
+      if_true:   Terminal(premium_path)
+      if_false:  Terminal(standard_path)
+    }
+  }
+}

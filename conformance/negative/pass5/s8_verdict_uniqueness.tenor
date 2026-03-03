@@ -1,0 +1,18 @@
+// S8 violation: two rules produce the same VerdictType
+
+fact amount {
+  type:   Int(min: 0, max: 1000)
+  source: "payment_service.amount"
+}
+
+rule low_amount {
+  stratum: 0
+  when:    amount < 500
+  produce: verdict threshold_result { payload: Bool = true }
+}
+
+rule high_amount {
+  stratum: 0
+  when:    amount >= 500
+  produce: verdict threshold_result { payload: Bool = false }
+}

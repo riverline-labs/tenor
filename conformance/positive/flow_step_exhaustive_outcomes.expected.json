@@ -1,0 +1,160 @@
+{
+  "constructs": [
+    {
+      "id": "adjudicator",
+      "kind": "Persona",
+      "provenance": {
+        "file": "flow_step_exhaustive_outcomes.tenor",
+        "line": 5
+      },
+      "tenor": "1.0"
+    },
+    {
+      "id": "claim_eligible",
+      "kind": "Fact",
+      "provenance": {
+        "file": "flow_step_exhaustive_outcomes.tenor",
+        "line": 13
+      },
+      "source": {
+        "field": "eligible",
+        "system": "claims"
+      },
+      "tenor": "1.0",
+      "type": {
+        "base": "Bool"
+      }
+    },
+    {
+      "id": "Claim",
+      "initial": "review",
+      "kind": "Entity",
+      "provenance": {
+        "file": "flow_step_exhaustive_outcomes.tenor",
+        "line": 7
+      },
+      "states": [
+        "review",
+        "approved",
+        "rejected"
+      ],
+      "tenor": "1.0",
+      "transitions": [
+        {
+          "from": "review",
+          "to": "approved"
+        },
+        {
+          "from": "review",
+          "to": "rejected"
+        }
+      ]
+    },
+    {
+      "body": {
+        "produce": {
+          "payload": {
+            "type": {
+              "base": "Bool"
+            },
+            "value": true
+          },
+          "verdict_type": "eligible_v"
+        },
+        "when": {
+          "left": {
+            "fact_ref": "claim_eligible"
+          },
+          "op": "=",
+          "right": {
+            "literal": true,
+            "type": {
+              "base": "Bool"
+            }
+          }
+        }
+      },
+      "id": "check_eligible",
+      "kind": "Rule",
+      "provenance": {
+        "file": "flow_step_exhaustive_outcomes.tenor",
+        "line": 18
+      },
+      "stratum": 0,
+      "tenor": "1.0"
+    },
+    {
+      "allowed_personas": [
+        "adjudicator"
+      ],
+      "effects": [
+        {
+          "entity_id": "Claim",
+          "from": "review",
+          "outcome": "approved",
+          "to": "approved"
+        },
+        {
+          "entity_id": "Claim",
+          "from": "review",
+          "outcome": "rejected",
+          "to": "rejected"
+        }
+      ],
+      "error_contract": [
+        "precondition_failed"
+      ],
+      "id": "decide_claim",
+      "kind": "Operation",
+      "outcomes": [
+        "approved",
+        "rejected"
+      ],
+      "precondition": {
+        "verdict_present": "eligible_v"
+      },
+      "provenance": {
+        "file": "flow_step_exhaustive_outcomes.tenor",
+        "line": 24
+      },
+      "tenor": "1.0"
+    },
+    {
+      "entry": "step_decide",
+      "id": "claim_decision",
+      "kind": "Flow",
+      "provenance": {
+        "file": "flow_step_exhaustive_outcomes.tenor",
+        "line": 32
+      },
+      "snapshot": "at_initiation",
+      "steps": [
+        {
+          "id": "step_decide",
+          "kind": "OperationStep",
+          "on_failure": {
+            "kind": "Terminate",
+            "outcome": "error"
+          },
+          "op": "decide_claim",
+          "outcomes": {
+            "approved": {
+              "kind": "Terminal",
+              "outcome": "success"
+            },
+            "rejected": {
+              "kind": "Terminal",
+              "outcome": "failure"
+            }
+          },
+          "persona": "adjudicator"
+        }
+      ],
+      "tenor": "1.0"
+    }
+  ],
+  "id": "flow_step_exhaustive_outcomes",
+  "kind": "Bundle",
+  "tenor": "1.0",
+  "tenor_version": "1.0.0"
+}

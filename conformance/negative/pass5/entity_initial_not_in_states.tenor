@@ -1,0 +1,9 @@
+// Negative test — Pass 5
+// Entity initial state is not a member of the declared states set.
+// §12.2 Pass 5 Entity: "initial ∈ states"
+
+entity Order {
+  states:  [submitted, approved, rejected]
+  initial: draft
+  transitions: [(submitted, approved), (submitted, rejected)]
+}

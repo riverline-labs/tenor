@@ -1,0 +1,8 @@
+// Positive test: Fact with Text type and string default value
+// Exercises text default serialization in fact defaults.
+
+fact greeting {
+  type:    Text(max_length: 200)
+  source:  "config_service.greeting"
+  default: "hello"
+}

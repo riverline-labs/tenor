@@ -1,0 +1,5 @@
+// Negative test: Duplicate persona id
+// Expected: pass 2 error for duplicate Persona id
+
+persona admin
+persona admin

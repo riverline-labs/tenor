@@ -1,0 +1,28 @@
+// Positive test: basic Entity declarations
+// Covers: states, initial state, transitions, and a parent-child hierarchy
+// Expected: elaborates without error, produces entity_basic.expected.json
+
+entity Order {
+  states:  [draft, submitted, approved, rejected, fulfilled, cancelled]
+  initial: draft
+  transitions: [
+    (draft, submitted),
+    (draft, cancelled),
+    (submitted, approved),
+    (submitted, rejected),
+    (approved, fulfilled),
+    (approved, cancelled)
+  ]
+}
+
+entity OrderLineItem {
+  parent:  Order
+  states:  [pending, confirmed, shipped, returned]
+  initial: pending
+  transitions: [
+    (pending, confirmed),
+    (pending, returned),
+    (confirmed, shipped),
+    (shipped, returned)
+  ]
+}

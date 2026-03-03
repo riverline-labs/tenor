@@ -1,0 +1,240 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Tenor",
+  "scopeName": "source.tenor",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#import" },
+    { "include": "#construct-declaration" },
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#booleans" },
+    { "include": "#built-in-types" },
+    { "include": "#operators" },
+    { "include": "#field-labels" },
+    { "include": "#step-types" },
+    { "include": "#built-in-functions" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.tenor",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.tenor",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.comment.begin.tenor" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.comment.end.tenor" }
+          }
+        }
+      ]
+    },
+    "import": {
+      "patterns": [
+        {
+          "match": "\\b(import)\\s+(\"[^\"]*\")",
+          "captures": {
+            "1": { "name": "keyword.control.import.tenor" },
+            "2": { "name": "string.quoted.double.tenor" }
+          }
+        }
+      ]
+    },
+    "construct-declaration": {
+      "patterns": [
+        {
+          "comment": "Construct keyword followed by name and opening brace",
+          "match": "\\b(fact|entity|rule|operation|flow|system|type)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\{)",
+          "captures": {
+            "1": { "name": "keyword.declaration.tenor" },
+            "2": { "name": "entity.name.type.tenor" }
+          }
+        },
+        {
+          "comment": "Persona declaration (no braces, just: persona name)",
+          "match": "\\b(persona)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "keyword.declaration.tenor" },
+            "2": { "name": "entity.name.type.tenor" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "comment": "Control and structural keywords",
+          "name": "keyword.control.tenor",
+          "match": "\\b(when|then|where|precondition|postcondition|on_success|on_failure|entry_point|import|entry|snapshot|produce|verdict)\\b"
+        },
+        {
+          "comment": "Construct keywords used as standalone (not before a name)",
+          "name": "keyword.declaration.tenor",
+          "match": "\\b(fact|entity|rule|operation|flow|system|type|persona)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "comment": "ASCII logical keyword operators",
+          "name": "keyword.operator.logical.tenor",
+          "match": "\\b(and|or|not|forall|exists)\\b"
+        },
+        {
+          "comment": "Unicode logical operators",
+          "name": "keyword.operator.logical.tenor",
+          "match": "[\u2200\u2203\u2208\u2227\u2228\u00ac]"
+        },
+        {
+          "comment": "Transition arrow (ASCII)",
+          "name": "keyword.operator.arrow.tenor",
+          "match": "->"
+        },
+        {
+          "comment": "Transition arrow (Unicode)",
+          "name": "keyword.operator.arrow.tenor",
+          "match": "\u2192"
+        },
+        {
+          "comment": "Comparison operators",
+          "name": "keyword.operator.comparison.tenor",
+          "match": "!=|<=|>=|<|>|="
+        },
+        {
+          "comment": "Arithmetic operators",
+          "name": "keyword.operator.arithmetic.tenor",
+          "match": "\\*"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.tenor",
+          "begin": "\"",
+          "end": "\"",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.string.begin.tenor" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.tenor" }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.tenor",
+              "match": "\\\\[\"\\\\nt]"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "comment": "Money literal: currency code followed by amount",
+          "match": "\\b([A-Z]{3})\\s+(-?\\d+(?:\\.\\d+)?)\\b",
+          "captures": {
+            "1": { "name": "support.type.currency.tenor" },
+            "2": { "name": "constant.numeric.money.tenor" }
+          }
+        },
+        {
+          "comment": "Decimal literal",
+          "name": "constant.numeric.decimal.tenor",
+          "match": "-?\\b\\d+\\.\\d+\\b"
+        },
+        {
+          "comment": "Integer literal",
+          "name": "constant.numeric.integer.tenor",
+          "match": "-?\\b\\d+\\b"
+        }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.tenor",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "built-in-types": {
+      "patterns": [
+        {
+          "name": "support.type.tenor",
+          "match": "\\b(Int|Decimal|Money|Bool|String|Text|Date|DateTime|Duration|Enum|Record|List|TaggedUnion)\\b"
+        }
+      ]
+    },
+    "field-labels": {
+      "patterns": [
+        {
+          "comment": "Field label: word followed by colon at line start or after whitespace",
+          "match": "^\\s+([a-z_][a-z0-9_]*)\\s*:",
+          "captures": {
+            "1": { "name": "variable.other.property.tenor" }
+          }
+        }
+      ]
+    },
+    "step-types": {
+      "patterns": [
+        {
+          "comment": "Flow step types and terminal markers",
+          "name": "support.class.step-type.tenor",
+          "match": "\\b(OperationStep|BranchStep|HandoffStep|Terminal|Terminate|Compensate)\\b"
+        }
+      ]
+    },
+    "built-in-functions": {
+      "patterns": [
+        {
+          "comment": "Built-in predicate functions",
+          "match": "\\b(verdict_present|at_initiation|each_step)\\b",
+          "name": "support.function.tenor"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.block.begin.tenor",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.definition.block.end.tenor",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.separator.tenor",
+          "match": ","
+        },
+        {
+          "name": "punctuation.definition.bracket.begin.tenor",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.definition.bracket.end.tenor",
+          "match": "\\]"
+        },
+        {
+          "name": "punctuation.definition.paren.begin.tenor",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.definition.paren.end.tenor",
+          "match": "\\)"
+        }
+      ]
+    }
+  }
+}

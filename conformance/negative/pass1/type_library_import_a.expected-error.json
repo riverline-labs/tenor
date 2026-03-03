@@ -1,0 +1,9 @@
+{
+  "construct_id": null,
+  "construct_kind": null,
+  "field": "import",
+  "file": "type_library_import_b.tenor",
+  "line": 3,
+  "message": "type library files may not contain import declarations; a file containing only TypeDecl constructs is a type library and must be self-contained",
+  "pass": 1
+}

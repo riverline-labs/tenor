@@ -1,0 +1,21 @@
+// Evaluator test: Money cross-comparison (spec Section 12)
+//
+// Tests that the evaluator correctly compares two Money(currency: "USD")
+// values using the <= operator. Money comparison uses comparison_type
+// to direct the evaluator to extract and compare Decimal amounts.
+
+fact payment_amount {
+  type:   Money(currency: "USD")
+  source: "payment.amount"
+}
+
+fact payment_limit {
+  type:   Money(currency: "USD")
+  source: "payment.limit"
+}
+
+rule within_payment_limit {
+  stratum: 0
+  when:    payment_amount <= payment_limit
+  produce: verdict payment_within_limit { payload: Bool = true }
+}

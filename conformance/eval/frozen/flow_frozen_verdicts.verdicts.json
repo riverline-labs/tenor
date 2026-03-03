@@ -1,0 +1,32 @@
+{
+  "verdicts": [
+    {
+      "payload": {
+        "kind": "bool_value",
+        "value": true
+      },
+      "provenance": {
+        "facts_used": [
+          "is_eligible"
+        ],
+        "rule": "check_eligibility",
+        "stratum": 0,
+        "verdicts_used": []
+      },
+      "type": "order_eligible"
+    }
+  ],
+  "flow_outcome": "frozen_verdict_confirmed",
+  "steps_executed": [
+    {
+      "step_id": "step_reject",
+      "step_type": "operation",
+      "result": "success"
+    },
+    {
+      "step_id": "step_check",
+      "step_type": "branch",
+      "result": "true"
+    }
+  ]
+}
